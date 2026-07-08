@@ -1,10 +1,10 @@
 const express = require('express');
-const auth = require('../../middlewares/auth');
-const validate = require('../../middlewares/validate');
-const treatmentPackageValidation = require('../../validations/exercise/treatmentPackage.validation');
-const treatmentPackageController = require('../../controllers/exercise/treatmentPackage.controller');
-const injectData = require('../../middlewares/injectData');
-const allRights = require('../../config/rights');
+const auth = require('../../../middlewares/auth');
+const validate = require('../../../middlewares/validate');
+const treatmentPackageValidation = require('../../../validations/exercise/treatmentPackage.validation');
+const treatmentPackageController = require('../../../controllers/exercise/treatmentPackage.controller');
+const injectData = require('../../../middlewares/injectData');
+const allRights = require('../../../config/rights');
 
 const router = express.Router();
 
