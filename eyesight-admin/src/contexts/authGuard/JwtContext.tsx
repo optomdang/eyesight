@@ -1,7 +1,8 @@
 import React, { createContext, useEffect, useReducer } from 'react';
+import axios from 'axios';
 import { User, ApiResponse } from 'src/types/core';
 import { isValidToken, setSession } from 'src/utils/Jwt';
-import { getData, postData } from 'src/utils/request';
+import { axiosClient, getData, postData } from 'src/utils/request';
 import { deleteFCMToken } from 'src/utils/firebase';
 import useSnackbar from '../UseSnackbar';
 
@@ -135,8 +136,9 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
   // Hàm đăng nhập sử dụng Axios
   const login = async (email: string, password: string) => {
     try {
-      const data = await postData<ApiResponse<User>>('auth/login', { email, password });
-      const { tokens, user } = data;
+      // Public endpoint — must not go through requestWithAuth (401 would trigger refresh → "Authentication failed")
+      const response = await axiosClient.post('auth/login', { email, password });
+      const { tokens, user } = response.data;
 
       setSession(tokens);
       localStorage.setItem('user', JSON.stringify(user));
@@ -148,6 +150,13 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
       });
     } catch (err) {
       console.error('Login failed:', err);
+      if (axios.isAxiosError(err)) {
+        const message =
+          (err.response?.data as { message?: string })?.message ||
+          err.message ||
+          'Đăng nhập thất bại';
+        throw new Error(message);
+      }
       throw err;
     }
   };
