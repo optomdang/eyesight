@@ -86,6 +86,18 @@ describe('normalizeExerciseConfigPayload', () => {
     expect(result.levelOverride).toBe(true);
     expect(result.visionLevel).toBe(10);
   });
+
+  it('omits null vtSettings (2048 / non-VT configs)', () => {
+    const result = normalizeExerciseConfigPayload({
+      name: '2048 Max',
+      exerciseId: 1,
+      configType: 'admin',
+      eye: 'both',
+      vtSettings: null,
+    });
+
+    expect(result).not.toHaveProperty('vtSettings');
+  });
 });
 
 describe('translateErrorMessage', () => {

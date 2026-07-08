@@ -100,7 +100,8 @@ export const exerciseConfigSchema = Yup.object({
         .max(168, 'Khoảng cách nhắc tối đa 168 giờ'),
     })
     .optional(),
-  vtSettings: Yup.object().optional(),
+  // 2048 / non-VT configs store null in DB — treat as optional empty
+  vtSettings: Yup.object().nullable().optional(),
 });
 
 export const exerciseAssignmentSchema = Yup.object({

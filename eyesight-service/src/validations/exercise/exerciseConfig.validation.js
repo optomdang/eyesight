@@ -109,6 +109,7 @@ const vtSettingsSchema = Joi.object()
       })
       .optional(),
   })
+  .allow(null)
   .optional();
 
 const createExerciseConfig = {

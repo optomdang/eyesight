@@ -25,7 +25,10 @@ interface FarAcuityTestStepProps {
   charType: ExamCharType;
   fontSizeMm: number;
   screenInfo: ScreenInfo;
-  contrastOpacity: number;
+  /** Optotype fill color (already contrast-blended when needed) */
+  textColor?: string;
+  /** Display area background from exercise colorScheme */
+  backgroundColor?: string;
   snellenLabel: string;
   logCsLabel: string;
   eyeLabel: string;
@@ -50,7 +53,8 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
   charType,
   fontSizeMm,
   screenInfo,
-  contrastOpacity,
+  textColor = '#000000',
+  backgroundColor = '#FFFFFF',
   snellenLabel,
   logCsLabel,
   eyeLabel,
@@ -153,7 +157,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'background.paper',
+          bgcolor: backgroundColor,
           overflowX: 'hidden',
           overflowY: 'auto',
           position: 'relative',
@@ -215,7 +219,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                   display={item.display}
                   sizeMm={fontSizeMm}
                   screenInfo={screenInfo}
-                  opacity={contrastOpacity}
+                  textColor={textColor}
                   spacing={0}
                 />
               ))}

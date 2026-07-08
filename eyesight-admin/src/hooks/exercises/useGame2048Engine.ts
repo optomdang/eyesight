@@ -12,7 +12,11 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { loadGame2048Scripts, getGame2048HTML } from 'src/utils/game2048Utils';
+import {
+  loadGame2048Scripts,
+  getGame2048HTML,
+  buildGame2048TileColorCss,
+} from 'src/utils/game2048Utils';
 import { get2048EffectiveScale } from 'src/utils/visionUtils';
 import { VisualSettings, GameManager } from 'src/types/core';
 
@@ -165,38 +169,18 @@ export function useGame2048Engine(options: UseGame2048EngineOptions = {}): UseGa
 
       // Build CSS using individual property assignments to avoid template literal issues
       const hideDisplay = hideUnnecessaryUI ? 'none' : 'block';
-      const contrastValue = `${contrast}%`;
 
       let css = `.heading, .above-game { display: ${hideDisplay} !important; }`;
       css += ` .game-container { transform: scale(${effectiveScale}) !important; transform-origin: center center !important; }`;
       css += ` .game-container .tile, .game-container .tile .tile-inner { font-size: 55px !important; }`;
 
-      // Apply contrast using container filter. Avoid per-tile opacity because
-      // translucent tiles make merge/new layers appear as overlapping numbers.
-      css += ` .game-container { filter: contrast(${contrastValue}) !important; }`;
-
-      // Apply color scheme if provided
-      if (
-        colorScheme &&
-        typeof colorScheme === 'object' &&
-        colorScheme.preset
-      ) {
-        const tileSelectors = [
-          '.game-container .tile.tile-2 .tile-inner',
-          '.game-container .tile.tile-4 .tile-inner',
-          '.game-container .tile.tile-8 .tile-inner',
-          '.game-container .tile.tile-16 .tile-inner',
-          '.game-container .tile.tile-32 .tile-inner',
-          '.game-container .tile.tile-64 .tile-inner',
-          '.game-container .tile.tile-128 .tile-inner',
-          '.game-container .tile.tile-256 .tile-inner',
-          '.game-container .tile.tile-512 .tile-inner',
-          '.game-container .tile.tile-1024 .tile-inner',
-          '.game-container .tile.tile-2048 .tile-inner',
-          '.game-container .tile.tile-super .tile-inner',
-        ].join(',');
-        css += ` ${tileSelectors} { background: ${colorScheme.backgroundColor} !important; color: ${colorScheme.textColor} !important; }`;
-      }
+      // Clinical contrast: blend digit color toward tile background (opaque).
+      // Do NOT use filter:contrast() — that greys the whole board like a fog layer.
+      const numericContrast =
+        typeof contrast === 'number'
+          ? contrast
+          : Number.parseFloat(String(contrast).replace('%', '')) || 100;
+      css += buildGame2048TileColorCss(numericContrast, colorScheme ?? null);
 
       styleTag.textContent = css;
       document.head.appendChild(styleTag);

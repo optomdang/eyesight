@@ -3,19 +3,31 @@
  */
 
 import type { Assignment } from 'src/types';
+import type { ColorScheme } from 'src/types/core/visual-settings';
 
 export interface FarAcuitySandboxParams {
-  /** Simulated patient vision level (1-based); applied via levelOverride. */
+  /**
+   * Simulated starting level (1-based).
+   * - far / near → acuity (letter size)
+   * - contrast → contrast logCS step (FarAcuityExercise reads this as initialContrastLevel)
+   */
   visionLevel?: number;
-  /** far | near — controls acuity table and letter sizing. */
+  /** far | near | contrast — controls acuity table / contrast ladder. */
   visionType?: 'far' | 'near' | 'contrast';
+  /** Explicit letter-size acuity when visionType is contrast (defaults to level 10 / 20/50). */
+  farAcuityLevel?: number;
   distance?: number;
   eye?: 'left' | 'right' | 'both';
   duration?: number;
   exerciseName?: string;
+  /** Applied to optotype text + background in the sandbox exercise. */
+  colorScheme?: ColorScheme | null;
 }
 
 export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams = {}): Assignment {
+  const visionType = params.visionType ?? 'far';
+  const isContrast = visionType === 'contrast';
+
   return {
     id: 0,
     patientId: 0,
@@ -23,7 +35,9 @@ export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams =
     status: 'active',
     sessionsCompleted: 0,
     levelOverride: true,
-    visionLevel: params.visionLevel ?? 10,
+    // Contrast: assignment.visionLevel = contrast step; far letter size via lastAchievedVisionLevel stash
+    visionLevel: params.visionLevel ?? (isContrast ? 1 : 10),
+    lastAchievedVisionLevel: isContrast ? (params.farAcuityLevel ?? 10) : undefined,
     createdAt: '',
     updatedAt: '',
     exercise: {
@@ -40,10 +54,11 @@ export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams =
       eye: params.eye ?? 'both',
       distance: params.distance ?? 3,
       duration: params.duration ?? 30,
-      visionType: params.visionType ?? 'far',
+      visionType,
       fontSize: 55,
       contrast: 100,
       inactivityThreshold: 30,
+      ...(params.colorScheme ? { colorScheme: params.colorScheme } : {}),
     } as Assignment['exerciseConfig'],
   };
 }

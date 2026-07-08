@@ -3,11 +3,15 @@
  *
  * Axes:
  *   farLevel    1–20  (index into farVisionLevels; higher = smaller letters)
- *   contrastLevel 1–12  (index into contrastVisionLevels; higher = lower contrast; max logCS 1.65)
+ *   contrastLevel 1–16 (index into contrastVisionLevels; higher = lower contrast)
+ *
+ * Adaptive progression ceiling for contrast is logCS 1.65 (level 12): harder than
+ * that is only for doctor-designated starts / preview. Lower contrast beyond that
+ * is rarely usable for adaptive training.
  *
  * Round rules (accuracy = correct / 5, pass = accuracy > 0.5):
  *   Pass, contrastLevel < 12  → contrastLevel += 1; new letters
- *   Pass, contrastLevel === 12, farLevel < 20  → farLevel += 1, contrastLevel = 1, new letters
+ *   Pass, contrastLevel ≥ 12, farLevel < 20  → farLevel += 1, contrastLevel = 1, new letters
  *   Pass at maximum difficulty → stay
  *   Fail, contrastLevel > 1   → contrastLevel -= 1; new letters
  *   Fail, contrastLevel === 1, farLevel > 1  → farLevel -= 1, new letters
@@ -23,11 +27,13 @@ export const FAR_ACUITY_CHAR_COUNT = 5;
 export const FAR_LEVEL_MIN = 1;
 export const FAR_LEVEL_MAX = farVisionLevels.length;
 export const CONTRAST_LEVEL_MIN = 1;
-/** Hardest contrast step for far-acuity exercise (logCS 1.65); lower contrast is not usable. */
+/** Absolute max contrast step (full clinical ladder including designated starts like logCS 1.80). */
+export const CONTRAST_LEVEL_ABSOLUTE_MAX = contrastVisionLevels.length;
+/** Adaptive training ceiling (logCS 1.65); pass at/above this advances letter size. */
 export const FAR_ACUITY_MAX_LOG_CS = 1.65;
 export const CONTRAST_LEVEL_MAX =
   contrastVisionLevels.find((l) => parseFloat(l.score) === FAR_ACUITY_MAX_LOG_CS)?.level ??
-  contrastVisionLevels.length;
+  CONTRAST_LEVEL_ABSOLUTE_MAX;
 
 export type FarAcuityCharType = 'E' | 'C' | 'A' | 'N' | 'S';
 
@@ -115,7 +121,10 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
     if (options.initialState) return options.initialState;
     const acuityLevelMax = getAcuityLevelMax(options.visionType ?? 'far');
     const farLevel = Math.max(FAR_LEVEL_MIN, Math.min(acuityLevelMax, options.initialFarLevel ?? 1));
-    const contrastLevel = Math.max(CONTRAST_LEVEL_MIN, Math.min(CONTRAST_LEVEL_MAX, options.initialContrastLevel ?? 1));
+    const contrastLevel = Math.max(
+      CONTRAST_LEVEL_MIN,
+      Math.min(CONTRAST_LEVEL_ABSOLUTE_MAX, options.initialContrastLevel ?? 1)
+    );
     return {
       farLevel,
       contrastLevel,
@@ -229,7 +238,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
         );
         const contrastLevel = Math.max(
           CONTRAST_LEVEL_MIN,
-          Math.min(CONTRAST_LEVEL_MAX, opts?.contrastLevel ?? CONTRAST_LEVEL_MIN)
+          Math.min(CONTRAST_LEVEL_ABSOLUTE_MAX, opts?.contrastLevel ?? CONTRAST_LEVEL_MIN)
         );
         return {
           farLevel,

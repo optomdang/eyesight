@@ -276,6 +276,12 @@ const updateExerciseConfigById = async (configId, updateBody) => {
     updateBody.levelOverride = false;
   }
 
+  // Non-VT configs (e.g. 2048) may submit/store null vtSettings — skip assigning null
+  // so Sequelize does not try to write an unexpected NOT NULL constraint on some DBs.
+  if (Object.prototype.hasOwnProperty.call(updateBody, 'vtSettings') && updateBody.vtSettings == null) {
+    delete updateBody.vtSettings;
+  }
+
   Object.assign(config, updateBody);
   await config.save();
 

@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const {
   standardId,
+  optionalId,
   standardString,
   standardQueryParams,
   standardTenantFields,
@@ -47,9 +48,10 @@ const updateExercise = {
   }),
   body: Joi.object()
     .keys({
-      id: standardId,
-      name: standardString.name,
-      code: standardString.code,
+      // ID already in URL params — body id is optional if clients send it
+      id: optionalId,
+      name: standardString.name.optional(),
+      code: standardString.code.optional(),
       description: standardString.description,
       exerciseType: Joi.string().trim().optional(),
       status: Joi.string().valid('active', 'inactive').optional(),

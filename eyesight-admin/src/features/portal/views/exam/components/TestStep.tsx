@@ -7,6 +7,7 @@ import CustomTextField from 'src/components/forms/theme-elements/CustomTextField
 import { CHAR_POOL_MAP, FONT_MAP } from 'src/utils/constant.ts';
 import { getCharSpacing, clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { EXAM_CHAR_PADDING_PX } from 'src/services/exam-state';
+import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
 
 const TestStep = () => {
   const {
@@ -34,6 +35,15 @@ const TestStep = () => {
 
   const fontSizePx = clinicalMmToLayoutPx(fontSize, screenInfo);
   const spacing = getCharSpacing(fontSizePx, currentBatchItems.length);
+
+  const contrastColors =
+    testMode === 'contrast'
+      ? resolveOpaqueContrastColors({
+          contrastPercent: (Number(testContrast) || 0) * 100,
+          textColor: '#000000',
+          backgroundColor: '#FFFFFF',
+        })
+      : null;
 
   const answeredCount = getCurrentLineData(testEye as 'right' | 'left' | 'both').filter(
     (i: any) => i.answer !== undefined
@@ -95,7 +105,7 @@ const TestStep = () => {
           height: '100vh',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'background.paper',
+          bgcolor: contrastColors?.backgroundColor ?? 'background.paper',
           overflowX: 'hidden',
           overflowY: 'auto',
         }}
@@ -156,7 +166,11 @@ const TestStep = () => {
                   display={item.display}
                   size={fontSize}
                   spacing={0}
-                  style={testMode === 'contrast' ? { opacity: testContrast } : undefined}
+                  style={
+                    contrastColors
+                      ? { color: contrastColors.textColor }
+                      : undefined
+                  }
                 />
               ))}
             </Box>

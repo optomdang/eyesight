@@ -144,10 +144,12 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
           level: index + 1,
         }));
       case 'contrast':
-        return visionLevels.contrast.map((_level, index) => ({
-          value: index + 1,
-          label: getContrastLevelLabel(index + 1),
-          level: index + 1,
+        // Full clinical contrast ladder (16 levels up to logCS 2.25) — same as config form.
+        // Do NOT use getDefaultVisionLevels().contrast (legacy 10 steps ending at ~4%).
+        return contrastVisionLevels.map((item) => ({
+          value: item.level,
+          label: getContrastLevelLabel(item.level),
+          level: item.level,
         }));
       default:
         return [];
@@ -185,10 +187,9 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       contrast,
       visionType,
       ...(colorScheme &&
-        colorScheme.preset !== 'whiteBlack' &&
         colorScheme.preset !== 'original' && {
           colorScheme: {
-            preset: colorScheme.preset as 'redBlue' | 'redGreen' | 'custom',
+            preset: colorScheme.preset as ColorScheme['preset'],
             textColor: colorScheme.textColor,
             backgroundColor: colorScheme.backgroundColor,
           },
@@ -232,8 +233,18 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       eye,
       duration,
       exerciseName: exercise.name,
+      colorScheme: colorScheme ?? undefined,
     });
-  }, [isFarAcuity, exercise, selectedLevel, visionType, previewDistance, eye, duration]);
+  }, [
+    isFarAcuity,
+    exercise,
+    selectedLevel,
+    visionType,
+    previewDistance,
+    eye,
+    duration,
+    colorScheme,
+  ]);
 
   const vtSizingPreview = useMemo(() => {
     if (!vtQuestMode || !sandboxAssignment) return null;
@@ -303,8 +314,11 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       : null;
   const farAcuityPreviewVisionType: FarAcuityVisionType =
     visionType === 'near' ? 'near' : 'far';
+  // Contrast: selectedLevel is contrast step; letter-size acuity stays at mid far (20/50 ≈ 10)
+  const acuityPreviewLevel =
+    isFarAcuity && visionType === 'contrast' ? 10 : selectedLevel;
   const acuityPreview = isFarAcuity
-    ? getAcuityLevelInfo(farAcuityPreviewVisionType, selectedLevel)
+    ? getAcuityLevelInfo(farAcuityPreviewVisionType, acuityPreviewLevel)
     : null;
 
   return (
@@ -502,7 +516,9 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
             {vtQuestMode && vtSizingPreview
               ? `Cỡ chữ ~${vtSizingPreview.letterHeightPx}px · TP ${vtSizingPreview.stimulusContrastPercent}%`
               : isFarAcuity && acuityPreview
-                ? `${acuityPreview.score} · Độ tương phản thích ứng từ 100%`
+                ? visionType === 'contrast' && selectedContrastLevel
+                  ? `${acuityPreview.score} · Tương phản: ${formatContrastScore(selectedContrastLevel.score)} (${formatContrastPercent(selectedContrastLevel.contrastPercent)})`
+                  : `${acuityPreview.score} · Độ tương phản thích ứng từ 100%`
                 : `Font: ${visualSettings.fontSize}px${
                   visionType === 'contrast' && selectedContrastLevel
                     ? `, Tương phản: ${formatContrastScore(selectedContrastLevel.score)} (${formatContrastPercent(visualSettings.contrast)})`

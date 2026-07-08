@@ -3,32 +3,12 @@
  */
 
 import type { ColorScheme } from 'src/types/core/visual-settings';
+import { blendHexAtContrastPercent } from 'src/utils/clinicalContrastColor';
 
 export interface VtStimulusColorScheme {
   color1: string;
   color2: string;
   useColoredPanels: boolean;
-}
-
-function parseHex(hex: string): [number, number, number] {
-  const normalized = hex.replace('#', '').trim();
-  const full =
-    normalized.length === 3
-      ? normalized
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : normalized;
-  const n = parseInt(full, 16);
-  if (!Number.isFinite(n)) return [255, 255, 255];
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-function toHex(r: number, g: number, b: number): string {
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  return `#${[clamp(r), clamp(g), clamp(b)]
-    .map((v) => v.toString(16).padStart(2, '0'))
-    .join('')}`;
 }
 
 /** Blend foreground toward background by clinical contrast percent (0–100). */
@@ -37,10 +17,7 @@ export function colorAtContrastPercent(
   contrastPercent: number,
   backgroundHex = '#000000'
 ): string {
-  const t = Math.max(0, Math.min(100, contrastPercent)) / 100;
-  const [fr, fg, fb] = parseHex(foregroundHex);
-  const [br, bg, bb] = parseHex(backgroundHex);
-  return toHex(br + (fr - br) * t, bg + (fg - bg) * t, bb + (fb - bb) * t);
+  return blendHexAtContrastPercent(foregroundHex, contrastPercent, backgroundHex);
 }
 
 /** True when exercise config uses a non-default color scheme for games 2 & 3. */

@@ -180,6 +180,8 @@ const FIELD_LABELS_VI: Record<string, string> = {
 const EXACT_ERROR_VI: Record<string, string> = {
   'visionType cannot be null':
     'Loại thị lực là bắt buộc. Vui lòng chọn loại thị lực (xa, gần hoặc tương phản).',
+  'vtSettings cannot be null':
+    'Cấu hình VT không hợp lệ. Hãy thử lưu lại hoặc bỏ trống cài đặt VT Quest.',
   'Validation error': 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường trong form.',
 };
 

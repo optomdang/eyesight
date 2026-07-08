@@ -90,9 +90,12 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
       levelOverride: configData?.levelOverride ?? false,
       visionLevel: configData?.visionLevel ?? null,
 
-      vtSettings: (configData as { vtSettings?: unknown })?.vtSettings as
-        | import('src/types/core/vtQuest').VtSettings
-        | undefined,
+      // DB may return null for non-VT games; Yup object() rejects null unless nullable
+      vtSettings:
+        ((configData as { vtSettings?: unknown })?.vtSettings as
+          | import('src/types/core/vtQuest').VtSettings
+          | null
+          | undefined) ?? undefined,
 
       inactivityThreshold: configData?.inactivityThreshold ?? 30,
 

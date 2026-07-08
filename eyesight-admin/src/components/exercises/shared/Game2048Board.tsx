@@ -4,7 +4,7 @@ import LoadingBoundary from 'src/components/shared/LoadingBoundary';
 import { use2048Exercise } from 'src/hooks/use2048Exercise';
 import { Game2048SessionResult, GameManager, VisualSettings } from 'src/types/core';
 import { calculateVisualSettings, calculatePPI, VisionCalculationInput, ScreenInfo } from 'src/utils/visionUtils';
-import { loadGame2048Scripts } from 'src/utils/game2048Utils';
+import { loadGame2048Scripts, buildGame2048TileColorCss } from 'src/utils/game2048Utils';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
 
 interface Game2048BoardProps {
@@ -290,7 +290,7 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
   }, []);
 
   // CSS Generator helpers
-  const getBaseCss = useCallback((fontSize: number, contrastValue: number): string => {
+  const getBaseCss = useCallback((fontSize: number): string => {
     // Use CSS custom properties set by the vision-scaling effect so that the
     // computed font-size and transform scale are always in sync.
     // Fallbacks are the passed-in values so this function still works when no
@@ -302,7 +302,6 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
       }
 
       .game-container {
-        filter: contrast(${contrastValue}) !important;
         transform: scale(var(--game-scale-factor, 1)) !important;
         transform-origin: center center !important;
       }
@@ -310,30 +309,32 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
   }, []);
 
   const getColorModeCss = useCallback(
-    (colorMode: string, customColors?: { textColor: string; backgroundColor: string }): string => {
-      if (colorMode === 'custom' && customColors) {
-        return `
-        .game-container .tile,
-        .game-container .tile .tile-inner {
-          background: ${customColors.backgroundColor} !important;
-          color: ${customColors.textColor} !important;
-        }
-        .game-container .tile-2,
-        .game-container .tile-4,
-        .game-container .tile-8,
-        .game-container .tile-16,
-        .game-container .tile-32,
-        .game-container .tile-64,
-        .game-container .tile-128,
-        .game-container .tile-256,
-        .game-container .tile-512,
-        .game-container .tile-1024,
-        .game-container .tile-2048 {
-          background: ${customColors.backgroundColor} !important;
-          color: ${customColors.textColor} !important;
-        }
-      `;
-      } else if (colorMode === 'redgreen') {
+    (
+      colorMode: string,
+      customColors?: { textColor: string; backgroundColor: string; preset?: string } | null,
+      contrastPercent = 100
+    ): string => {
+      // Named clinical presets: opaque blend (no filter fog).
+      if (
+        colorMode === 'custom' ||
+        colorMode === 'whiteBlack' ||
+        colorMode === 'redBlue' ||
+        colorMode === 'redGreen'
+      ) {
+        return buildGame2048TileColorCss(contrastPercent, {
+          preset: colorMode,
+          textColor: customColors?.textColor,
+          backgroundColor: customColors?.backgroundColor,
+        });
+      }
+
+      // Reduced contrast on original/legacy palette — still opaque blend.
+      if (contrastPercent < 99.5) {
+        return buildGame2048TileColorCss(contrastPercent, customColors ?? null);
+      }
+
+      // Legacy rainbow modes (older admin previews) at full contrast only
+      if (colorMode === 'redgreen') {
         return `
         .game-container .tile-2 { background: #ffcccc !important; color: #660000 !important; }
         .game-container .tile-4 { background: #ffaaaa !important; color: #660000 !important; }
@@ -347,7 +348,8 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
         .game-container .tile-1024 { background: #44ff44 !important; color: #ffffff !important; }
         .game-container .tile-2048 { background: #ff0000 !important; color: #ffffff !important; }
       `;
-      } else if (colorMode === 'bluewhite') {
+      }
+      if (colorMode === 'bluewhite') {
         return `
         .game-container .tile-2 { background: #e6f3ff !important; color: #003366 !important; }
         .game-container .tile-4 { background: #cce7ff !important; color: #003366 !important; }
@@ -362,7 +364,7 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
         .game-container .tile-2048 { background: #003399 !important; color: #ffffff !important; }
       `;
       }
-      return ''; // Fallback for unknown color mode
+      return '';
     },
     []
   );
@@ -411,14 +413,14 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
         const styleTag = document.createElement('style');
         styleTag.id = 'game-visual-settings';
 
-        // Generate base CSS for font size and contrast
-        const baseCss = getBaseCss(fontSize, contrastValue);
+        // Generate base CSS for font size (no board-wide contrast filter)
+        const baseCss = getBaseCss(fontSize);
 
-        // Original preset: keep native tile colors from the game stylesheet
+        // Original + full contrast: keep native tile colors; otherwise opaque blend
         const colorModeCss =
-          colorPreset === 'original'
+          colorPreset === 'original' && contrastValue >= 99.5
             ? ''
-            : getColorModeCss(colorPreset, externalVisualSettings?.colorScheme);
+            : getColorModeCss(colorPreset, settings.colorScheme, contrastValue);
 
         // Combine CSS rules
         styleTag.textContent = baseCss + colorModeCss;
@@ -488,7 +490,6 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
       calculateContrast,
       getBaseCss,
       getColorModeCss,
-      externalVisualSettings?.colorScheme,
     ]
   );
 

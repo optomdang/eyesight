@@ -740,8 +740,14 @@ export const isValidVisionLevel = (visionLevel: string): boolean => {
 export const getDefaultVisionLevels = () => ({
   far: farVisionLevels.map((level) => level.score), // 20 levels: 20/400 to 20/5
   near: nearVisionLevels.map((level) => level.score), // 8 levels: N3 to N64
-  contrast: ['100%', '70%', '50%', '35%', '25%', '18%', '13%', '9%', '6%', '4%'], // 10 levels
+  // Keep in sync with contrastVisionLevels (16 clinical logCS steps)
+  contrast: contrastVisionLevels.map((level) => formatContrastPercentLabel(level.contrastPercent)),
 });
+
+function formatContrastPercentLabel(percent: number): string {
+  const rounded = Number(percent.toFixed(2));
+  return `${rounded}%`;
+}
 
 // ==================== VISION SCALING FUNCTIONS ====================
 
@@ -1602,7 +1608,7 @@ export function calculateGameScaleFactor(
     return Math.min(NEAR_MAX_SCALE, Math.max(NEAR_MIN_SCALE, Math.pow(ratio, NEAR_EXPONENT)));
   }
 
-  // Contrast: scaling stays at 1.0; only opacity/contrast changes
+  // Contrast: scaling stays at 1.0; letter–background contrast via opaque color blend
   return 1.0;
 }
 

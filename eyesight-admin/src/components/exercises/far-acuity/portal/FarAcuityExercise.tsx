@@ -62,6 +62,8 @@ import { useFarAcuityGamification } from '../gamification/useFarAcuityGamificati
 import { COPY } from 'src/components/exercises/vt/gamification/copy.vi';
 import { isStreakMilestone } from 'src/components/exercises/vt/gamification/rewards';
 import { useExerciseFullscreen } from 'src/hooks/useExerciseFullscreen';
+import { isOriginalGameColorScheme } from 'src/services/colorPreset.service';
+import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
 
 interface ExerciseExecution {
   startTime: number;
@@ -162,7 +164,24 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [currentResultId]);
 
   // ── Engine ────────────────────────────────────────────────────────────────
+  // Contrast: override level = contrast step (logCS). Far letter size uses a stable
+  // acuity level (sandbox stashes it in lastAchievedVisionLevel; live patients use exam far).
   const initialAcuityLevel = useMemo(() => {
+    if (trainingVisionType === 'contrast') {
+      if (sandboxMode && assignment?.lastAchievedVisionLevel != null) {
+        return assignment.lastAchievedVisionLevel;
+      }
+      return (
+        resolveExerciseStartVisionLevel({
+          difficultyBaselineSource: 'current_exam',
+          levelOverride: false,
+          visionType: 'far',
+          trainingEye: assignment?.trainingEye,
+          configEye: exerciseConfig?.eye,
+          examResults: patientExamResults,
+        }) ?? 10
+      );
+    }
     return (
       resolveExerciseStartVisionLevel({
         difficultyBaselineSource: exerciseConfig?.difficultyBaselineSource,
@@ -176,6 +195,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       }) ?? 1
     );
   }, [
+    sandboxMode,
     exerciseConfig?.difficultyBaselineSource,
     assignment?.levelOverride,
     assignment?.visionLevel,
@@ -186,10 +206,39 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     patientExamResults,
   ]);
 
+  const initialContrastLevel = useMemo(() => {
+    if (trainingVisionType !== 'contrast') return 1;
+    if (assignment?.levelOverride && assignment.visionLevel != null && assignment.visionLevel > 0) {
+      return assignment.visionLevel;
+    }
+    return (
+      resolveExerciseStartVisionLevel({
+        difficultyBaselineSource: exerciseConfig?.difficultyBaselineSource,
+        levelOverride: assignment?.levelOverride,
+        visionLevel: assignment?.visionLevel,
+        visionType: 'contrast',
+        trainingEye: assignment?.trainingEye,
+        configEye: exerciseConfig?.eye,
+        examResults: patientExamResults,
+        lastAchievedVisionLevel: assignment?.lastAchievedVisionLevel,
+      }) ?? 1
+    );
+  }, [
+    trainingVisionType,
+    exerciseConfig?.difficultyBaselineSource,
+    assignment?.levelOverride,
+    assignment?.visionLevel,
+    assignment?.lastAchievedVisionLevel,
+    assignment?.trainingEye,
+    exerciseConfig?.eye,
+    patientExamResults,
+  ]);
+
   const engine = useFarAcuityEngine({
     initialFarLevel: initialAcuityLevel ?? 1,
+    initialContrastLevel,
     charType,
-    visionType: trainingVisionType,
+    visionType: trainingVisionType === 'near' ? 'near' : 'far',
   });
   const { state, setAnswer, submitRound, allAnswered, serializeForPause, restoreFromSnapshot, resetSession, regenerateLetters } = engine;
 
@@ -211,12 +260,16 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
 
   const handleCharTypeConfirm = useCallback(() => {
     setSetupPhase('active');
-    resetSession({ farLevel: initialAcuityLevel ?? 1, charType });
+    resetSession({
+      farLevel: initialAcuityLevel ?? 1,
+      contrastLevel: initialContrastLevel,
+      charType,
+    });
     resetInputState();
     if (charType === 'A' || charType === 'N') {
       setInputFocusKey((k) => k + 1);
     }
-  }, [initialAcuityLevel, charType, resetSession, resetInputState]);
+  }, [initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
 
   // ── Visual sizing ─────────────────────────────────────────────────────────
   const distance = useMemo(
@@ -225,9 +278,12 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
 
   const fontSizeMm = useMemo(() => {
-    const acuityInfo = getAcuityLevelInfo(trainingVisionType, state.farLevel);
+    // Contrast training keeps letter size on the far acuity axis
+    const sizeVisionType: FarAcuityVisionType =
+      trainingVisionType === 'near' ? 'near' : 'far';
+    const acuityInfo = getAcuityLevelInfo(sizeVisionType, state.farLevel);
     try {
-      if (trainingVisionType === 'near' && 'size' in acuityInfo) {
+      if (sizeVisionType === 'near' && 'size' in acuityInfo) {
         return calculateNearFontSize(acuityInfo.size, distance);
       }
       if ('n' in acuityInfo) {
@@ -239,10 +295,22 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     }
   }, [state.farLevel, distance, trainingVisionType]);
 
-  const contrastOpacity = useMemo(() => {
-    const info = getContrastLevelInfo(state.contrastLevel);
-    return info.contrastPercent / 100;
-  }, [state.contrastLevel]);
+  const stimulusColors = useMemo(() => {
+    const scheme = exerciseConfig?.colorScheme;
+    const base =
+      !scheme || isOriginalGameColorScheme(scheme)
+        ? { textColor: '#000000', backgroundColor: '#FFFFFF' }
+        : {
+            textColor: scheme.textColor || '#000000',
+            backgroundColor: scheme.backgroundColor || '#FFFFFF',
+          };
+    const contrastInfo = getContrastLevelInfo(state.contrastLevel);
+    return resolveOpaqueContrastColors({
+      contrastPercent: contrastInfo.contrastPercent,
+      textColor: base.textColor,
+      backgroundColor: base.backgroundColor,
+    });
+  }, [exerciseConfig?.colorScheme, state.contrastLevel]);
 
   const displayStrategy = useMemo(
     () =>
@@ -623,7 +691,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     );
   }
 
-  const acuityInfo = getAcuityLevelInfo(trainingVisionType, state.farLevel);
+  const acuityInfo = getAcuityLevelInfo(
+    trainingVisionType === 'near' ? 'near' : 'far',
+    state.farLevel
+  );
   const contrastInfo = getContrastLevelInfo(state.contrastLevel);
   const eyeLabel = eye === 'left' ? 'Mắt trái' : eye === 'right' ? 'Mắt phải' : 'Hai mắt';
 
@@ -773,7 +844,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
               charType={charType}
               fontSizeMm={fontSizeMm}
               screenInfo={screenParams}
-              contrastOpacity={contrastOpacity}
+              textColor={stimulusColors.textColor}
+              backgroundColor={stimulusColors.backgroundColor}
               snellenLabel={acuityInfo.score}
               logCsLabel={contrastInfo.score}
               eyeLabel={eyeLabel}

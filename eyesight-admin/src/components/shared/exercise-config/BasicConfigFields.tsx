@@ -114,7 +114,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
   const showColorPreview = Boolean(
     !isOriginalPreset &&
       values.colorScheme &&
-      (isAdmin || isAnaglyphPreset || preset === 'custom')
+      (isAdmin || isAnaglyphPreset || preset === 'custom' || preset === 'whiteBlack')
   );
   const channel1Label = isAnaglyphPreset
     ? t('config.anaglyphRed', 'Kênh đỏ')

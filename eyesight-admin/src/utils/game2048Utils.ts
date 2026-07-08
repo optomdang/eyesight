@@ -207,9 +207,70 @@ export interface VisionScaleResult {
   contrast: number; // Contrast percentage (1-100)
 }
 
+import { blendHexAtContrastPercent } from 'src/utils/clinicalContrastColor';
+
+/** Re-export shared clinical blend for 2048 callers / tests. */
+export { blendHexAtContrastPercent };
+
+const GAME2048_TILE_INNER_SELECTORS = [
+  '.game-container .tile.tile-2 .tile-inner',
+  '.game-container .tile.tile-4 .tile-inner',
+  '.game-container .tile.tile-8 .tile-inner',
+  '.game-container .tile.tile-16 .tile-inner',
+  '.game-container .tile.tile-32 .tile-inner',
+  '.game-container .tile.tile-64 .tile-inner',
+  '.game-container .tile.tile-128 .tile-inner',
+  '.game-container .tile.tile-256 .tile-inner',
+  '.game-container .tile.tile-512 .tile-inner',
+  '.game-container .tile.tile-1024 .tile-inner',
+  '.game-container .tile.tile-2048 .tile-inner',
+  '.game-container .tile.tile-super .tile-inner',
+].join(',');
+
+export interface Game2048TileColorInput {
+  textColor?: string;
+  backgroundColor?: string;
+  preset?: string;
+}
+
+/**
+ * Opaque tile fill + digit colors for 2048 vision training.
+ * Avoids `filter: contrast()` which greys the whole board like a fog layer.
+ *
+ * @param containerPrefix - e.g. '' or '#my-root ' to scope selectors under a container id
+ */
+export function buildGame2048TileColorCss(
+  contrastPercent: number,
+  colorScheme?: Game2048TileColorInput | null,
+  containerPrefix = ''
+): string {
+  const contrast =
+    typeof contrastPercent === 'number' && Number.isFinite(contrastPercent)
+      ? Math.max(0, Math.min(100, contrastPercent))
+      : 100;
+
+  const preset = colorScheme?.preset;
+  const isOriginal = !colorScheme || preset === 'original';
+
+  // Full contrast + original palette: keep native multi-color tile stylesheet.
+  if (isOriginal && contrast >= 99.5) {
+    return '';
+  }
+
+  const backgroundColor =
+    colorScheme?.backgroundColor || (isOriginal ? '#eee4da' : '#ffffff');
+  const textColor = colorScheme?.textColor || (isOriginal ? '#776e65' : '#000000');
+  const digitColor = blendHexAtContrastPercent(textColor, contrast, backgroundColor);
+  const selectors = GAME2048_TILE_INNER_SELECTORS.split(',')
+    .map((sel) => `${containerPrefix}${sel.trim()}`)
+    .join(',');
+
+  return ` ${selectors} { background: ${backgroundColor} !important; color: ${digitColor} !important; }`;
+}
+
 /**
  * Apply vision scaling CSS to a game container
- * Uses CSS transform and filter for scaling and contrast
+ * Uses CSS transform for scale; digit contrast via opaque color blend (not filter).
  *
  * This consolidates vision scaling that was previously in:
  * - Game2048Board.tsx (inline)
@@ -249,7 +310,7 @@ export const applyVisionScalingStyles = (
   // CSS for vision scaling
   // - Hide unnecessary UI elements
   // - Scale entire game container
-  // - Apply contrast filter
+  // - Opaque digit/background blend for contrast (no board-wide filter fog)
   const css = `
     /* Vision Scaling Styles - ID: ${styleId} */
     
@@ -263,7 +324,6 @@ export const applyVisionScalingStyles = (
     #${container.id} .game-container {
       transform: scale(${scaleFactor}) !important;
       transform-origin: center center !important;
-      filter: contrast(${contrast}%) !important;
     }
     
     /* Preserve original game styling - scaling handles sizing */
@@ -271,6 +331,7 @@ export const applyVisionScalingStyles = (
     #${container.id} .game-container .tile .tile-inner {
       font-size: 55px !important;
     }
+    ${buildGame2048TileColorCss(contrast, null, `#${container.id} `)}
   `;
 
   styleTag.textContent = css;

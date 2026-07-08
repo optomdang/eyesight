@@ -79,7 +79,7 @@ export const patientAssignmentFormSchema = Yup.object({
     reminderDaysInterval: Yup.number().min(1, 'Minimum 1 day').max(30, 'Maximum 30 days'),
     maxReminders: Yup.number().min(1, 'Minimum 1 reminder').max(10, 'Maximum 10 reminders'),
   }),
-  vtSettings: Yup.object().optional(),
+  vtSettings: Yup.object().nullable().optional(),
 });
 
 export type PatientAssignmentFormData = Yup.InferType<typeof patientAssignmentFormSchema>;

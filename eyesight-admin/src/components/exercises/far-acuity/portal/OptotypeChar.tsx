@@ -16,8 +16,8 @@ interface OptotypeCharProps {
   /** Letter height in mm */
   sizeMm: number;
   screenInfo: ScreenInfo;
-  /** 0–1 opacity for contrast mode */
-  opacity?: number;
+  /** Letter color (opaque; contrast is blended into this hex) */
+  textColor?: string;
   spacing?: number;
   style?: React.CSSProperties;
 }
@@ -27,7 +27,7 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
   display,
   sizeMm,
   screenInfo,
-  opacity = 1,
+  textColor = 'black',
   spacing = 0,
   style,
 }) => {
@@ -67,12 +67,11 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily,
-        color: 'black',
+        color: textColor,
         overflow: 'visible',
         lineHeight: 1,
         textAlign: 'center',
         marginRight: spacing ? `${spacing}px` : 0,
-        opacity,
         ...style,
       }}
     >

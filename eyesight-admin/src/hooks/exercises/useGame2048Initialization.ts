@@ -5,7 +5,7 @@
  */
 
 import { useRef, useCallback, useEffect } from 'react';
-import { loadGame2048Scripts } from 'src/utils/game2048Utils';
+import { loadGame2048Scripts, buildGame2048TileColorCss } from 'src/utils/game2048Utils';
 import { VisualSettings, GameManager } from 'src/types/core';
 
 export interface UseGame2048InitializationOptions {
@@ -123,7 +123,6 @@ export const useGame2048Initialization = (
       .game-container {
         transform: scale(${scaleFactor}) !important;
         transform-origin: center center !important;
-        filter: contrast(${contrast}%) !important;
       }
       
       .game-container .tile,
@@ -132,26 +131,15 @@ export const useGame2048Initialization = (
       }
     `;
 
-    // Add color scheme CSS
-    if (colorScheme && typeof colorScheme === 'object') {
-      css += `
-        .game-container .tile.tile-2 .tile-inner,
-        .game-container .tile.tile-4 .tile-inner,
-        .game-container .tile.tile-8 .tile-inner,
-        .game-container .tile.tile-16 .tile-inner,
-        .game-container .tile.tile-32 .tile-inner,
-        .game-container .tile.tile-64 .tile-inner,
-        .game-container .tile.tile-128 .tile-inner,
-        .game-container .tile.tile-256 .tile-inner,
-        .game-container .tile.tile-512 .tile-inner,
-        .game-container .tile.tile-1024 .tile-inner,
-        .game-container .tile.tile-2048 .tile-inner,
-        .game-container .tile.tile-super .tile-inner {
-          background: ${colorScheme.backgroundColor} !important;
-          color: ${colorScheme.textColor} !important;
-        }
-      `;
-    }
+    // Opaque digit/background contrast blend (not filter:contrast fog)
+    const numericContrast =
+      typeof contrast === 'number'
+        ? contrast
+        : Number.parseFloat(String(contrast ?? 100).replace('%', '')) || 100;
+    css += buildGame2048TileColorCss(
+      numericContrast,
+      colorScheme && typeof colorScheme === 'object' ? colorScheme : null
+    );
 
     styleTag.textContent = css;
     document.head.appendChild(styleTag);

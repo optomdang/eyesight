@@ -7,7 +7,7 @@ import React, { useMemo } from 'react';
 import { Box, Typography, Grid } from '@mui/material';
 import type { ColorScheme } from 'src/types/core/visual-settings';
 import {
-  isVtColoredStimulusScheme,
+  isAnaglyphExerciseColorScheme,
   alternatingLetterColors,
 } from 'src/components/exercises/vt/core/vtStimulusColors';
 
@@ -139,15 +139,15 @@ interface ColorSchemePreviewProps {
 export const ColorSchemePreview: React.FC<ColorSchemePreviewProps> = ({ colorScheme }) => {
   if (!colorScheme) return null;
 
-  const isColored = isVtColoredStimulusScheme(colorScheme);
+  const isAnaglyph = isAnaglyphExerciseColorScheme(colorScheme);
   const textHex = (colorScheme.textColor || '#000000').toUpperCase();
   const bgHex = (colorScheme.backgroundColor || '#FFFFFF').toUpperCase();
 
-  if (!isColored) {
+  if (!isAnaglyph) {
     return (
       <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, border: '1px dashed', borderColor: 'divider' }}>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          Xem trước — Trắng đen
+          Xem trước — {colorScheme.preset === 'whiteBlack' ? 'Trắng đen' : 'Bảng màu'}
         </Typography>
         <Box
           sx={{
@@ -161,7 +161,7 @@ export const ColorSchemePreview: React.FC<ColorSchemePreviewProps> = ({ colorSch
           }}
         >
           <Typography sx={{ fontSize: 32, fontWeight: 900, color: textHex }}>A</Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{ color: textHex, opacity: 0.7 }}>
             {textHex} trên {bgHex}
           </Typography>
         </Box>

@@ -98,5 +98,11 @@ export const normalizeExerciseConfigPayload = (
     };
   }
 
+  // 2048 / non-VT configs often have vtSettings=null from the API.
+  // Omit null so Joi does not reject "vtSettings cannot be null" before .allow(null) deploys.
+  if (payload.vtSettings == null) {
+    delete payload.vtSettings;
+  }
+
   return payload;
 };
