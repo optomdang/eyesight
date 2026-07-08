@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 export const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:4001';
-export const ADMIN_EMAIL = 'admin@lotusvision.vn';
+export const ADMIN_EMAIL = 'admin@nhuocthi.vn';
 export const ADMIN_PASSWORD = 'Admin@123';
 
 export async function loginAdmin(page: Page) {

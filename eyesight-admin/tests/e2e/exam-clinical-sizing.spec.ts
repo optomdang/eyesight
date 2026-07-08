@@ -20,7 +20,7 @@ import { answerOneStereopsisStep } from './helpers/stereopsisExam.helper';
  *     equals the clinical target in millimetres — and is the same at DPR 1
  *     and DPR 2 (the DPR-independence proof).
  *
- * Test patient: patient@lotusvision.vn / Patient@123
+ * Test patient: patient@nhuocthi.vn / Patient@123
  * Reference screen: 15.6" diagonal, 1920 × 1080 physical pixels
  *   PPI = sqrt(1920²+1080²) / 15.6 ≈ 141.21
  *   px/mm = PPI / 25.4 ≈ 5.559
@@ -150,7 +150,7 @@ async function injectScreenConfig(page: Page) {
 async function login(page: Page) {
   await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'networkidle' });
   await page.waitForSelector('input#email', { timeout: 10000 });
-  await page.locator('input#email').fill('patient@lotusvision.vn');
+  await page.locator('input#email').fill('patient@nhuocthi.vn');
   await page.locator('input#password').fill('Patient@123');
   await page.locator('button:has-text("Sign In")').click();
   await page.waitForURL('**/portal/**', { timeout: 30000 });
@@ -995,7 +995,7 @@ async function queryDb(scriptName: string, ...args: string[]): Promise<Record<st
 }
 
 test.describe.serial('Clinical Sizing — BU exact complaint: Level 1 (20/400) + Lea shapes', () => {
-  // BU screenshot: vision.lotusvision.vn/portal/exam/254
+  // BU screenshot: app.nhuocthi.vn/portal/exam/254
   //   Far vision, charType='S' (Lea shapes), Level 1 = 20/400
   //   BU annotated: "kích thước hình không đúng với mức thị lực 20/400"
   //
@@ -1017,7 +1017,7 @@ test.describe.serial('Clinical Sizing — BU exact complaint: Level 1 (20/400) +
   });
 
   test('SIZE-016: far + Lea shapes (S) at Level 1 (20/400) @ REF_DISTANCE_M — the exact BU complaint scenario', async ({ page }) => {
-    // BU screenshot: vision.lotusvision.vn/portal/exam/254
+    // BU screenshot: app.nhuocthi.vn/portal/exam/254
     //   charType = S (Lea shapes), Level 1 = 20/400
     //   at REF_DISTANCE_M (change this constant to test at BU's 3m)
     await injectScreenConfig(page);

@@ -79,8 +79,8 @@ const options = {
       `,
       contact: {
         name: 'Eye-Sight Development Team',
-        email: 'support@eyesight.com',
-        url: 'http://vision.lotusvision.vn',
+        email: 'support@nhuocthi.vn',
+        url: 'https://nhuocthi.vn',
       },
       license: {
         name: 'MIT',
@@ -93,7 +93,7 @@ const options = {
         description: 'Development server',
       },
       {
-        url: 'http://vision.lotusvision.vn/v1',
+        url: 'https://api.nhuocthi.vn/api/v1',
         description: 'Production server',
       },
     ],

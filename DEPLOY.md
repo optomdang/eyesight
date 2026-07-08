@@ -104,7 +104,7 @@ cd ~/Du-an-code/eyesight/eyesight-service
 NODE_ENV=development node scripts/seed-initial-data.js
 ```
 
-Đăng nhập thử: `admin@lotusvision.vn` / `Admin@123` — **đổi mật khẩu ngay** sau khi vào được.
+Đăng nhập thử: `admin@nhuocthi.vn` / `Admin@123` — **đổi mật khẩu ngay** sau khi vào được.
 
 ---
 

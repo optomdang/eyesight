@@ -2,6 +2,7 @@
  * Create base tables from Sequelize models (development only).
  * Run before db:migrate on a fresh local database.
  */
+require('../src/models');
 const { connectDB, sequelize } = require('../src/config/db');
 
 (async () => {

@@ -1,7 +1,7 @@
 /**
  * Reset exam sessions for E2E tests.
  * Resets completed exam sessions/results back to incomplete
- * for patient@lotusvision.vn so tests always have sessions available.
+ * for patient@nhuocthi.vn so tests always have sessions available.
  *
  * Run via: DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD=... node tests/e2e/reset-exam-sessions.cjs
  */

@@ -7,7 +7,7 @@ import {
 /**
  * E2E Test Suite: Exam Execution Flow
  *
- * Test Patient: patient@lotusvision.vn / Patient@123
+ * Test Patient: patient@nhuocthi.vn / Patient@123
  *
  * NOTE: EXAM-007 to 010 run serially and share one exam completion
  * to avoid consuming multiple exam sessions on the same patient account.
@@ -20,7 +20,7 @@ const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:4001';
 async function login(page: Page) {
   await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'networkidle' });
   await page.waitForSelector('input#email', { timeout: 10000 });
-  await page.locator('input#email').fill('patient@lotusvision.vn');
+  await page.locator('input#email').fill('patient@nhuocthi.vn');
   await page.locator('input#password').fill('Patient@123');
   await page.locator('button:has-text("Sign In")').click();
   await page.waitForURL('**/portal/**', { timeout: 30000 });

@@ -10,7 +10,7 @@ import { test, expect, Page } from '@playwright/test';
  * 4. End exercise (navigate to sessions)
  * 5. View session history
  *
- * Test Patient: patient@lotusvision.vn / Patient@123
+ * Test Patient: patient@nhuocthi.vn / Patient@123
  */
 
 test.describe('Portal - Exercise Execution', () => {
@@ -30,7 +30,7 @@ test.describe('Portal - Exercise Execution', () => {
   async function login(page: Page) {
     await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'networkidle' });
     await page.waitForSelector('input#email', { timeout: 10000 });
-    await page.locator('input#email').fill('patient@lotusvision.vn');
+    await page.locator('input#email').fill('patient@nhuocthi.vn');
     await page.locator('input#password').fill('Patient@123');
     await page.locator('button:has-text("Sign In")').click();
     await page.waitForURL('**/portal/**', { timeout: 30000 });

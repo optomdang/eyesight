@@ -34,7 +34,7 @@ import {
  *
  * ⚠️ LƯU Ý KHI CHẠY:
  *  - Cần FE (4001) + BE (4000) chạy thật + DB. Playwright tự khởi FE qua webServer.
- *  - Super-admin mặc định: admin@lotusvision.vn / Admin@123 (đổi qua env nếu khác).
+ *  - Super-admin mặc định: admin@nhuocthi.vn / Admin@123 (đổi qua env nếu khác).
  *  - Test ĐỔI center hiện hành của tài khoản super-admin (side effect). afterAll
  *    cố gắng đổi lại center ban đầu (best-effort).
  *  - Đây là happy-path bằng UI thật với nhiều MUI Select/Autocomplete; lần chạy

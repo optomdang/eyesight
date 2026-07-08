@@ -32,8 +32,8 @@ import {
  *   - Backend running on :4000 with a seeded DB (init seed or seed-demo).
  *   - Frontend dev server on :4001 (Playwright starts it via webServer config).
  *   - Seeded accounts:
- *       admin@lotusvision.vn / Admin@123     (admin)
- *       patient@lotusvision.vn / Patient@123 (patient with active treatment,
+ *       admin@nhuocthi.vn / Admin@123     (admin)
+ *       patient@nhuocthi.vn / Patient@123 (patient with active treatment,
  *         at least one enabled ExamAssignment and one active ExerciseAssignment)
  *   - tests/e2e/../eye-sight-service/tests/e2e-reset.cjs resets the patient's
  *     exam/exercise state to a predictable baseline.
@@ -42,7 +42,7 @@ import {
  *   npx playwright test tests/e2e/system-happy-path.spec.ts
  */
 
-const PATIENT_EMAIL = process.env.E2E_PATIENT_EMAIL || 'patient@lotusvision.vn';
+const PATIENT_EMAIL = process.env.E2E_PATIENT_EMAIL || 'patient@nhuocthi.vn';
 const PATIENT_PASSWORD = process.env.E2E_PATIENT_PASSWORD || 'Patient@123';
 const FAST_EXERCISE_DURATION_SECONDS = Number(process.env.E2E_EXERCISE_DURATION_SECONDS || '30');
 

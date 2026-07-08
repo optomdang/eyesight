@@ -52,7 +52,7 @@ async function run() {
        "updatedAt" = NOW()
        FROM "Users" u
        WHERE u.id = p."userId"
-         AND u.email = 'patient@lotusvision.vn'
+         AND u.email = 'patient@nhuocthi.vn'
          AND p.deleted = false
        RETURNING p.id`,
       [rightEye, leftEye, bothEye]

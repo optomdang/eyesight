@@ -77,7 +77,7 @@ const seedInitialData = async () => {
     console.log('\n🏥 Creating Default Center...');
     const center = await Center.create({
       code: generateCode('E'),
-      name: 'Trung tâm Lotus Vision',
+      name: 'Trung tâm Nhuọc Thị',
       address: JSON.stringify({
         country: 'Vietnam',
         province: 'Hà Nội',
@@ -130,7 +130,7 @@ const seedInitialData = async () => {
     // 4. Create Admin Users
     console.log('\n👤 Creating Admin Users...');
     const adminUser = await User.create({
-      email: 'admin@lotusvision.vn',
+      email: 'admin@nhuocthi.vn',
       password: 'Admin@123',
       name: 'Administrator',
       userType: 'admin',
@@ -192,7 +192,7 @@ const seedInitialData = async () => {
     // 5. Create Doctor User
     console.log('\n👨‍⚕️ Creating Doctor User...');
     const doctorUser = await User.create({
-      email: 'doctor@lotusvision.vn',
+      email: 'doctor@nhuocthi.vn',
       password: 'Doctor@123',
       name: 'Bác sĩ Nguyễn Văn A',
       userType: 'doctor',
@@ -224,7 +224,7 @@ const seedInitialData = async () => {
     // 6. Create Patient User
     console.log('\n🧑 Creating Patient User...');
     const patientUser = await User.create({
-      email: 'patient@lotusvision.vn',
+      email: 'patient@nhuocthi.vn',
       password: 'Patient@123',
       name: 'Nguyễn Thị B',
       userType: 'patient',
@@ -292,11 +292,11 @@ const seedInitialData = async () => {
 
     console.log('\n✨ Seed completed successfully!');
     console.log('\n📝 Default Accounts:');
-    console.log('   Admin: admin@lotusvision.vn / Admin@123');
+    console.log('   Admin: admin@nhuocthi.vn / Admin@123');
     console.log('   Admin: hungdx@gmail.com / 12345678a');
     console.log('   Admin: vinhnb@example.com / 12345678a');
-    console.log('   Doctor: doctor@lotusvision.vn / Doctor@123');
-    console.log('   Patient: patient@lotusvision.vn / Patient@123');
+    console.log('   Doctor: doctor@nhuocthi.vn / Doctor@123');
+    console.log('   Patient: patient@nhuocthi.vn / Patient@123');
     console.log('\n🎮 Sample Exercise Created:');
     console.log(`   - ${exercise2048.name} (${exercise2048.code})`);
     console.log('\n💡 Please change passwords after first login!');

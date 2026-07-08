@@ -1,6 +1,6 @@
 /**
  * E2E test data reset script.
- * Resets exam and exercise state for patient@lotusvision.vn
+ * Resets exam and exercise state for patient@nhuocthi.vn
  * so portal E2E tests always start from a predictable baseline.
  */
 
@@ -24,7 +24,7 @@ const client = new Client({
   ssl: process.env.DB_USE_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
-const TEST_PATIENT_EMAIL = process.env.E2E_PATIENT_EMAIL || 'patient@lotusvision.vn';
+const TEST_PATIENT_EMAIL = process.env.E2E_PATIENT_EMAIL || 'patient@nhuocthi.vn';
 
 const buildSessionCode = (examType) => {
   const ts = Date.now().toString().slice(-8);

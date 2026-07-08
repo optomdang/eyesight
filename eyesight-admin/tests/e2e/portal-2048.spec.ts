@@ -8,12 +8,12 @@ import { test, expect, type Page } from '@playwright/test';
  * 2. Time-up hard-stop with auto-submit
  * 3. Reopen after timeout returns blocked state
  *
- * Test Patient: patient@lotusvision.vn / Patient@123
+ * Test Patient: patient@nhuocthi.vn / Patient@123
  */
 
 test.describe('Portal 2048 Exercise Lifecycle', () => {
   const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:4001';
-  const PATIENT_EMAIL = 'patient@lotusvision.vn';
+  const PATIENT_EMAIL = 'patient@nhuocthi.vn';
   const PATIENT_PASSWORD = 'Patient@123';
   const FAST_EXERCISE_DURATION_SECONDS = Number(process.env.E2E_EXERCISE_DURATION_SECONDS || '30');
 

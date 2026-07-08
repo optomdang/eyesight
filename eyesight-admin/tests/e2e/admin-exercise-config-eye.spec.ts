@@ -21,7 +21,7 @@ async function loginAdmin(page: Page) {
  * Bối cảnh: trước đây form chỉ cho chọn "Cả 2 mắt" khi visionType=stereopsis.
  * Thay đổi: far/near/contrast cũng được chọn "Cả 2 mắt".
  *
- * Account: admin@lotusvision.vn / Admin@123 (init db)
+ * Account: admin@nhuocthi.vn / Admin@123 (init db)
  *
  * Các test này kiểm tra hành vi FORM qua UI thật (không phụ thuộc DB write),
  * trừ CFG-04 có tạo & lưu thật (cần backend chạy).

@@ -293,8 +293,8 @@ Frontend URLs explicitly whitelisted in `src/app.js`:
 ```javascript
 cors({
   origin: [
-    'http://vision.lotusvision.vn',
-    'https://vision.lotusvision.vn',
+    'http://app.nhuocthi.vn',
+    'https://app.nhuocthi.vn',
     'http://localhost:5173',  // Vite dev server
   ],
   credentials: true,  // Allow cookies for auth

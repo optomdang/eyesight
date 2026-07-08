@@ -43,7 +43,7 @@ cp eyesight-admin/.env.example eyesight-admin/.env
 # Khi dev local: PUBLIC_URL=http://localhost:4001 và VITE_BASE_API_URL=http://localhost:4000/api/v1
 ```
 
-**Tài khoản sau seed mẫu (`db:seed`):** `admin@lotusvision.vn` / `Admin@123`
+**Tài khoản sau seed mẫu (`db:seed`):** `admin@nhuocthi.vn` / `Admin@123`
 
 **Tài khoản sau seed demo (`npm run db:seed:demo`):** `admin@demo.com` / `Demo@1234` — dashboard có đủ mock (20 bệnh nhân).
 

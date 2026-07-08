@@ -19,7 +19,7 @@ async function resetExamSessions() {
     const patientRes = await client.query(
       `SELECT p.id FROM "Patients" p 
        JOIN "Users" u ON p."userId" = u.id 
-       WHERE u.email = 'patient@lotusvision.vn' LIMIT 1`
+       WHERE u.email = 'patient@nhuocthi.vn' LIMIT 1`
     );
     const patientId = patientRes.rows[0]?.id;
     if (!patientId) throw new Error('Patient not found');
