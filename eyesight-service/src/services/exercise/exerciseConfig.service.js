@@ -195,6 +195,21 @@ const createExerciseConfig = async (configBody, transaction = null) => {
  * @returns {Promise<{rows: ExerciseConfig[], count: number, limit: number, page: number, totalPages: number}>}
  */
 const queryExerciseConfigs = async (filter, options, user = null) => {
+  // Before listing, ensure this center has every catalog system mode (additive sync).
+  // Covers: old centers after catalog growth, even before the next process restart finishes.
+  if (user?.centerId) {
+    try {
+      // Lazy require avoids circular dependency with defaultExerciseModes.service
+      // eslint-disable-next-line global-require
+      const { ensureDefaultExerciseModes } = require('../system/defaultExerciseModes.service');
+      await ensureDefaultExerciseModes(user.centerId, user.id ?? null);
+    } catch (err) {
+      // Listing must not fail if sync has a transient error
+      // eslint-disable-next-line no-console
+      console.error('ensureDefaultExerciseModes during list failed:', err.message);
+    }
+  }
+
   const { limit, page, offset } = sanitizePagination(options.limit, options.page, 100);
   const order = buildSortBy(
     options.sortBy,

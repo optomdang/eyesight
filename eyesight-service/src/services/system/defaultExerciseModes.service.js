@@ -11,7 +11,8 @@ const {
   DEFAULT_EXERCISE_MODES,
 } = require('../../config/defaultExerciseModes');
 const exerciseService = require('../exercise/exercise.service');
-const exerciseConfigService = require('../exercise/exerciseConfig.service');
+// Lazy-require exerciseConfig.service inside helpers to avoid circular
+// dependency (exerciseConfig.service also syncs catalog on list).
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
   enabled: false,
@@ -119,6 +120,8 @@ const ensureDefaultExerciseModes = async (centerId, updatedBy, transaction = nul
       continue;
     }
 
+    // eslint-disable-next-line global-require
+    const exerciseConfigService = require('../exercise/exerciseConfig.service');
     // eslint-disable-next-line no-await-in-loop
     await exerciseConfigService.createExerciseConfig(
       {
@@ -154,6 +157,10 @@ const ensureDefaultExerciseModes = async (centerId, updatedBy, transaction = nul
 
 /**
  * Backfill catalog modes for every active center (idempotent).
+ * Safe to run on every API boot when DEFAULT_EXERCISE_MODES grows — only creates
+ * missing modes; never deletes or overwrites customized existing rows.
+ *
+ * @returns {Promise<{ centers: number, created: number, skipped: number, summary: object[] }>}
  */
 const backfillDefaultExerciseModesForAllCenters = async (actorUserId = null) => {
   const centers = await Center.findAll({
@@ -163,9 +170,14 @@ const backfillDefaultExerciseModesForAllCenters = async (actorUserId = null) => 
   });
 
   const summary = [];
+  let created = 0;
+  let skipped = 0;
+
   for (const center of centers) {
     // eslint-disable-next-line no-await-in-loop
     const result = await ensureDefaultExerciseModes(center.id, actorUserId);
+    created += result.created;
+    skipped += result.skipped;
     summary.push({
       centerId: center.id,
       code: center.code,
@@ -173,7 +185,8 @@ const backfillDefaultExerciseModesForAllCenters = async (actorUserId = null) => 
       ...result,
     });
   }
-  return summary;
+
+  return { centers: centers.length, created, skipped, summary };
 };
 
 module.exports = {
