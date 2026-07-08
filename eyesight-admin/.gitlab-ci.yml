@@ -1,0 +1,50 @@
+stages:
+  - build-image
+  - deploy
+
+variables:
+  DOCKER_TLS_CERTDIR: ""  # Disable TLS so we can connect via tcp
+  DOCKER_HOST: "tcp://docker:2375"  # Must match alias above
+  DOCKER_DRIVER: overlay2
+  IMAGE_NAME: "$DOCKERHUB_USERNAME/eyesight-admin:$CI_COMMIT_SHA"
+  IMAGE_NAME_LATEST: "$DOCKERHUB_USERNAME/eyesight-admin:latest"
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+
+build-image:
+  image: docker:latest
+  stage: build-image
+  script:
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker buildx create --name multiarch-builder --driver docker-container --use
+    - docker buildx inspect --bootstrap
+    - docker buildx build --platform linux/arm64/v8 -t $IMAGE_NAME -t $IMAGE_NAME_LATEST --push .
+  only:
+    - master
+
+deploy:
+  image: ubuntu:latest
+  stage: deploy
+  needs: [build-image]
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  script:
+    - |
+      ssh $SERVER_USER@$SERVER "IMAGE_NAME=$IMAGE_NAME_LATEST bash -c 'echo IMAGE_NAME_LATEST on server: $IMAGE_NAME_LATEST'"
+      ssh $SERVER_USER@$SERVER "docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD"
+      ssh $SERVER_USER@$SERVER "docker pull $IMAGE_NAME"
+      ssh $SERVER_USER@$SERVER "cd /home/$SERVER_USER/eyesight-admin && docker-compose -f docker-compose.yml down || true"
+      # Ghi IMAGE_NAME vào file .env trên server để docker-compose đọc được biến
+      echo "IMAGE_NAME=$IMAGE_NAME" | ssh $SERVER_USER@$SERVER "cat > /home/$SERVER_USER/eyesight-admin/.env"
+      ssh $SERVER_USER@$SERVER "cd /home/$SERVER_USER/eyesight-admin && docker-compose -f docker-compose.yml up -d --no-build"
+  only:
+    - master

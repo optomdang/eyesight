@@ -1,0 +1,530 @@
+{
+  "version": 1,
+  "provider": "azure",
+  "voiceId": "vi-VN-HoaiMyNeural",
+  "enVoiceId": "en-US-JennyNeural",
+  "rate": 0.95,
+  "generatedAt": "2026-07-07T13:28:57.087Z",
+  "entries": {
+    "vi:exam_welcome_far": {
+      "contentHash": "d356c4a00bb834bb",
+      "file": "vi/exam_welcome_far.mp3"
+    },
+    "en:exam_welcome_far": {
+      "contentHash": "9d43cf62a2e16f35",
+      "file": "en/exam_welcome_far.mp3"
+    },
+    "vi:exam_welcome_near": {
+      "contentHash": "d588f44be4b115ae",
+      "file": "vi/exam_welcome_near.mp3"
+    },
+    "en:exam_welcome_near": {
+      "contentHash": "84aa9ef1a08f2cf1",
+      "file": "en/exam_welcome_near.mp3"
+    },
+    "vi:exam_welcome_contrast": {
+      "contentHash": "e7caf56175bc2aea",
+      "file": "vi/exam_welcome_contrast.mp3"
+    },
+    "en:exam_welcome_contrast": {
+      "contentHash": "b563e1af49fe2b8d",
+      "file": "en/exam_welcome_contrast.mp3"
+    },
+    "vi:exam_welcome_stereopsis": {
+      "contentHash": "12f756d3b0b007be",
+      "file": "vi/exam_welcome_stereopsis.mp3"
+    },
+    "en:exam_welcome_stereopsis": {
+      "contentHash": "599493c698ee758a",
+      "file": "en/exam_welcome_stereopsis.mp3"
+    },
+    "vi:exam_glasses_cover": {
+      "contentHash": "61282ea20e80d9d0",
+      "file": "vi/exam_glasses_cover.mp3"
+    },
+    "en:exam_glasses_cover": {
+      "contentHash": "4d21bfc8864d8dc9",
+      "file": "en/exam_glasses_cover.mp3"
+    },
+    "vi:exam_choose_direction": {
+      "contentHash": "ddc0cdae7eb5aded",
+      "file": "vi/exam_choose_direction.mp3"
+    },
+    "en:exam_choose_direction": {
+      "contentHash": "ad490a4fc58bc9d7",
+      "file": "en/exam_choose_direction.mp3"
+    },
+    "vi:exam_no_hints": {
+      "contentHash": "8ae3b7cc630e655a",
+      "file": "vi/exam_no_hints.mp3"
+    },
+    "en:exam_no_hints": {
+      "contentHash": "6225df326832e86a",
+      "file": "en/exam_no_hints.mp3"
+    },
+    "vi:exam_no_squint": {
+      "contentHash": "69a0e235df1c6e83",
+      "file": "vi/exam_no_squint.mp3"
+    },
+    "en:exam_no_squint": {
+      "contentHash": "27b9234e0567a1c0",
+      "file": "en/exam_no_squint.mp3"
+    },
+    "vi:exam_compromised_recheck": {
+      "contentHash": "253172a98dff7902",
+      "file": "vi/exam_compromised_recheck.mp3"
+    },
+    "en:exam_compromised_recheck": {
+      "contentHash": "4529919c828f9d74",
+      "file": "en/exam_compromised_recheck.mp3"
+    },
+    "vi:exam_cherry_pick": {
+      "contentHash": "54618fa5fa615441",
+      "file": "vi/exam_cherry_pick.mp3"
+    },
+    "en:exam_cherry_pick": {
+      "contentHash": "cd448f4b60960a9e",
+      "file": "en/exam_cherry_pick.mp3"
+    },
+    "vi:exam_lighting": {
+      "contentHash": "0dad447717f5b17d",
+      "file": "vi/exam_lighting.mp3"
+    },
+    "en:exam_lighting": {
+      "contentHash": "6f67345cc7345135",
+      "file": "en/exam_lighting.mp3"
+    },
+    "vi:exam_start": {
+      "contentHash": "b7ac4ccc6aa0b924",
+      "file": "vi/exam_start.mp3"
+    },
+    "en:exam_start": {
+      "contentHash": "dfa7d560d3f66874",
+      "file": "en/exam_start.mp3"
+    },
+    "vi:exam_stereo_glasses": {
+      "contentHash": "6a2ff7d712861d18",
+      "file": "vi/exam_stereo_glasses.mp3"
+    },
+    "en:exam_stereo_glasses": {
+      "contentHash": "27645c66c59201a3",
+      "file": "en/exam_stereo_glasses.mp3"
+    },
+    "vi:exam_stereo_supporter": {
+      "contentHash": "6296f4d38e31d346",
+      "file": "vi/exam_stereo_supporter.mp3"
+    },
+    "en:exam_stereo_supporter": {
+      "contentHash": "0b9050322bf293b4",
+      "file": "en/exam_stereo_supporter.mp3"
+    },
+    "vi:exam_stereo_q_shape": {
+      "contentHash": "49ecece3e7b46822",
+      "file": "vi/exam_stereo_q_shape.mp3"
+    },
+    "en:exam_stereo_q_shape": {
+      "contentHash": "3dd31b928ecf412e",
+      "file": "en/exam_stereo_q_shape.mp3"
+    },
+    "vi:exam_stereo_q_row": {
+      "contentHash": "55493f1ee7f265d8",
+      "file": "vi/exam_stereo_q_row.mp3"
+    },
+    "en:exam_stereo_q_row": {
+      "contentHash": "777e7a4fea85009f",
+      "file": "en/exam_stereo_q_row.mp3"
+    },
+    "vi:exam_stereo_q_digit": {
+      "contentHash": "89d54924ab261812",
+      "file": "vi/exam_stereo_q_digit.mp3"
+    },
+    "en:exam_stereo_q_digit": {
+      "contentHash": "0d9310ba2078f36c",
+      "file": "en/exam_stereo_q_digit.mp3"
+    },
+    "vi:exam_switch_eye": {
+      "contentHash": "45aa91aa8a6d30e7",
+      "file": "vi/exam_switch_eye.mp3"
+    },
+    "en:exam_switch_eye": {
+      "contentHash": "24edf10205f9f99f",
+      "file": "en/exam_switch_eye.mp3"
+    },
+    "vi:vt_choose_world": {
+      "contentHash": "b4db30fa95cf72f0",
+      "file": "vi/vt_choose_world.mp3"
+    },
+    "en:vt_choose_world": {
+      "contentHash": "defd21ec0dd5ce94",
+      "file": "en/vt_choose_world.mp3"
+    },
+    "vi:vt_start": {
+      "contentHash": "15b7d9fc782b1759",
+      "file": "vi/vt_start.mp3"
+    },
+    "en:vt_start": {
+      "contentHash": "7a1bd0e3c255c5d9",
+      "file": "en/vt_start.mp3"
+    },
+    "vi:vt_boss": {
+      "contentHash": "11c3072e2a33029d",
+      "file": "vi/vt_boss.mp3"
+    },
+    "en:vt_boss": {
+      "contentHash": "2d57232f4920aa5c",
+      "file": "en/vt_boss.mp3"
+    },
+    "vi:vt_gabor_default": {
+      "contentHash": "5714d0d79ae87ca4",
+      "file": "vi/vt_gabor_default.mp3"
+    },
+    "en:vt_gabor_default": {
+      "contentHash": "4e1a090ceb712650",
+      "file": "en/vt_gabor_default.mp3"
+    },
+    "vi:vt_gabor_orientation": {
+      "contentHash": "6c61a352206faead",
+      "file": "vi/vt_gabor_orientation.mp3"
+    },
+    "en:vt_gabor_orientation": {
+      "contentHash": "a782d4c9261c3ae7",
+      "file": "en/vt_gabor_orientation.mp3"
+    },
+    "vi:vt_gabor_match": {
+      "contentHash": "4670531e9f916278",
+      "file": "vi/vt_gabor_match.mp3"
+    },
+    "en:vt_gabor_match": {
+      "contentHash": "cd79c6b616ee7a61",
+      "file": "en/vt_gabor_match.mp3"
+    },
+    "vi:vt_gabor_odd": {
+      "contentHash": "953005b850505a0d",
+      "file": "vi/vt_gabor_odd.mp3"
+    },
+    "en:vt_gabor_odd": {
+      "contentHash": "5dc780e8a4a56610",
+      "file": "en/vt_gabor_odd.mp3"
+    },
+    "vi:vt_gabor_sf": {
+      "contentHash": "f6f420254a1fa714",
+      "file": "vi/vt_gabor_sf.mp3"
+    },
+    "en:vt_gabor_sf": {
+      "contentHash": "aad59b361217464f",
+      "file": "en/vt_gabor_sf.mp3"
+    },
+    "vi:vt_gabor_memorize": {
+      "contentHash": "609eeb385a949327",
+      "file": "vi/vt_gabor_memorize.mp3"
+    },
+    "en:vt_gabor_memorize": {
+      "contentHash": "e30fb0407b62a058",
+      "file": "en/vt_gabor_memorize.mp3"
+    },
+    "vi:vt_gabor_recall": {
+      "contentHash": "854fc8f7479b295e",
+      "file": "vi/vt_gabor_recall.mp3"
+    },
+    "en:vt_gabor_recall": {
+      "contentHash": "a26b8d144b5f702b",
+      "file": "en/vt_gabor_recall.mp3"
+    },
+    "vi:vt_vernier_default": {
+      "contentHash": "ffe1531a87453448",
+      "file": "vi/vt_vernier_default.mp3"
+    },
+    "en:vt_vernier_default": {
+      "contentHash": "450bea992fe14b08",
+      "file": "en/vt_vernier_default.mp3"
+    },
+    "vi:vt_vernier_direction": {
+      "contentHash": "0ff56f12d60f3f4b",
+      "file": "vi/vt_vernier_direction.mp3"
+    },
+    "en:vt_vernier_direction": {
+      "contentHash": "e05c18befd7691ea",
+      "file": "en/vt_vernier_direction.mp3"
+    },
+    "vi:vt_vernier_greater": {
+      "contentHash": "9453100307132f1b",
+      "file": "vi/vt_vernier_greater.mp3"
+    },
+    "en:vt_vernier_greater": {
+      "contentHash": "3b4bc3219b86b70a",
+      "file": "en/vt_vernier_greater.mp3"
+    },
+    "vi:vt_vernier_odd": {
+      "contentHash": "e667c8ffb8f8356c",
+      "file": "vi/vt_vernier_odd.mp3"
+    },
+    "en:vt_vernier_odd": {
+      "contentHash": "1a92c7667d4d0c21",
+      "file": "en/vt_vernier_odd.mp3"
+    },
+    "vi:vt_vernier_memorize": {
+      "contentHash": "93d719bda08f7ff1",
+      "file": "vi/vt_vernier_memorize.mp3"
+    },
+    "en:vt_vernier_memorize": {
+      "contentHash": "15a833b79e7c6d72",
+      "file": "en/vt_vernier_memorize.mp3"
+    },
+    "vi:vt_vernier_recall": {
+      "contentHash": "68c74a6c3910937f",
+      "file": "vi/vt_vernier_recall.mp3"
+    },
+    "en:vt_vernier_recall": {
+      "contentHash": "07fea587e76a302e",
+      "file": "en/vt_vernier_recall.mp3"
+    },
+    "vi:vt_crowding_default": {
+      "contentHash": "7e28709bf46cb040",
+      "file": "vi/vt_crowding_default.mp3"
+    },
+    "en:vt_crowding_default": {
+      "contentHash": "e379d5b25f1b6d54",
+      "file": "en/vt_crowding_default.mp3"
+    },
+    "vi:vt_crowding_central": {
+      "contentHash": "1decd3ca589ecb14",
+      "file": "vi/vt_crowding_central.mp3"
+    },
+    "en:vt_crowding_central": {
+      "contentHash": "a5cca220f5240905",
+      "file": "en/vt_crowding_central.mp3"
+    },
+    "vi:vt_crowding_same_diff": {
+      "contentHash": "40319dac771597ae",
+      "file": "vi/vt_crowding_same_diff.mp3"
+    },
+    "en:vt_crowding_same_diff": {
+      "contentHash": "08a1464617891ce7",
+      "file": "en/vt_crowding_same_diff.mp3"
+    },
+    "vi:vt_crowding_match": {
+      "contentHash": "8b1c353be770b5ad",
+      "file": "vi/vt_crowding_match.mp3"
+    },
+    "en:vt_crowding_match": {
+      "contentHash": "4883221ad31088f6",
+      "file": "en/vt_crowding_match.mp3"
+    },
+    "vi:vt_crowding_odd": {
+      "contentHash": "e93fff68485abe8f",
+      "file": "vi/vt_crowding_odd.mp3"
+    },
+    "en:vt_crowding_odd": {
+      "contentHash": "aed43ca0d999b08f",
+      "file": "en/vt_crowding_odd.mp3"
+    },
+    "vi:vt_crowding_memorize": {
+      "contentHash": "6902deed0cfaaa09",
+      "file": "vi/vt_crowding_memorize.mp3"
+    },
+    "en:vt_crowding_memorize": {
+      "contentHash": "87e468531207210a",
+      "file": "en/vt_crowding_memorize.mp3"
+    },
+    "vi:vt_crowding_recall": {
+      "contentHash": "a715162022fff4f3",
+      "file": "vi/vt_crowding_recall.mp3"
+    },
+    "en:vt_crowding_recall": {
+      "contentHash": "dc0f386b6c4d3130",
+      "file": "en/vt_crowding_recall.mp3"
+    },
+    "vi:vt_stereo_glasses": {
+      "contentHash": "5976f89c2944a872",
+      "file": "vi/vt_stereo_glasses.mp3"
+    },
+    "en:vt_stereo_glasses": {
+      "contentHash": "fa4499fc00b67393",
+      "file": "en/vt_stereo_glasses.mp3"
+    },
+    "vi:vt_stereo_shape": {
+      "contentHash": "d2f89515390d3286",
+      "file": "vi/vt_stereo_shape.mp3"
+    },
+    "en:vt_stereo_shape": {
+      "contentHash": "da7851deddacd42b",
+      "file": "en/vt_stereo_shape.mp3"
+    },
+    "vi:vt_stereo_float": {
+      "contentHash": "1c1ec082462a8895",
+      "file": "vi/vt_stereo_float.mp3"
+    },
+    "en:vt_stereo_float": {
+      "contentHash": "8b84a32180e8c96f",
+      "file": "en/vt_stereo_float.mp3"
+    },
+    "vi:vt_stereo_digit": {
+      "contentHash": "072264cff3608877",
+      "file": "vi/vt_stereo_digit.mp3"
+    },
+    "en:vt_stereo_digit": {
+      "contentHash": "bd1b2f6def8c340e",
+      "file": "en/vt_stereo_digit.mp3"
+    },
+    "vi:vt_stage_1": {
+      "contentHash": "8efeb44f3b32d7f2",
+      "file": "vi/vt_stage_1.mp3"
+    },
+    "en:vt_stage_1": {
+      "contentHash": "24e78441cbb978d3",
+      "file": "en/vt_stage_1.mp3"
+    },
+    "vi:vt_stage_2": {
+      "contentHash": "19db10dd646258fc",
+      "file": "vi/vt_stage_2.mp3"
+    },
+    "en:vt_stage_2": {
+      "contentHash": "edacf313c50793bc",
+      "file": "en/vt_stage_2.mp3"
+    },
+    "vi:vt_stage_3": {
+      "contentHash": "90eeab580c4e4833",
+      "file": "vi/vt_stage_3.mp3"
+    },
+    "en:vt_stage_3": {
+      "contentHash": "5c2700865e394227",
+      "file": "en/vt_stage_3.mp3"
+    },
+    "vi:vt_stage_4": {
+      "contentHash": "e14b79cdfca14c6a",
+      "file": "vi/vt_stage_4.mp3"
+    },
+    "en:vt_stage_4": {
+      "contentHash": "a3d3c4a3ecc30681",
+      "file": "en/vt_stage_4.mp3"
+    },
+    "vi:vt_stage_5": {
+      "contentHash": "05c6aa7308223a3d",
+      "file": "vi/vt_stage_5.mp3"
+    },
+    "en:vt_stage_5": {
+      "contentHash": "f3086bbc954ed430",
+      "file": "en/vt_stage_5.mp3"
+    },
+    "vi:vt_stage_6": {
+      "contentHash": "52f5cbd4d7fac926",
+      "file": "vi/vt_stage_6.mp3"
+    },
+    "en:vt_stage_6": {
+      "contentHash": "9439cb283aba7dc8",
+      "file": "en/vt_stage_6.mp3"
+    },
+    "vi:vt_stage_7": {
+      "contentHash": "4bf356041d8d1598",
+      "file": "vi/vt_stage_7.mp3"
+    },
+    "en:vt_stage_7": {
+      "contentHash": "60990a6230e6a685",
+      "file": "en/vt_stage_7.mp3"
+    },
+    "vi:vt_stage_8": {
+      "contentHash": "b745556236aa5a82",
+      "file": "vi/vt_stage_8.mp3"
+    },
+    "en:vt_stage_8": {
+      "contentHash": "abeb8f1d54e433d0",
+      "file": "en/vt_stage_8.mp3"
+    },
+    "vi:vt_stage_9": {
+      "contentHash": "ab137fa9d66f2629",
+      "file": "vi/vt_stage_9.mp3"
+    },
+    "en:vt_stage_9": {
+      "contentHash": "4330c46647bdef8c",
+      "file": "en/vt_stage_9.mp3"
+    },
+    "vi:vt_stage_10": {
+      "contentHash": "762ef2b8c556074d",
+      "file": "vi/vt_stage_10.mp3"
+    },
+    "en:vt_stage_10": {
+      "contentHash": "064dd4bfef9c9659",
+      "file": "en/vt_stage_10.mp3"
+    },
+    "vi:vt_stage_11": {
+      "contentHash": "755b5a3754b3193d",
+      "file": "vi/vt_stage_11.mp3"
+    },
+    "en:vt_stage_11": {
+      "contentHash": "b91756b990a36379",
+      "file": "en/vt_stage_11.mp3"
+    },
+    "vi:vt_stage_12": {
+      "contentHash": "5108aec10347ff20",
+      "file": "vi/vt_stage_12.mp3"
+    },
+    "en:vt_stage_12": {
+      "contentHash": "5099c272735075c7",
+      "file": "en/vt_stage_12.mp3"
+    },
+    "vi:vt_stage_13": {
+      "contentHash": "8924c77c285aaa7e",
+      "file": "vi/vt_stage_13.mp3"
+    },
+    "en:vt_stage_13": {
+      "contentHash": "df74f818c75652f7",
+      "file": "en/vt_stage_13.mp3"
+    },
+    "vi:vt_stage_14": {
+      "contentHash": "41335886be5b9260",
+      "file": "vi/vt_stage_14.mp3"
+    },
+    "en:vt_stage_14": {
+      "contentHash": "9653c3dcdd68ad69",
+      "file": "en/vt_stage_14.mp3"
+    },
+    "vi:vt_stage_15": {
+      "contentHash": "a34478ab9abc2462",
+      "file": "vi/vt_stage_15.mp3"
+    },
+    "en:vt_stage_15": {
+      "contentHash": "b8369dc83be9b939",
+      "file": "en/vt_stage_15.mp3"
+    },
+    "vi:vt_stage_16": {
+      "contentHash": "9897aeac4eb9c354",
+      "file": "vi/vt_stage_16.mp3"
+    },
+    "en:vt_stage_16": {
+      "contentHash": "e589f9f296e8a62d",
+      "file": "en/vt_stage_16.mp3"
+    },
+    "vi:vt_stage_17": {
+      "contentHash": "9fe13ce1d62ba806",
+      "file": "vi/vt_stage_17.mp3"
+    },
+    "en:vt_stage_17": {
+      "contentHash": "36f047e1e5d305d0",
+      "file": "en/vt_stage_17.mp3"
+    },
+    "vi:vt_stage_18": {
+      "contentHash": "c0c7facfb79fcb7f",
+      "file": "vi/vt_stage_18.mp3"
+    },
+    "en:vt_stage_18": {
+      "contentHash": "bd05020a148df963",
+      "file": "en/vt_stage_18.mp3"
+    },
+    "vi:vt_stage_19": {
+      "contentHash": "3a3d1295ba5cdc7c",
+      "file": "vi/vt_stage_19.mp3"
+    },
+    "en:vt_stage_19": {
+      "contentHash": "1c9e6694131b2f7d",
+      "file": "en/vt_stage_19.mp3"
+    },
+    "vi:vt_stage_20": {
+      "contentHash": "18a7186ef3204691",
+      "file": "vi/vt_stage_20.mp3"
+    },
+    "en:vt_stage_20": {
+      "contentHash": "2d9d88e909b8e482",
+      "file": "en/vt_stage_20.mp3"
+    }
+  }
+}

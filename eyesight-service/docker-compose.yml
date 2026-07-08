@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  eyesight-service:
+    image: ${IMAGE_NAME}
+    ports:
+      - '4000:4000'
+    volumes:
+      - .:/usr/src/node-app
+      - /usr/src/node-app/node_modules # Prevent host node_modules overwrite
+    networks:
+      - eyesight-network
+    restart: unless-stopped
+
+networks:
+  eyesight-network:
+    driver: bridge

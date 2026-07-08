@@ -1,0 +1,45 @@
+---
+description: Mọi bài tập phải tự động full màn hình khi bệnh nhân vào chơi
+globs: eyesight-admin/src/components/exercises/**/*
+alwaysApply: false
+---
+
+# Exercise fullscreen (bắt buộc)
+
+Khi thêm hoặc sửa **bài tập cho bệnh nhân** (portal exercise), luôn đảm bảo màn chơi **tự động full màn hình** ngay khi vào bài tập.
+
+## Chuẩn triển khai
+
+Dùng hook có sẵn `useExerciseFullscreen` — không tự viết logic fullscreen riêng.
+
+```tsx
+import { useRef } from 'react';
+import { useExerciseFullscreen } from 'src/hooks/useExerciseFullscreen';
+
+const fullscreenRootRef = useRef<HTMLDivElement>(null);
+useExerciseFullscreen(fullscreenRootRef, !isLoading);
+
+return (
+  <Box ref={fullscreenRootRef} sx={{ width: '100%', minHeight: '100vh', ... }}>
+    {/* HUD, game area, dialogs */}
+  </Box>
+);
+```
+
+## Quy tắc
+
+- **Portal / chơi thử / bài đã giao**: bật fullscreen khi exercise active (`enabled = !isLoading`).
+- **Sandbox** (`sandboxMode`): vẫn bật fullscreen — chơi thử admin cũng full màn hình trình duyệt.
+- **Root container**: `ref={fullscreenRootRef}`, phủ toàn viewport (`minHeight: '100vh'`, `width: '100%'`).
+- **Dialog** (pause, exit, completion): truyền `container={fullscreenRootRef.current}` để hiện đúng trong fullscreen.
+- **Cleanup**: hook tự thoát fullscreen khi unmount — không bỏ qua.
+
+## Tham chiếu
+
+- Hook: `eyesight-admin/src/hooks/useExerciseFullscreen.ts`
+- Mẫu đúng: `VtQuestExercise.tsx`
+- Props sandbox: `PortalExerciseProps.sandboxMode`
+
+## Không làm
+
+- Chỉ dùng `position: fixed` + `100vw/100vh` mà không gọi `useExerciseFullscreen`.

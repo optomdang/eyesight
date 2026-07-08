@@ -1,0 +1,53 @@
+---
+description: KHÓA — hiệu chuẩn màn hình & kích thước vật lý optotype. Không sửa trừ khi user yêu cầu cụ thể.
+alwaysApply: true
+---
+
+# KHÓA: Hiệu chuẩn màn hình & kích thước vật lý chính xác
+
+**Không chỉnh sửa các file/hàm dưới đây** khi làm task khác (UI, routing, game logic, v.v.).
+Chỉ được sửa khi user **yêu cầu rõ ràng** liên quan hiệu chuẩn, PPI, hoặc kích thước vật lý optotype.
+
+## File bị khóa (LOCKED)
+
+| File | Vai trò |
+|------|---------|
+| `eyesight-admin/src/services/screenCalibration.service.ts` | Lưu/đọc PPI + thông số màn hình; `getPreferredScreenInfo()` |
+| `eyesight-admin/src/features/portal/views/settings/ScreenCalibrationPage.tsx` | UI hiệu chuẩn (Bước 1: màn hình, Bước 2: thẻ/thước) |
+| `eyesight-admin/src/components/shared/CalibrationGate.tsx` | Chặn exam/exercise khi chưa hiệu chuẩn |
+| `eyesight-admin/src/utils/visionUtils.ts` | **Chỉ các hàm sizing/PPI bên dưới** — không khóa toàn file |
+| `eyesight-admin/src/components/exercises/vt/core/stimulusSizing.ts` | mm/deg/arcsec → layout px qua `clinicalMmToLayoutPx` |
+| `eyesight-admin/src/components/exercises/vt/core/vtVisionSizing.ts` | VT sizing dựa trên `calculateVisualSettings` |
+| `eyesight-admin/src/utils/__tests__/visionUtils.test.ts` | Test cho logic sizing/PPI |
+
+## Hàm lõi bị khóa trong `visionUtils.ts`
+
+- `calculatePPI`, `resolveDevicePixelRatio`
+- `clinicalMmToLayoutPx` / `mmToCssPixels` — **điểm duy nhất** mm → CSS px; ưu tiên PPI hiệu chuẩn
+- `calculateSnellenOptotypeHeightMm`, `calculateCssFontSizeForTargetHeightMm`
+- `calculateFarFontSize`, `calculateNearFontSize`
+- `calculateVisualSettings`, `calculateGameScaleFactor`
+- `buildExamDisplayStrategy`, `countExamCharsFitOnRow`, `calculateMinDiagonalInchForExamRow`
+- Hằng số: `SNELLEN_*`, `CLEAR_SANS_DIGIT_CAP_HEIGHT_RATIO`, `EXAM_ROW_CHAR_COUNT`
+
+## Quy tắc khi làm việc gần vùng khóa
+
+1. **Consumer** (PreviewDialog, ExamChar, FarAcuityExercise, DistanceStep, …): chỉ **gọi** `getPreferredScreenInfo()` hoặc `clinicalMmToLayoutPx()` — không copy công thức PPI/mm sang file khác.
+2. **Không** hardcode PPI, inch, hoặc công thức Snellen ở component — luôn qua service/utils đã khóa.
+3. **Không** refactor/rename/move file khóa trừ khi user yêu cầu.
+4. Sửa UI xung quanh (label, layout) được; **không** đổi công thức lưu/load calibration hoặc chuyển đổi mm→px.
+
+## Luồng dữ liệu (không phá vỡ)
+
+```
+ScreenCalibrationPage → buildAndSaveCalibration → localStorage
+getPreferredScreenInfo() → ScreenInfo (exam, exercise, preview)
+clinicalMmToLayoutPx(mm, screenInfo) → CSS px (dùng PPI hiệu chuẩn nếu có)
+calculateVisualSettings / calculateFarFontSize / calculateNearFontSize → mm trước khi render
+```
+
+## Được phép không cần hỏi lại
+
+- Import và **đọc** `getPreferredScreenInfo()` từ file mới.
+- Sửa text/UI không ảnh hưởng công thức.
+- Thêm test mới cho hành vi hiện có (không đổi kỳ vọng số học trừ khi user yêu cầu).

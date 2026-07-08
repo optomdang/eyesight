@@ -1,0 +1,299 @@
+/**
+ * @swagger
+ * tags:
+ *   name: GameConfigs
+ *   description: Game configuration management
+ */
+
+/**
+ * @swagger
+ * /game-configs:
+ *   post:
+ *     summary: Create a game configuration
+ *     description: Only admins can create game configurations.
+ *     tags: [GameConfigs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - gameType
+ *               - code
+ *               - name
+ *               - centerId
+ *             properties:
+ *               gameType:
+ *                 type: string
+ *                 description: Type of game (e.g., 2048, memory)
+ *               code:
+ *                 type: string
+ *                 description: Unique code for the configuration
+ *               name:
+ *                 type: string
+ *                 description: Name of the configuration
+ *               description:
+ *                 type: string
+ *                 description: Description of the configuration
+ *               defaultSettings:
+ *                 type: object
+ *                 description: Default settings for the game
+ *               visualAcuityLevels:
+ *                 type: object
+ *                 description: Settings for visual acuity levels
+ *               contrastLevels:
+ *                 type: object
+ *                 description: Settings for contrast levels
+ *               colorSchemes:
+ *                 type: object
+ *                 description: Available color schemes
+ *               difficultyLevels:
+ *                 type: object
+ *                 description: Settings for different difficulty levels
+ *               autoAdjustmentRules:
+ *                 type: object
+ *                 description: Rules for auto-adjustment
+ *               centerId:
+ *                 type: integer
+ *                 description: Center ID
+ *     responses:
+ *       "201":
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GameConfig'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *
+ *   get:
+ *     summary: Get all game configurations
+ *     description: Retrieve game configurations with filters.
+ *     tags: [GameConfigs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: gameType
+ *         schema:
+ *           type: string
+ *         description: Game type
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Configuration code
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Configuration name
+ *       - in: query
+ *         name: centerId
+ *         schema:
+ *           type: integer
+ *         description: Center ID
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *         description: Sort by field:order
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         default: 10
+ *         description: Maximum number of results per page
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/GameConfig'
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 1
+ *                 totalResults:
+ *                   type: integer
+ *                   example: 1
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @swagger
+ * /game-configs/{id}:
+ *   get:
+ *     summary: Get a game configuration
+ *     description: Get a specific game configuration by ID.
+ *     tags: [GameConfigs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Game configuration ID
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GameConfig'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ *   patch:
+ *     summary: Update a game configuration
+ *     description: Update a specific game configuration.
+ *     tags: [GameConfigs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Game configuration ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               gameType:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               defaultSettings:
+ *                 type: object
+ *               visualAcuityLevels:
+ *                 type: object
+ *               contrastLevels:
+ *                 type: object
+ *               colorSchemes:
+ *                 type: object
+ *               difficultyLevels:
+ *                 type: object
+ *               autoAdjustmentRules:
+ *                 type: object
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GameConfig'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ *   delete:
+ *     summary: Delete a game configuration
+ *     description: Delete a specific game configuration.
+ *     tags: [GameConfigs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Game configuration ID
+ *     responses:
+ *       "204":
+ *         description: No content
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     GameConfig:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         gameType:
+ *           type: string
+ *         code:
+ *           type: string
+ *         name:
+ *           type: string
+ *         description:
+ *           type: string
+ *         defaultSettings:
+ *           type: object
+ *         visualAcuityLevels:
+ *           type: object
+ *         contrastLevels:
+ *           type: object
+ *         colorSchemes:
+ *           type: object
+ *         difficultyLevels:
+ *           type: object
+ *         autoAdjustmentRules:
+ *           type: object
+ *         centerId:
+ *           type: integer
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */

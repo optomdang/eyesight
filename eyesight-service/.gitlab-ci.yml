@@ -1,0 +1,56 @@
+stages:
+  - build-image
+  - deploy
+
+variables:
+  DOCKER_TLS_CERTDIR: ""  # Disable TLS so we can connect via tcp
+  DOCKER_HOST: "tcp://docker:2375"  # Must match alias above
+  DOCKER_DRIVER: overlay2
+  IMAGE_NAME: "$DOCKERHUB_USERNAME/eyesight-service:latest"
+  IMAGE_NAME_SHA: "$DOCKERHUB_USERNAME/eyesight-service:$CI_COMMIT_SHA"
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+
+build-image:
+  image: docker:latest
+  stage: build-image
+  script:
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker buildx create --name multiarch-builder --driver docker-container --use
+    - docker buildx inspect --bootstrap
+    - docker buildx build --platform linux/arm64/v8 -t $IMAGE_NAME -t $IMAGE_NAME_SHA --push .
+  only:
+    - master
+
+deploy:
+  image: ubuntu:latest
+  stage: deploy
+  needs: [build-image]
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  script:
+    - |
+      echo "IMAGE_NAME in CI: $IMAGE_NAME"
+      ssh $SERVER_USER@$SERVER "IMAGE_NAME=$IMAGE_NAME bash -c 'echo IMAGE_NAME on server: $IMAGE_NAME'"
+      ssh $SERVER_USER@$SERVER "docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD"
+      # Stop và xóa containers đang chạy
+      ssh $SERVER_USER@$SERVER "cd /home/$SERVER_USER/eyesight-service && docker-compose -f docker-compose.yml down || true"
+      # Force xóa image cũ và dọn dẹp images không dùng
+      ssh $SERVER_USER@$SERVER "docker rmi -f $IMAGE_NAME || true"
+      ssh $SERVER_USER@$SERVER "docker image prune -f || true"
+      # Pull image mới từ DockerHub
+      ssh $SERVER_USER@$SERVER "docker pull $IMAGE_NAME"
+      # Cập nhật hoặc thêm biến IMAGE_NAME vào file .env trên server để docker-compose đọc được biến
+      ssh $SERVER_USER@$SERVER "sed -i '/^IMAGE_NAME=/d' /home/$SERVER_USER/eyesight-service/.env && echo IMAGE_NAME=$IMAGE_NAME >> /home/$SERVER_USER/eyesight-service/.env"
+      ssh $SERVER_USER@$SERVER "cd /home/$SERVER_USER/eyesight-service && yarn docker:prod"
+  only:
+    - master

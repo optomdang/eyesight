@@ -1,0 +1,25 @@
+---
+description: Inline field explanations use HelpTooltip icons, not helperText/captions
+alwaysApply: true
+---
+
+# Inline help → Tooltip (? / i)
+
+## Display rules
+
+| Content type | How to show |
+|--------------|-------------|
+| Field/label/option explanations | `HelpTooltip` or `LabelWithHelp` from `src/components/shared/HelpTooltip.tsx` |
+| Validation errors | Inline `helperText` / `FormHelperText` (red), unchanged |
+| Workflow guidance (multi-step) | Keep `Alert` blocks (blue/yellow), unchanged |
+
+## Do not
+
+- Use `helperText`, `FormHelperText`, or `Typography variant="caption"` for informational hints under fields
+- Wrap entire buttons in tooltips when only the title needs help (put icon next to title instead)
+
+## Do
+
+- Default icon: `InfoOutlined` (`variant="info"`)
+- Use `variant="help"` (`HelpOutline` / ?) when a question-style hint fits better
+- Keep labels compact; full explanation on hover only

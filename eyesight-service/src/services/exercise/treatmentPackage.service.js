@@ -1,0 +1,298 @@
+const httpStatus = require('http-status');
+const { Op } = require('sequelize');
+const ApiError = require('../../utils/ApiError');
+const {
+  TreatmentPackage,
+  PatientTreatmentPackage,
+  ExerciseAssignment,
+  ExerciseConfig,
+} = require('../../models');
+const { sanitizePagination, buildSortBy, buildPagination } = require('../../utils/query');
+const { removeAccents, escapeRegExp } = require('../../utils/common');
+const auditLogService = require('../system/auditLog.service');
+
+const normalizeConfigIds = (ids) => {
+  if (!Array.isArray(ids)) return [];
+  return [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+};
+
+const addDays = (date, days) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + Number(days));
+  return result;
+};
+
+const computeImprovementPercent = async (packageId, configIds, centerId) => {
+  if (!configIds.length) return 0;
+
+  const activePatients = await PatientTreatmentPackage.findAll({
+    where: {
+      treatmentPackageId: packageId,
+      deleted: false,
+      status: 'active',
+      expiresAt: { [Op.gt]: new Date() },
+    },
+    attributes: ['patientId'],
+  });
+  const patientIds = activePatients.map((row) => row.patientId);
+  if (!patientIds.length) return 0;
+
+  const assignments = await ExerciseAssignment.findAll({
+    where: {
+      patientId: { [Op.in]: patientIds },
+      centerId,
+      exerciseConfigId: { [Op.in]: configIds },
+      deleted: false,
+    },
+    attributes: ['sessionsCompleted'],
+  });
+  if (!assignments.length) return 0;
+
+  const total = assignments.reduce(
+    (sum, assignment) => sum + Math.min(100, (assignment.sessionsCompleted || 0) * 8),
+    0
+  );
+  return Math.round(total / assignments.length);
+};
+
+const enrichPackageRow = async (pkg) => {
+  const json = pkg.toJSON ? pkg.toJSON() : pkg;
+  const configIds = normalizeConfigIds(json.exerciseConfigIds);
+  const userCount = await PatientTreatmentPackage.count({
+    where: {
+      treatmentPackageId: json.id,
+      deleted: false,
+      status: 'active',
+      expiresAt: { [Op.gt]: new Date() },
+    },
+  });
+  const improvementPercent = await computeImprovementPercent(json.id, configIds, json.centerId);
+
+  return {
+    ...json,
+    exerciseCount: configIds.length,
+    userCount,
+    improvementPercent,
+  };
+};
+
+const validateConfigIdsBelongToCenter = async (configIds, centerId) => {
+  if (!configIds.length) return;
+  const count = await ExerciseConfig.count({
+    where: { id: { [Op.in]: configIds }, centerId, deleted: false },
+  });
+  if (count !== configIds.length) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Một hoặc nhiều chế độ tập luyện không hợp lệ');
+  }
+};
+
+const createTreatmentPackage = async (body) => {
+  const exerciseConfigIds = normalizeConfigIds(body.exerciseConfigIds);
+  await validateConfigIdsBelongToCenter(exerciseConfigIds, body.centerId);
+
+  if (await TreatmentPackage.isDuplicateCode(body.code, body.centerId)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Mã gói điều trị đã tồn tại');
+  }
+
+  body.createdBy = body.updatedBy;
+  body.exerciseConfigIds = exerciseConfigIds;
+
+  const pkg = await TreatmentPackage.create(body);
+
+  await auditLogService.logEntityAuditEvent({
+    action: 'treatmentPackage.create',
+    entityType: 'treatmentPackage',
+    entityId: pkg.id,
+    centerId: pkg.centerId,
+    actorUserId: body.updatedBy || null,
+    metadata: { code: pkg.code, name: pkg.name },
+  });
+
+  return enrichPackageRow(pkg);
+};
+
+const queryTreatmentPackages = async (originalFilter, options) => {
+  const filter = { ...originalFilter, deleted: false };
+
+  if (filter.name) {
+    filter.name = { [Op.iRegexp]: removeAccents(escapeRegExp(filter.name)) };
+  }
+  if (filter.code) {
+    filter.code = { [Op.iRegexp]: removeAccents(escapeRegExp(filter.code)) };
+  }
+
+  const { limit, page, offset } = sanitizePagination(options.limit, options.page, 100);
+  const order = buildSortBy(options.sortBy, ['name', 'code', 'createdAt', 'durationDays']);
+
+  const { count, rows } = await TreatmentPackage.findAndCountAll({
+    where: filter,
+    limit,
+    offset,
+    order,
+  });
+
+  const enrichedRows = await Promise.all(rows.map((row) => enrichPackageRow(row)));
+
+  return {
+    rows: enrichedRows,
+    ...buildPagination(count, limit, page),
+  };
+};
+
+const getTreatmentPackageById = async (id) => {
+  const pkg = await TreatmentPackage.findOne({ where: { id, deleted: false } });
+  if (!pkg) return null;
+  return enrichPackageRow(pkg);
+};
+
+const updateTreatmentPackageById = async (packageId, updateBody) => {
+  const pkg = await TreatmentPackage.findOne({ where: { id: packageId, deleted: false } });
+  if (!pkg) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy gói điều trị');
+  }
+
+  if (updateBody.code && updateBody.code !== pkg.code) {
+    if (await TreatmentPackage.isDuplicateCode(updateBody.code, pkg.centerId, packageId)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Mã gói điều trị đã tồn tại');
+    }
+  }
+
+  if (updateBody.exerciseConfigIds) {
+    updateBody.exerciseConfigIds = normalizeConfigIds(updateBody.exerciseConfigIds);
+    await validateConfigIdsBelongToCenter(updateBody.exerciseConfigIds, pkg.centerId);
+  }
+
+  Object.assign(pkg, updateBody);
+  await pkg.save();
+
+  await auditLogService.logEntityAuditEvent({
+    action: 'treatmentPackage.update',
+    entityType: 'treatmentPackage',
+    entityId: pkg.id,
+    centerId: pkg.centerId,
+    actorUserId: updateBody.updatedBy || null,
+    metadata: { code: pkg.code, name: pkg.name },
+  });
+
+  return enrichPackageRow(pkg);
+};
+
+const deleteTreatmentPackageById = async (packageId, body) => {
+  const pkg = await TreatmentPackage.findOne({ where: { id: packageId, deleted: false } });
+  if (!pkg) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy gói điều trị');
+  }
+
+  pkg.deleted = true;
+  pkg.updatedBy = body.updatedBy;
+  await pkg.save();
+
+  await PatientTreatmentPackage.update(
+    { status: 'cancelled', deleted: true },
+    { where: { treatmentPackageId: packageId, deleted: false } }
+  );
+};
+
+const deleteTreatmentPackageByIds = async (body) => {
+  const ids = body.ids || [];
+  await Promise.all(ids.map((id) => deleteTreatmentPackageById(id, body)));
+};
+
+const assignPackageToPatient = async ({ patientId, treatmentPackageId, centerId, assignedBy }) => {
+  const pkg = await TreatmentPackage.findOne({
+    where: { id: treatmentPackageId, centerId, deleted: false },
+  });
+  if (!pkg) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy gói điều trị');
+  }
+
+  const assignedAt = new Date();
+  const expiresAt = addDays(assignedAt, pkg.durationDays);
+
+  await PatientTreatmentPackage.update(
+    { status: 'cancelled', deleted: true },
+    { where: { patientId, centerId, deleted: false, status: 'active' } }
+  );
+
+  const assignment = await PatientTreatmentPackage.create({
+    patientId,
+    treatmentPackageId,
+    centerId,
+    assignedAt,
+    expiresAt,
+    assignedBy,
+    status: 'active',
+  });
+
+  return assignment;
+};
+
+const getActivePatientPackage = async (patientId) => {
+  const now = new Date();
+  const row = await PatientTreatmentPackage.findOne({
+    where: {
+      patientId,
+      deleted: false,
+      status: 'active',
+      expiresAt: { [Op.gt]: now },
+    },
+    include: [{ model: TreatmentPackage, as: 'treatmentPackage', where: { deleted: false }, required: true }],
+    order: [['assignedAt', 'DESC']],
+  });
+
+  if (!row) return null;
+
+  return {
+    assignment: row,
+    treatmentPackage: row.treatmentPackage,
+    isExpired: false,
+    expiresAt: row.expiresAt,
+    allowedConfigIds: normalizeConfigIds(row.treatmentPackage.exerciseConfigIds),
+  };
+};
+
+const expireStaleAssignments = async (patientId) => {
+  await PatientTreatmentPackage.update(
+    { status: 'expired' },
+    {
+      where: {
+        patientId,
+        deleted: false,
+        status: 'active',
+        expiresAt: { [Op.lte]: new Date() },
+      },
+    }
+  );
+};
+
+const isExerciseConfigAccessibleForPatient = async (patientId, exerciseConfigId) => {
+  await expireStaleAssignments(patientId);
+  const active = await getActivePatientPackage(patientId);
+  if (!active) return true;
+  return active.allowedConfigIds.includes(Number(exerciseConfigId));
+};
+
+const filterAssignmentsByTreatmentPackage = async (patientId, assignments) => {
+  await expireStaleAssignments(patientId);
+  const active = await getActivePatientPackage(patientId);
+  if (!active) return assignments;
+
+  return assignments.filter((assignment) => {
+    const configId = assignment.exerciseConfigId ?? assignment.exerciseConfig?.id;
+    return active.allowedConfigIds.includes(Number(configId));
+  });
+};
+
+module.exports = {
+  createTreatmentPackage,
+  queryTreatmentPackages,
+  getTreatmentPackageById,
+  updateTreatmentPackageById,
+  deleteTreatmentPackageById,
+  deleteTreatmentPackageByIds,
+  assignPackageToPatient,
+  getActivePatientPackage,
+  isExerciseConfigAccessibleForPatient,
+  filterAssignmentsByTreatmentPackage,
+  normalizeConfigIds,
+};

@@ -1,0 +1,28 @@
+# Blueprint Render — backend API (Express).
+# Tạo Web Service từ repo GitHub, chọn "Apply render.yaml" hoặc cấu hình thủ công:
+#   Root Directory: eyesight-service
+#   Build: npm install --ignore-scripts
+#   Start: npm run start:node
+#   Health check: /api/v1/version
+
+services:
+  - type: web
+    name: eyesight-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: eyesight-service
+    buildCommand: npm install --ignore-scripts
+    startCommand: npm run start:node
+    healthCheckPath: /api/v1/version
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DB_USE_SSL
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false

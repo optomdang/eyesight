@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  eyesight-admin:
+    image: $IMAGE_NAME
+    container_name: admin
+    ports:
+        - "82:80"
+    restart: always
+    environment:
+        NODE_ENV: production
+    networks:
+      - eyesight-network
+networks:
+  eyesight-network:
+    driver: bridge

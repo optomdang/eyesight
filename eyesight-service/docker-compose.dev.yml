@@ -1,0 +1,6 @@
+version: '3'
+
+services:
+  eyesight-service:
+    container_name: eyesight-service-dev
+    command: yarn dev -L

@@ -1,0 +1,305 @@
+components:
+  schemas:
+    # Exam Configuration Schemas
+    ExamAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        examType:
+          type: string
+          enum: [far, near, contrast, stereopsis]
+        intervalDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 7
+        isEnabled:
+          type: boolean
+          default: true
+        notificationSettings:
+          $ref: '#/components/schemas/NotificationSettings'
+        centerId:
+          type: integer
+        updatedBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        patientId: 123
+        examType: "far"
+        intervalDays: 7
+        isEnabled: true
+        notificationSettings:
+          enabled: true
+          beforeDays: 1
+          time: "09:00"
+          methods: ["email"]
+        centerId: 1
+
+    NotificationSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        beforeDays:
+          type: integer
+          minimum: 0
+          maximum: 30
+          default: 1
+        time:
+          type: string
+          pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+          default: "09:00"
+        methods:
+          type: array
+          items:
+            type: string
+            enum: [email, zalo]
+          default: ["email"]
+
+    # Exam Session with Scheduling
+    ExamSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+        status:
+          type: string
+          enum: [incomplete, completed]
+          description: "Database status: incomplete (scheduled/in progress), completed (exam finished)"
+        scheduledDate:
+          type: string
+          format: date
+        examType:
+          type: string
+          enum: [far, near, contrast, stereopsis]
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        centerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        code: "EXAM_2024_ABC123"
+        patientId: 123
+        doctorId: 456
+        status: "incomplete"
+        scheduledDate: "2024-12-25"
+        examType: "far"
+        centerId: 1
+
+    # Exam Metrics
+    ExamMetric:
+      type: object
+      properties:
+        id:
+          type: integer
+        examResultId:
+          type: integer
+        examSessionId:
+          type: integer
+        patientId:
+          type: integer
+        examType:
+          type: string
+          enum: [far, near, contrast, stereopsis]
+        rightEyeLevel:
+          type: string
+        leftEyeLevel:
+          type: string
+        stereopsisLevel:
+          type: integer
+        averageResponseTime:
+          type: integer
+        correctAnswersCount:
+          type: integer
+        totalQuestionsCount:
+          type: integer
+        contrastSensitivity:
+          type: number
+        additionalMetrics:
+          type: object
+        centerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Compliance Report
+    PatientCompliance:
+      type: object
+      properties:
+        patient:
+          type: object
+          properties:
+            id:
+              type: integer
+            fullName:
+              type: string
+            phoneNumber:
+              type: string
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+            periodType:
+              type: string
+              enum: [week, month, quarter, year]
+        examTypes:
+          type: array
+          items:
+            type: object
+            properties:
+              examType:
+                type: string
+                enum: [far, near, contrast, stereopsis]
+              intervalDays:
+                type: integer
+              requiredExams:
+                type: integer
+              completedExams:
+                type: integer
+              performanceRate:
+                type: integer
+                minimum: 0
+                maximum: 100
+              latestExamDate:
+                type: string
+                format: date-time
+              isOverdue:
+                type: boolean
+        overallCompliance:
+          type: integer
+          minimum: 0
+          maximum: 100
+      example:
+        patient:
+          id: 123
+          fullName: "John Doe"
+          phoneNumber: "0901234567"
+        period:
+          from: "2024-11-01T00:00:00Z"
+          to: "2024-12-01T00:00:00Z"
+          periodType: "month"
+        examTypes:
+          - examType: "far"
+            intervalDays: 7
+            requiredExams: 4
+            completedExams: 3
+              performanceRate: 75
+            latestExamDate: "2024-11-25T10:30:00Z"
+            isOverdue: false
+        overallCompliance: 75
+
+    # Scheduled Exam Response
+    ScheduledExam:
+      type: object
+      properties:
+        patientId:
+          type: integer
+        patient:
+          type: object
+          properties:
+            id:
+              type: integer
+            fullName:
+              type: string
+            phoneNumber:
+              type: string
+        examType:
+          type: string
+          enum: [far, near, contrast, stereopsis]
+        nextDueDate:
+          type: string
+          format: date-time
+        intervalDays:
+          type: integer
+        isOverdue:
+          type: boolean
+        lastExamDate:
+          type: string
+          format: date-time
+      example:
+        patientId: 123
+        patient:
+          id: 123
+          fullName: "John Doe"
+          phoneNumber: "0901234567"
+        examType: "far"
+        nextDueDate: "2024-12-25T00:00:00Z"
+        intervalDays: 7
+        isOverdue: false
+        lastExamDate: "2024-12-18T10:30:00Z"
+
+  responses:
+    # Common API responses
+    ExamConfigCreated:
+      description: Exam configuration created successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExamAssignment'
+
+    ComplianceReport:
+      description: Patient exam performance report (calculated from ExamMetrics)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PatientCompliance'
+
+    ScheduledExams:
+      description: List of scheduled exams
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              rows:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExamSession'
+              count:
+                type: integer
+              limit:
+                type: integer
+              page:
+                type: integer
+              totalPages:
+                type: integer

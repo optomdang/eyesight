@@ -1,0 +1,98 @@
+/**
+ * @swagger
+ * tags:
+ *   name: LevelAdjustment
+ *   description: Level adjustment for patient exercises
+ */
+
+/**
+ * @swagger
+ * /level-adjustments/patient-exercises/{patientExerciseId}/adjust-level:
+ *   post:
+ *     summary: Auto-adjust level for a patient exercise
+ *     description: Auto-adjust difficulty level for a patient exercise based on specified criteria.
+ *     tags: [LevelAdjustment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientExerciseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Patient exercise ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adjustmentSource:
+ *                 type: string
+ *                 enum: [exam_result, doctor_setting, last_session]
+ *                 default: doctor_setting
+ *                 description: Source for level adjustment
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PatientExercise'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /level-adjustments/patient-exercises/{patientExerciseId}/toggle-auto-adjust:
+ *   patch:
+ *     summary: Toggle auto-adjustment for a patient exercise
+ *     description: Enable or disable automatic level adjustment for a patient exercise.
+ *     tags: [LevelAdjustment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientExerciseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Patient exercise ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               autoAdjust:
+ *                 type: boolean
+ *                 description: Enable or disable auto-adjustment
+ *               adjustmentSource:
+ *                 type: string
+ *                 enum: [exam_result, doctor_setting, last_session]
+ *                 description: Source for level adjustment
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PatientExercise'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */

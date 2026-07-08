@@ -1,0 +1,206 @@
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [patient, doctor, admin]
+        userType:
+          type: string
+          enum: [doctor, patient]
+        isEmailVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        email: "patient@example.com"
+        name: "John Doe"
+        role: "patient"
+        userType: "patient"
+        isEmailVerified: true
+
+    Exercise:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        exerciseType:
+          type: string
+          enum: [visual_tracking, contrast_sensitivity, peripheral_vision, visual_field]
+        status:
+          type: string
+          enum: [active, inactive]
+        centerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        name: "Visual Tracking Exercise"
+        code: "VTE001"
+        description: "Track moving objects with your eyes"
+        exerciseType: "visual_tracking"
+        status: "active"
+        centerId: 1
+
+    ExerciseConfig:
+      type: object
+      properties:
+        id:
+          type: integer
+        exerciseId:
+          type: integer
+        name:
+          type: string
+        version:
+          type: string
+        isDefault:
+          type: boolean
+        description:
+          type: string
+        levels:
+          type: object
+          description: "Visual settings for each level (1-5)"
+        passConditions:
+          type: object
+          description: "Conditions to pass the exercise"
+        autoAdjustmentRules:
+          type: object
+          description: "Rules for auto-adjusting visual level"
+        centerId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        exerciseId: 1
+        name: "Basic Visual Tracking"
+        version: "1.0"
+        isDefault: true
+        description: "Default configuration for visual tracking exercise"
+        centerId: 1
+
+    PatientExercise:
+      type: object
+      properties:
+        id:
+          type: integer
+        patientId:
+          type: integer
+        configId:
+          type: integer
+        level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        levelAssignedByDoctor:
+          type: boolean
+        overriddenConfig:
+          type: object
+        autoAdjustLevel:
+          type: boolean
+        adjustmentSource:
+          type: string
+          enum: [exam_result, doctor_setting, last_session]
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [active, completed, suspended]
+        centerId:
+          type: integer
+        assignedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: 1
+        patientId: 1
+        configId: 1
+        level: 2
+        levelAssignedByDoctor: true
+        autoAdjustLevel: false
+        adjustmentSource: "doctor_setting"
+        notes: "Start with level 2"
+        status: "active"
+        centerId: 1
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      example:
+        code: 404
+        message: "Resource not found"
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 401
+            message: "Please authenticate"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 403
+            message: "Forbidden"
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 404
+            message: "Not found"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

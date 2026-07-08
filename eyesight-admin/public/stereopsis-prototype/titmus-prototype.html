@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiểm tra thị giác lập thể</title>
+  <style>
+    :root {
+      --ink: #e8eef5; --panel: #1a1f2e; --border: #3d4f6f;
+      --accent: #6eb5ff; --green: #4ade80; --red: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0a0c10; color: var(--ink); min-height: 100vh; line-height: 1.5; }
+
+    header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+    header h1 { font-size: 1.15rem; margin-bottom: 0.15rem; }
+    header p { font-size: 0.82rem; opacity: 0.75; }
+
+    main { max-width: 680px; margin: 0 auto; padding: 1rem 1rem 130px; }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── INSTRUCTIONS ── */
+    .hint-box {
+      background: #141a28; border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.1rem 1.2rem; margin-bottom: 0.85rem;
+    }
+    .hint-box h2 { font-size: 0.95rem; color: var(--accent); margin-bottom: 0.55rem; }
+    .hint-box ul { padding-left: 1.1rem; }
+    .hint-box li { font-size: 0.875rem; margin-bottom: 0.3rem; }
+    .steps-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
+    .steps-table th, .steps-table td { padding: 0.35rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .steps-table th { color: var(--accent); font-size: 0.8rem; }
+    .btn-start {
+      display: block; width: 100%; max-width: 300px; margin: 1.2rem auto 0;
+      padding: 0.85rem; background: var(--accent); color: #0a0c10;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-start:hover { background: #9ecfff; }
+
+    /* ── STEP HEADER ── */
+    .step-header {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 0.75rem;
+    }
+    .step-label { font-size: 0.95rem; font-weight: 700; color: var(--accent); }
+    .step-prog  { font-size: 0.75rem; opacity: 0.6; margin-top: 0.1rem; }
+    .step-arc   { font-size: 1.3rem; font-weight: 700; text-align: right; }
+    .step-diff  { font-size: 0.72rem; opacity: 0.6; text-align: right; }
+
+    /* ── CANVAS AREA ── */
+    .canvas-area {
+      background: #000; border-radius: 10px;
+      display: flex; justify-content: center; align-items: center;
+      padding: 8px; margin-bottom: 0.6rem; min-height: 160px;
+    }
+    .canvas-area canvas {
+      display: block; max-width: 100%; height: auto; image-rendering: pixelated;
+    }
+    /* Shape-row: 5 canvases side by side */
+    .row-area {
+      background: #000; border-radius: 10px;
+      padding: 10px; margin-bottom: 0.6rem;
+    }
+    .row-figs { display: flex; gap: 4px; justify-content: center; }
+    .row-figs canvas { display: block; width: 100%; max-width: 120px; height: auto; image-rendering: pixelated; }
+
+    /* Loading */
+    .loading-msg { padding: 2rem; text-align: center; opacity: 0.55; font-size: 0.9rem; }
+
+    .step-question {
+      text-align: center; font-size: 0.88rem; opacity: 0.78; margin-bottom: 0.4rem;
+    }
+
+    /* ── ANSWER BAR (sticky bottom) ── */
+    #answer-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0e1117; border-top: 1px solid var(--border);
+      padding: 0.65rem 1rem 0.75rem; z-index: 200;
+    }
+    .answer-inner { max-width: 680px; margin: 0 auto; }
+
+    .feedback-row {
+      text-align: center; font-size: 0.88rem; font-weight: 600;
+      min-height: 1.5rem; margin-bottom: 0.45rem;
+      transition: opacity 0.15s;
+    }
+    .feedback-row.correct { color: var(--green); }
+    .feedback-row.wrong   { color: var(--red); }
+
+    /* Shape choice buttons */
+    .shape-choices {
+      display: flex; gap: 5px; flex-wrap: wrap;
+      justify-content: center; margin-bottom: 0.5rem;
+    }
+    .shape-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      padding: 0.45rem 0.55rem; min-width: 66px;
+      background: #1e2840; border: 2px solid var(--border);
+      border-radius: 8px; color: var(--ink); cursor: pointer;
+      font-size: 0.78rem; font-weight: 600; transition: border-color 0.12s, background 0.12s;
+    }
+    .shape-btn .ico { font-size: 1.2rem; line-height: 1.2; }
+    .shape-btn:hover { border-color: var(--accent); }
+    .shape-btn.selected { border-color: var(--accent); background: #1b3555; }
+
+    /* Digit input */
+    .digit-row {
+      display: flex; gap: 10px; justify-content: center;
+      align-items: center; margin-bottom: 0.5rem;
+    }
+    .digit-input {
+      width: 72px; padding: 0.5rem; text-align: center;
+      font-size: 1.6rem; font-weight: 700;
+      background: #1e2840; border: 2px solid var(--border);
+      border-radius: 8px; color: var(--ink); outline: none;
+    }
+    .digit-input:focus { border-color: var(--accent); }
+    .digit-hint { font-size: 0.82rem; opacity: 0.65; }
+
+    .btn-confirm {
+      display: block; width: 100%;
+      padding: 0.6rem; background: var(--accent); color: #0a0c10;
+      border: none; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-confirm:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-confirm:not(:disabled):hover { background: #9ecfff; }
+
+    /* ── RESULT SCREEN ── */
+    .result-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2rem 1.5rem;
+      text-align: center; margin-top: 1.5rem;
+    }
+    .result-icon   { font-size: 3rem; margin-bottom: 0.5rem; }
+    .result-title  { font-size: 1rem; opacity: 0.8; margin-bottom: 0.3rem; }
+    .result-score  { font-size: 3.2rem; font-weight: 700; color: var(--accent); }
+    .result-unit   { font-size: 1rem; font-weight: 400; opacity: 0.7; margin-left: 2px; }
+    .result-detail { font-size: 0.85rem; opacity: 0.65; margin: 0.5rem 0 1.5rem; line-height: 1.6; }
+    .result-row    { display: flex; gap: 1rem; justify-content: center; }
+    .btn-restart   { padding: 0.7rem 1.6rem; background: var(--accent); color: #0a0c10; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+    .btn-instr     { padding: 0.7rem 1.2rem; background: transparent; color: var(--ink); border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem; cursor: pointer; }
+    .btn-restart:hover { background: #9ecfff; }
+
+    @media (max-width: 500px) {
+      .shape-btn { min-width: 52px; font-size: 0.72rem; }
+      .shape-btn .ico { font-size: 1.05rem; }
+      .result-score { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Kiểm tra thị giác lập thể</h1>
+  <p>Kính anaglyph: đỏ mắt trái · xanh mắt phải</p>
+</header>
+
+<main>
+
+  <!-- ════ INSTRUCTIONS ════ -->
+  <div id="screen-instr" class="screen active">
+    <div class="hint-box">
+      <h2>Hướng dẫn thực hiện</h2>
+      <ul>
+        <li>Đeo <strong>kính đỏ–xanh (anaglyph)</strong>: kính đỏ mắt trái, kính xanh mắt phải.</li>
+        <li>Ngồi cách màn hình khoảng <strong>40 cm</strong>, nhìn thẳng vào giữa hình.</li>
+        <li>Nếu thấy <strong>hình hoặc số nổi lên</strong> khỏi nền, chọn/nhập đáp án ở thanh dưới rồi bấm <em>Xác nhận</em>.</li>
+        <li>Đúng → tự động sang bước tiếp theo · Sai → bài dừng và hiển thị kết quả.</li>
+        <li>Hình/số ngẫu nhiên mỗi lần làm, không cố định.</li>
+      </ul>
+    </div>
+    <div class="hint-box">
+      <h2>Trình tự bài kiểm tra (12 bước)</h2>
+      <table class="steps-table">
+        <tr><th>Bước</th><th>Nội dung</th><th>Giá trị</th><th>Đáp án</th></tr>
+        <tr><td>1</td><td>Mục 1 — hình đơn</td><td>800″</td><td>Chọn hình</td></tr>
+        <tr><td>2</td><td>Hàng A — 5 ô</td><td>400″</td><td>Chọn hình</td></tr>
+        <tr><td>3</td><td>Hàng B — 5 ô</td><td>200″</td><td>Chọn hình</td></tr>
+        <tr><td>4–12</td><td>Hình 1–9 (số trong vòng tròn)</td><td>200″ → 20″</td><td>Nhập số</td></tr>
+      </table>
+    </div>
+    <button class="btn-start" id="btn-start">Bắt đầu kiểm tra</button>
+  </div>
+
+  <!-- ════ TEST ════ -->
+  <div id="screen-test" class="screen">
+    <div class="step-header">
+      <div>
+        <div class="step-label" id="step-label">Mục 1</div>
+        <div class="step-prog"  id="step-prog">Bước 1 / 12</div>
+      </div>
+      <div>
+        <div class="step-arc"  id="step-arc">800″</div>
+        <div class="step-diff" id="step-diff">Mức khởi động</div>
+      </div>
+    </div>
+    <div id="canvas-area" class="canvas-area">
+      <div class="loading-msg">Đang tải…</div>
+    </div>
+    <div id="step-question" class="step-question"></div>
+  </div>
+
+  <!-- ════ RESULT ════ -->
+  <div id="screen-result" class="screen">
+    <div class="result-card">
+      <div class="result-icon"  id="res-icon">📋</div>
+      <div class="result-title" id="res-title">Kết quả kiểm tra</div>
+      <div>
+        <span class="result-score" id="res-score">—</span>
+        <span class="result-unit"  id="res-unit"></span>
+      </div>
+      <div class="result-detail" id="res-detail"></div>
+      <div class="result-row">
+        <button class="btn-restart" id="btn-restart">Làm lại</button>
+        <button class="btn-instr"   id="btn-instr">Hướng dẫn</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ════ ANSWER BAR (fixed bottom) ════ -->
+<div id="answer-bar" style="display:none">
+  <div class="answer-inner">
+    <div class="feedback-row" id="feedback"></div>
+
+    <!-- Shape choices (mục 1 + hàng A/B) -->
+    <div class="shape-choices" id="shape-choices">
+      <button class="shape-btn" data-val="circle">  <span class="ico">⬤</span>Tròn</button>
+      <button class="shape-btn" data-val="triangle"><span class="ico">▲</span>Tam giác</button>
+      <button class="shape-btn" data-val="square">  <span class="ico">■</span>Vuông</button>
+      <button class="shape-btn" data-val="star">    <span class="ico">★</span>Ngôi sao</button>
+      <button class="shape-btn" data-val="diamond"> <span class="ico">◆</span>Hình thoi</button>
+      <button class="shape-btn" data-val="rect">    <span class="ico">▬</span>Chữ nhật</button>
+    </div>
+
+    <!-- Digit input (hình 1–9) -->
+    <div class="digit-row" id="digit-row" style="display:none">
+      <input type="text" class="digit-input" id="digit-input" maxlength="1" inputmode="numeric" pattern="[0-9]" placeholder="?" autocomplete="off" />
+      <span class="digit-hint">Số nổi lên (0–9)</span>
+    </div>
+
+    <button class="btn-confirm" id="btn-confirm" disabled>Xác nhận</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   RDS ANAGLYPH ENGINE
+   ═══════════════════════════════════════════════════════════════ */
+const DOT   = 2;
+const MONO  = { r: 255, g: 0, b: 0 };
+const MONO_B= { r: 0,   g: 0, b: 255 };
+let seed = 1;
+
+const rnd    = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const rndInt = (n) => Math.floor(rnd() * n);
+
+function paintAnaglyph(canvas, w, h, maskFn, opts = {}) {
+  const depthIn       = opts.depthIn       ?? false;
+  const density       = opts.density       ?? 0.5;
+  const dotPx         = opts.dotPx         ?? DOT;
+  const shiftCells    = opts.shiftCells    ?? 4;
+  const fieldFn       = opts.fieldFn       ?? (() => true);
+  const balancedStereo= opts.balancedStereo ?? false;
+
+  const pad  = 4;
+  const cols = Math.ceil((w - pad * 2) / dotPx);
+  const rows = Math.ceil((h - pad * 2) / dotPx);
+  const dots = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+  for (let gy = 0; gy < rows; gy++)
+    for (let gx = 0; gx < cols; gx++) {
+      const cx = pad + gx * dotPx + dotPx / 2;
+      const cy = pad + gy * dotPx + dotPx / 2;
+      if (fieldFn(cx, cy) && rnd() <= density) dots[gy][gx] = true;
+    }
+
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  for (let i = 3; i < w * h * 4; i += 4) img.data[i] = 255; // alpha
+
+  const stamp = (x, y, r, g, b) => {
+    for (let dy = 0; dy < dotPx; dy++)
+      for (let dx = 0; dx < dotPx; dx++) {
+        const px = x + dx, py = y + dy;
+        if (px < 0 || py < 0 || px >= w || py >= h) continue;
+        const i = (py * w + px) * 4;
+        img.data[i]   = Math.max(img.data[i],   r);
+        img.data[i+1] = Math.max(img.data[i+1], g);
+        img.data[i+2] = Math.max(img.data[i+2], b);
+        img.data[i+3] = 255;
+      }
+  };
+  const hasDot = (gx, gy) => gx >= 0 && gx < cols && gy >= 0 && gy < rows && dots[gy][gx];
+
+  for (let gy = 0; gy < rows; gy++)
+    for (let gx = 0; gx < cols; gx++) {
+      const x = pad + gx * dotPx, y = pad + gy * dotPx;
+      const cx = x + dotPx / 2,  cy = y + dotPx / 2;
+      if (!fieldFn(cx, cy)) continue;
+
+      const hit   = maskFn(cx, cy);
+      const shift = hit ? (depthIn ? -shiftCells : shiftCells) : 0;
+
+      if (balancedStereo && shift !== 0) {
+        const half = Math.max(1, Math.round(Math.abs(shift) / 2));
+        const sign = shift > 0 ? 1 : -1;
+        if (hasDot(gx - sign * half, gy)) stamp(x, y, MONO.r,  MONO.g,  MONO.b);
+        if (hasDot(gx + sign * half, gy)) stamp(x, y, MONO_B.r,MONO_B.g,MONO_B.b);
+        continue;
+      }
+      if (hasDot(gx, gy)) stamp(x, y, MONO.r, MONO.g, MONO.b);
+      if (hasDot(hit ? gx + shift : gx, gy)) stamp(x, y, MONO_B.r, MONO_B.g, MONO_B.b);
+    }
+
+  ctx.putImageData(img, 0, 0);
+}
+
+/* ── geometry helpers ── */
+const inCircle = (x, y, cx, cy, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+
+const inTriangle = (x, y, x1, y1, x2, y2, x3, y3) => {
+  const den = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3);
+  if (Math.abs(den) < 1e-6) return false;
+  const a = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / den;
+  const b = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / den;
+  return a >= 0 && b >= 0 && (1 - a - b) >= 0;
+};
+
+const inPolygon = (x, y, pts) => {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if (((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+};
+
+const inStar = (x, y, cx, cy, outerR, innerRatio = 0.38) => {
+  const innerR = outerR * innerRatio, pts = [];
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    pts.push([cx + (i % 2 === 0 ? outerR : innerR) * Math.cos(ang),
+              cy + (i % 2 === 0 ? outerR : innerR) * Math.sin(ang)]);
+  }
+  return inPolygon(x, y, pts);
+};
+
+const arcsecToShiftCells = (arc, { minArc=20, maxArc=200, minCells=2, maxCells=8 } = {}) => {
+  const a = Math.max(minArc, Math.min(maxArc, arc));
+  const t = (a - minArc) / (maxArc - minArc);
+  return Math.max(minCells, Math.round(minCells + t * (maxCells - minCells)));
+};
+
+const shiftCellsForDotPx = (cells, dotPx) => Math.max(1, Math.round(cells * DOT / dotPx));
+
+/* ── mask helpers ── */
+function introShapeMask(type, x, y, cx, cy, fieldR) {
+  if (type === 'square')   return Math.abs(x - cx) <= fieldR * 0.612 && Math.abs(y - cy) <= fieldR * 0.612;
+  if (type === 'triangle') return inTriangle(x, y, cx, cy - fieldR * 0.72, cx - fieldR * 0.72, cy + fieldR * 0.72 * 0.75, cx + fieldR * 0.72, cy + fieldR * 0.72 * 0.75);
+  if (type === 'star')     return inStar(x, y, cx, cy, fieldR * 0.8);
+  return false;
+}
+
+function geoShapeMask(type, x, y, cx, cy, sz) {
+  const h = sz * 0.44;
+  if (type === 'circle')   return inCircle(x, y, cx, cy, h);
+  if (type === 'square')   return Math.abs(x - cx) <= h && Math.abs(y - cy) <= h;
+  if (type === 'triangle') return inTriangle(x, y, cx, cy - h, cx - h, cy + h * 0.75, cx + h, cy + h * 0.75);
+  return false;
+}
+
+/* ── digit glyph ── */
+const glyphCache = {};
+const DIGIT_DOT_PX = 7;
+
+function getGlyph(digit, size) {
+  const key = `${digit}@${size}`;
+  if (!glyphCache[key]) {
+    const off = document.createElement('canvas');
+    off.width = off.height = size;
+    const ctx = off.getContext('2d');
+    const fp  = Math.round(size * 0.86);
+    ctx.font = `700 ${fp}px Arial, Helvetica, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(3, size * 0.023);
+    ctx.strokeText(String(digit), size / 2, size / 2 + size * 0.04);
+    ctx.fillStyle = '#fff';
+    ctx.fillText  (String(digit), size / 2, size / 2 + size * 0.04);
+    glyphCache[key] = ctx.getImageData(0, 0, size, size);
+  }
+  return glyphCache[key];
+}
+
+function digitAt(x, y, d, cx, cy, size) {
+  const img = getGlyph(d, size);
+  const lx = Math.floor(x - cx + size / 2), ly = Math.floor(y - cy + size / 2);
+  if (lx < 0 || ly < 0 || lx >= size || ly >= size) return false;
+  return img.data[(ly * size + lx) * 4 + 3] > 48;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STEP RENDERERS
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Mục 1: single circle with floating shape inside (800") */
+function renderShapeSingle(container, type) {
+  const w = 520, h = 520, cx = w / 2, cy = h / 2, fieldR = 215;
+  const cv = document.createElement('canvas');
+  const cells = arcsecToShiftCells(800, { minArc: 20, maxArc: 800, minCells: 2, maxCells: 12 });
+  paintAnaglyph(cv, w, h,
+    (x, y) => inCircle(x, y, cx, cy, fieldR) && introShapeMask(type, x, y, cx, cy, fieldR),
+    { shiftCells: cells, depthIn: false, fieldFn: (x, y) => inCircle(x, y, cx, cy, fieldR), dotPx: DOT }
+  );
+  container.innerHTML = '';
+  container.className = 'canvas-area';
+  container.appendChild(cv);
+}
+
+/** Hàng A / B: 5 small canvases, one with floating shape */
+function renderShapeRow(container, floatShape, floatAt, arcsec) {
+  const cells   = arcsecToShiftCells(arcsec, { minArc: 20, maxArc: 400, minCells: 2, maxCells: 8 });
+  const fillers = ['circle', 'triangle', 'square'];
+  const sz      = 180;
+  const figs    = document.createElement('div');
+  figs.className = 'row-figs';
+
+  for (let i = 0; i < 5; i++) {
+    const t  = i === floatAt ? floatShape : fillers[rndInt(fillers.length)];
+    const cv = document.createElement('canvas');
+    paintAnaglyph(cv, sz, sz,
+      (x, y) => i === floatAt && geoShapeMask(t, x, y, sz / 2, sz / 2, sz),
+      { shiftCells: cells, depthIn: false, balancedStereo: true, dotPx: DOT }
+    );
+    figs.appendChild(cv);
+  }
+  container.innerHTML = '';
+  container.className = 'row-area';
+  container.appendChild(figs);
+}
+
+/** Hình 1–9: digit inside circle */
+function renderDigitPanel(container, digit, arcsec) {
+  const s = 1080, cx = s / 2, cy = s / 2, outerR = s * 0.47, digitSize = 756;
+  const cv = document.createElement('canvas');
+  cv.style.maxWidth = '480px'; cv.style.width = '100%';
+  const cells = arcsecToShiftCells(arcsec);
+  paintAnaglyph(cv, s, s,
+    (x, y) => inCircle(x, y, cx, cy, outerR) && digitAt(x, y, digit, cx, cy, digitSize),
+    { shiftCells: shiftCellsForDotPx(cells, DIGIT_DOT_PX), depthIn: false,
+      fieldFn: (x, y) => inCircle(x, y, cx, cy, outerR), dotPx: DIGIT_DOT_PX }
+  );
+  container.innerHTML = '';
+  container.className = 'canvas-area';
+  container.appendChild(cv);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEST STATE MACHINE
+   ═══════════════════════════════════════════════════════════════ */
+const DIGIT_ARCSEC = [200, 150, 100, 80, 60, 40, 32, 25, 20];
+const DIGIT_DIFF   = ['Dễ nhất','','','','Trung bình','','','','Khó nhất'];
+const INTRO_SHAPES = ['star', 'triangle', 'square'];
+
+let testSteps    = [];
+let stepIdx      = 0;
+let selAnswer    = null;
+let locked       = false;
+
+function generateSteps() {
+  const introType  = INTRO_SHAPES[rndInt(INTRO_SHAPES.length)];
+  const floatAtA   = rndInt(5);
+  const floatAtB   = rndInt(5);
+  const digits     = DIGIT_ARCSEC.map(() => rndInt(10));
+
+  return [
+    { type: 'shape-single', arcsec: 800, label: 'Mục 1',  diff: 'Mức khởi động', answer: introType, shapeType: introType },
+    { type: 'shape-row',    arcsec: 400, label: 'Hàng A', diff: 'Dễ',            answer: 'square', floatShape: 'square', floatAt: floatAtA },
+    { type: 'shape-row',    arcsec: 200, label: 'Hàng B', diff: 'Trung bình',    answer: 'circle', floatShape: 'circle', floatAt: floatAtB },
+    ...DIGIT_ARCSEC.map((arcsec, i) => ({
+      type: 'digit', arcsec,
+      label: `Hình ${i + 1}`, diff: DIGIT_DIFF[i],
+      answer: String(digits[i]), digit: digits[i],
+    })),
+  ];
+}
+
+const SHAPE_LABELS = { circle:'Tròn', triangle:'Tam giác', square:'Vuông', star:'Ngôi sao', diamond:'Hình thoi', rect:'Chữ nhật' };
+
+function showScreen(id) {
+  ['screen-instr','screen-test','screen-result'].forEach((s) =>
+    document.getElementById(s).classList.toggle('active', s === id));
+}
+
+function startTest() {
+  seed        = (Date.now() % 2147483646) + 1;
+  testSteps   = generateSteps();
+  stepIdx     = 0;
+  selAnswer   = null;
+  locked      = false;
+  showScreen('screen-test');
+  document.getElementById('answer-bar').style.display = '';
+  renderCurrentStep();
+}
+
+function renderCurrentStep() {
+  const step = testSteps[stepIdx];
+  selAnswer  = null;
+  locked     = false;
+
+  /* header */
+  document.getElementById('step-label').textContent = step.label;
+  document.getElementById('step-prog') .textContent = `Bước ${stepIdx + 1} / ${testSteps.length}`;
+  document.getElementById('step-arc')  .textContent = `${step.arcsec}″`;
+  document.getElementById('step-diff') .textContent = step.diff;
+
+  /* feedback clear */
+  const fb = document.getElementById('feedback');
+  fb.textContent = '';
+  fb.className   = 'feedback-row';
+
+  /* confirm btn */
+  document.getElementById('btn-confirm').disabled = true;
+
+  /* show loading, then render asynchronously */
+  const ca = document.getElementById('canvas-area');
+  ca.innerHTML = '<div class="loading-msg">Đang tải…</div>';
+
+  setTimeout(() => {
+    if (step.type === 'shape-single') {
+      renderShapeSingle(ca, step.shapeType);
+      document.getElementById('step-question').textContent = 'Hình nào nổi lên khỏi nền?';
+      switchAnswerMode('shape');
+    } else if (step.type === 'shape-row') {
+      renderShapeRow(ca, step.floatShape, step.floatAt, step.arcsec);
+      document.getElementById('step-question').textContent = 'Trong 5 ô, ô nào nổi lên? (chọn hình bạn thấy)';
+      switchAnswerMode('shape');
+    } else {
+      renderDigitPanel(ca, step.digit, step.arcsec);
+      document.getElementById('step-question').textContent = 'Số nào nổi lên bên trong vòng tròn?';
+      switchAnswerMode('digit');
+    }
+  }, 16);
+}
+
+function switchAnswerMode(mode) {
+  const isShape = mode === 'shape';
+  document.getElementById('shape-choices').style.display = isShape ? '' : 'none';
+  document.getElementById('digit-row')    .style.display = isShape ? 'none' : '';
+  document.querySelectorAll('.shape-btn').forEach((b) => b.classList.remove('selected'));
+  if (!isShape) {
+    const inp = document.getElementById('digit-input');
+    inp.value = '';
+    setTimeout(() => inp.focus(), 50);
+  }
+}
+
+function showFeedback(correct, correctAns) {
+  const fb = document.getElementById('feedback');
+  const step = testSteps[stepIdx];
+  if (correct) {
+    fb.textContent = '✓ Đúng!';
+    fb.className   = 'feedback-row correct';
+  } else {
+    const label = step.type === 'digit' ? correctAns : (SHAPE_LABELS[correctAns] || correctAns);
+    fb.textContent = `✗ Sai! Đáp án đúng: ${label}`;
+    fb.className   = 'feedback-row wrong';
+  }
+}
+
+function confirmAnswer() {
+  if (locked) return;
+  const step  = testSteps[stepIdx];
+  let   userAns;
+
+  if (step.type === 'digit') {
+    userAns = document.getElementById('digit-input').value.trim();
+  } else {
+    userAns = selAnswer;
+  }
+  if (userAns === null || userAns === '') return;
+
+  locked = true;
+  document.getElementById('btn-confirm').disabled = true;
+
+  const correct = userAns === String(step.answer);
+  showFeedback(correct, step.answer);
+
+  if (correct) {
+    setTimeout(() => {
+      stepIdx++;
+      if (stepIdx >= testSteps.length) showResult(true);
+      else renderCurrentStep();
+    }, 700);
+  } else {
+    setTimeout(() => showResult(false), 1400);
+  }
+}
+
+function showResult(allPassed) {
+  document.getElementById('answer-bar').style.display = 'none';
+  showScreen('screen-result');
+
+  const failedStep      = allPassed ? null : testSteps[stepIdx];
+  const lastPassedArc   = stepIdx > 0 ? testSteps[stepIdx - 1].arcsec : null;
+
+  if (allPassed) {
+    document.getElementById('res-icon')  .textContent = '🏆';
+    document.getElementById('res-title') .textContent = 'Hoàn thành toàn bộ bài kiểm tra!';
+    document.getElementById('res-score') .textContent = '20';
+    document.getElementById('res-unit')  .textContent = '″';
+    document.getElementById('res-detail').textContent = 'Đạt ngưỡng tối thiểu 20 giây cung — thị giác lập thể bình thường.';
+  } else if (lastPassedArc !== null) {
+    document.getElementById('res-icon')  .textContent = '📋';
+    document.getElementById('res-title') .textContent = 'Ngưỡng thị giác lập thể đạt được:';
+    document.getElementById('res-score') .textContent = String(lastPassedArc);
+    document.getElementById('res-unit')  .textContent = '″';
+    document.getElementById('res-detail').textContent =
+      `Không nhận diện đúng ở mức ${failedStep.arcsec}″ (${failedStep.label}).\nKết quả ghi nhận: ${lastPassedArc} giây cung.`;
+  } else {
+    document.getElementById('res-icon')  .textContent = '📋';
+    document.getElementById('res-title') .textContent = 'Không vượt qua bước khởi động';
+    document.getElementById('res-score') .textContent = '—';
+    document.getElementById('res-unit')  .textContent = '';
+    document.getElementById('res-detail').textContent =
+      'Không nhận diện được hình ở mức 800″. Kiểm tra kính và thử lại.';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EVENT BINDINGS
+   ═══════════════════════════════════════════════════════════════ */
+document.getElementById('btn-start')  .addEventListener('click', startTest);
+document.getElementById('btn-restart').addEventListener('click', startTest);
+document.getElementById('btn-instr')  .addEventListener('click', () => {
+  document.getElementById('answer-bar').style.display = 'none';
+  showScreen('screen-instr');
+});
+
+document.querySelectorAll('.shape-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (locked) return;
+    document.querySelectorAll('.shape-btn').forEach((b) => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selAnswer = btn.dataset.val;
+    document.getElementById('btn-confirm').disabled = false;
+  });
+});
+
+document.getElementById('digit-input').addEventListener('input', (e) => {
+  const v = e.target.value.trim();
+  document.getElementById('btn-confirm').disabled = !/^[0-9]$/.test(v);
+});
+document.getElementById('digit-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('btn-confirm').disabled) confirmAnswer();
+});
+
+document.getElementById('btn-confirm').addEventListener('click', confirmAnswer);
+</script>
+</body>
+</html>
