@@ -20,7 +20,7 @@ const standardQuery = async (Model, originalFilter, options, includeConfig = [])
 
     // Build pagination and sorting with query utilities
     const { limit, page, offset } = sanitizePagination(options.limit, options.page, 100);
-    const order = buildSortBy(options.sortBy, ['id', 'code', 'name', 'createdAt', 'updatedAt']);
+    const order = buildSortBy(options.sortBy, ['id', 'code', 'name', 'exerciseType', 'createdAt', 'updatedAt'], options.order);
 
     // Optimize includes by adding attribute selection where missing
     const optimizedIncludes = includeConfig.map((include) => {

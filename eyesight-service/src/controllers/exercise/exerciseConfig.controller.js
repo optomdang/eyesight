@@ -12,11 +12,34 @@ const assertCanAccessExerciseConfig = (config, user) => {
   }
 };
 
+const assertCanMutateExerciseConfig = (config, user) => {
+  if (!exerciseConfigService.canUserMutateExerciseConfig(config, user)) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Chỉ quản trị viên mới được sửa hoặc xóa chế độ tập luyện mặc định của hệ thống'
+    );
+  }
+};
+
 /**
  * Create a new exercise configuration
  */
 const createExerciseConfig = catchAsync(async (req, res) => {
-  const config = await exerciseConfigService.createExerciseConfig(req.body);
+  const body = {
+    ...req.body,
+    centerId: req.user.centerId,
+    createdBy: req.body.createdBy ?? req.user.id,
+    updatedBy: req.user.id,
+  };
+
+  // Doctors may only create personal (doctor) configs — never system/admin catalog modes
+  if (req.user.userType === 'doctor') {
+    body.configType = 'doctor';
+  } else if (req.user.userType === 'admin') {
+    body.configType = body.configType === 'doctor' ? 'doctor' : 'admin';
+  }
+
+  const config = await exerciseConfigService.createExerciseConfig(body);
   res.status(httpStatus.CREATED).send(config);
 });
 
@@ -35,12 +58,15 @@ const getExerciseConfigByExerciseId = catchAsync(async (req, res) => {
  * Update exercise configuration by exercise ID
  */
 const updateExerciseConfig = catchAsync(async (req, res) => {
-  // First, get the config ID for this exercise
   const config = await exerciseConfigService.getExerciseConfigByExerciseId(req.params.exerciseId, req.user.centerId);
   if (!config) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Exercise configuration not found');
   }
-  // Then update the config using its ID
+  assertCanAccessExerciseConfig(config, req.user);
+  assertCanMutateExerciseConfig(config, req.user);
+  if (req.user.userType === 'doctor' && req.body?.configType) {
+    req.body.configType = 'doctor';
+  }
   const updatedConfig = await exerciseConfigService.updateExerciseConfigById(config.id, req.body);
   res.send(updatedConfig);
 });
@@ -49,12 +75,12 @@ const updateExerciseConfig = catchAsync(async (req, res) => {
  * Delete exercise configuration by exercise ID
  */
 const deleteExerciseConfig = catchAsync(async (req, res) => {
-  // First, get the config ID for this exercise
   const config = await exerciseConfigService.getExerciseConfigByExerciseId(req.params.exerciseId, req.user.centerId);
   if (!config) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Exercise configuration not found');
   }
-  // Then delete the config using its ID
+  assertCanAccessExerciseConfig(config, req.user);
+  assertCanMutateExerciseConfig(config, req.user);
   await exerciseConfigService.deleteExerciseConfigById(config.id, req.body);
   res.status(httpStatus.NO_CONTENT).send();
 });
@@ -88,6 +114,12 @@ const updateExerciseConfigById = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to update this exercise config');
   }
   assertCanAccessExerciseConfig(existingConfig, req.user);
+  assertCanMutateExerciseConfig(existingConfig, req.user);
+
+  // Doctors cannot elevate a personal config into a system template
+  if (req.user.userType === 'doctor' && req.body?.configType) {
+    req.body.configType = 'doctor';
+  }
 
   const config = await exerciseConfigService.updateExerciseConfigById(req.params.configId, req.body);
   res.send(config);
@@ -106,6 +138,7 @@ const deleteExerciseConfigById = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to delete this exercise config');
   }
   assertCanAccessExerciseConfig(existingConfig, req.user);
+  assertCanMutateExerciseConfig(existingConfig, req.user);
 
   await exerciseConfigService.deleteExerciseConfigById(req.params.configId, req.body);
   res.status(httpStatus.NO_CONTENT).send();

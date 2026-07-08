@@ -57,8 +57,11 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
       params.append('page', (currentPage + 1).toString());
       params.append('limit', currentLimit.toString());
       if (currentSortOrder && currentSortOrder.name && currentSortOrder.direction) {
-        params.append('sortBy', currentSortOrder.name);
-        params.append('order', currentSortOrder.direction.toUpperCase()); // Backend expects uppercase ASC/DESC
+        // Backend buildSortBy expects "field:ASC|DESC" (also accepts separate order for compat).
+        params.append(
+          'sortBy',
+          `${currentSortOrder.name}:${currentSortOrder.direction.toUpperCase()}`
+        );
       }
       // Thêm các tham số filter
       Object.entries(filterOverride ?? filter).forEach(([key, value]) => {
@@ -79,7 +82,6 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
       currentSortOrder?: { name: string; direction: 'asc' | 'desc' },
       filterOverride?: FilterTable
     ) => {
-      setDataRes({ count: 0, limit: 0, page: 0, rows: [], totalPages: 0 });
       setLoading(true);
       try {
         // Nếu không có tham số truyền vào, lấy mặc định từ tableState
@@ -91,6 +93,7 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
         setDataRes(response);
       } catch (error) {
         console.error('Lỗi khi fetch dữ liệu:', error);
+        // Keep previous rows on failure — clearing first caused empty "Không có dữ liệu" on sort errors.
       } finally {
         setLoading(false);
       }

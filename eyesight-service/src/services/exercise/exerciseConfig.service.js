@@ -85,14 +85,15 @@ const _getVisionString = (visionType, visionLevel) => {
 };
 
 /**
- * Whether the user may read/update/delete this exercise config (list filtering is separate).
- * @param {Object} config
- * @param {Object} user
- * @returns {boolean}
+ * System templates (`admin` / legacy `system`) are readable by doctors (assign) but only
+ * writable by center admins.
  */
 const isAdminManagedConfigType = (configType) =>
   configType === 'admin' || configType === 'system';
 
+/**
+ * Whether the user may read this exercise config (list filtering is separate).
+ */
 const canUserAccessExerciseConfig = (config, user) => {
   if (!config || !user) {
     return true;
@@ -101,12 +102,11 @@ const canUserAccessExerciseConfig = (config, user) => {
     return false;
   }
   if (user.userType === 'admin') {
-    // Admin: full access within center (incl. legacy `system` templates from demo seed)
     return true;
   }
   if (user.userType === 'doctor') {
     if (isAdminManagedConfigType(config.configType)) {
-      return true;
+      return true; // doctors can view/assign system modes
     }
     if (config.configType === 'doctor') {
       return config.createdBy === user.id;
@@ -114,6 +114,29 @@ const canUserAccessExerciseConfig = (config, user) => {
     return false;
   }
   return isAdminManagedConfigType(config.configType);
+};
+
+/**
+ * Whether the user may create/update/delete this config.
+ * Doctors cannot mutate admin/system catalog modes.
+ */
+const canUserMutateExerciseConfig = (config, user) => {
+  if (!config || !user) {
+    return false;
+  }
+  if (config.centerId !== user.centerId) {
+    return false;
+  }
+  if (user.userType === 'admin') {
+    return true;
+  }
+  if (user.userType === 'doctor') {
+    if (isAdminManagedConfigType(config.configType)) {
+      return false;
+    }
+    return config.configType === 'doctor' && config.createdBy === user.id;
+  }
+  return false;
 };
 
 /**
@@ -173,7 +196,21 @@ const createExerciseConfig = async (configBody, transaction = null) => {
  */
 const queryExerciseConfigs = async (filter, options, user = null) => {
   const { limit, page, offset } = sanitizePagination(options.limit, options.page, 100);
-  const order = buildSortBy(options.sortBy, ['createdAt', 'exercise.name', 'configType']);
+  const order = buildSortBy(
+    options.sortBy,
+    [
+      'createdAt',
+      'name',
+      'exercise.name',
+      'configType',
+      'eye',
+      'duration',
+      'frequency',
+      'distance',
+      'executionCount',
+    ],
+    options.order
+  );
 
   // Build where clause with role-based filtering
   let whereClause = { ...filter };
@@ -341,7 +378,7 @@ const deleteExerciseConfigsByIds = async (ids, user = null) => {
   let idsToDelete = ids;
   if (user) {
     const configs = await ExerciseConfig.findAll({ where: whereClause });
-    idsToDelete = configs.filter((config) => canUserAccessExerciseConfig(config, user)).map((config) => config.id);
+    idsToDelete = configs.filter((config) => canUserMutateExerciseConfig(config, user)).map((config) => config.id);
     if (idsToDelete.length === 0) {
       return 0;
     }
@@ -659,6 +696,8 @@ module.exports = {
   createExerciseConfig,
   queryExerciseConfigs,
   canUserAccessExerciseConfig,
+  canUserMutateExerciseConfig,
+  isAdminManagedConfigType,
   getExerciseConfigById,
   getExerciseConfigByExerciseId,
   updateExerciseConfigById,

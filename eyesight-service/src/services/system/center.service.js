@@ -16,6 +16,9 @@ const {
 } = require('../../utils/patterns');
 const exerciseService = require('../exercise/exercise.service');
 const exerciseConfigService = require('../exercise/exerciseConfig.service');
+const {
+  ensureDefaultExerciseModes,
+} = require('./defaultExerciseModes.service');
 
 /**
  * Create default roles for a center
@@ -137,13 +140,8 @@ const createCenter = async (centerBody) => {
     // Create default roles for the center
     await createDefaultRoles(center.id, centerBody.updatedBy, transaction);
 
-    // Create default exercise (2048) for the center
-    const defaultExercise = await createDefaultExercise(center.id, centerBody.updatedBy, transaction);
-
-    // If exercise was created successfully, also create its default configuration
-    if (defaultExercise) {
-      await createDefaultExerciseConfig(defaultExercise.id, center.id, centerBody.updatedBy, transaction);
-    }
+    // Provision system catalog: base exercises + 15 admin training modes
+    await ensureDefaultExerciseModes(center.id, centerBody.updatedBy, transaction);
 
     await auditLogService.logEntityAuditEvent({
       action: 'center.create',
@@ -154,6 +152,7 @@ const createCenter = async (centerBody) => {
       metadata: {
         code: center.code,
         name: center.name,
+        defaultExerciseModes: true,
       },
     });
 
@@ -271,6 +270,7 @@ module.exports = {
   createDefaultRoles,
   createDefaultExercise,
   createDefaultExerciseConfig,
+  ensureDefaultExerciseModes,
   queryCenters,
   getCenterById,
   getCenterByCode,

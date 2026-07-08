@@ -396,27 +396,52 @@ const sanitizePagination = (limit = 10, page = 1, maxLimit = 100) => {
 };
 
 /**
- * Build sort clause from parameter (e.g., "createdAt:DESC" or "user.name:ASC")
+ * Build sort clause from parameter (e.g., "createdAt:DESC" or "user.name:ASC").
+ * Also supports split params: sortBy="user.name" + orderParam="DESC"
+ * (DataTableContext historically sent those as separate query keys.)
  *
- * @param {string} sortBy - Sort parameter
- * @param {Array} allowedFields - Whitelist of allowed fields
+ * @param {string} sortBy - Sort field, optionally with ":ASC|:DESC"
+ * @param {Array|string} allowedFields - Whitelist of allowed fields (or legacy direction string)
+ * @param {string} [orderParam] - Separate ASC/DESC when sortBy has no ":direction"
  * @returns {Array} Sequelize order clause
  */
-const buildSortBy = (sortBy, allowedFields = []) => {
+const buildSortBy = (sortBy, allowedFields = [], orderParam) => {
   if (!sortBy) return [['createdAt', 'DESC']];
 
-  const [field, direction] = sortBy.split(':');
-  const sortDir = ['DESC', 'ASC'].includes(direction?.toUpperCase()) ? direction.toUpperCase() : 'ASC';
+  // Legacy mistaken call shape from older tests: buildSortBy('name', 'ASC')
+  let fields = allowedFields;
+  let directionHint = orderParam;
+  if (typeof allowedFields === 'string') {
+    if (['ASC', 'DESC', 'asc', 'desc'].includes(allowedFields)) {
+      fields = [];
+      directionHint = allowedFields;
+    } else {
+      fields = [];
+    }
+  }
+
+  let field;
+  let direction;
+  if (String(sortBy).includes(':')) {
+    [field, direction] = String(sortBy).split(':');
+  } else {
+    field = String(sortBy);
+    direction = directionHint;
+  }
+
+  const sortDir = ['DESC', 'ASC'].includes(direction?.toUpperCase())
+    ? direction.toUpperCase()
+    : 'ASC';
 
   // Validate field to prevent injection
-  if (allowedFields.length > 0 && !allowedFields.includes(field)) {
+  if (Array.isArray(fields) && fields.length > 0 && !fields.includes(field)) {
     return [['createdAt', 'DESC']]; // Fallback to default
   }
 
-  // Support nested fields (e.g., "user.name")
+  // Nested association fields (e.g. "exercise.name") → [['exercise', 'name', 'ASC']]
   if (field.includes('.')) {
     const parts = field.split('.');
-    return [parts, sortDir];
+    return [[...parts, sortDir]];
   }
 
   return [[field, sortDir]];

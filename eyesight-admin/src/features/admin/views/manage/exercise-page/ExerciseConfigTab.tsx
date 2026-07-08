@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'src/hooks/useTranslation';
 import { Box, Chip, IconButton, Tooltip, Button } from '@mui/material';
-import { Delete, Edit, People } from '@mui/icons-material';
+import { Delete, Edit, People, Visibility } from '@mui/icons-material';
 import useDataTable from 'src/contexts/data-context/useDataTable';
 import useAuth from 'src/contexts/authGuard/useAuth';
 import CustomDataTable from 'src/components/shared/CustomDataTable.tsx';
@@ -42,13 +42,36 @@ const ExerciseConfigTab: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
 
   const { setCreateAction } = useExercisePageHeader();
-  const canEdit = true;
+  const isAdmin = user?.userType === 'admin';
   const canAssign = user?.userType === 'doctor';
+
+  const canMutateConfig = useCallback(
+    (config?: ExerciseConfig | null) => {
+      if (!config) return isAdmin;
+      if (isAdmin) return true;
+      return config.configType === 'doctor';
+    },
+    [isAdmin]
+  );
 
   const handleCreateConfig = useCallback(() => {
     setConfigData(undefined);
     setOpenConfigModal(true);
   }, []);
+
+  const handleViewConfig = async (configId: string | number) => {
+    try {
+      const config = await exerciseService.getExerciseConfigById(Number(configId));
+      if (!config) {
+        showSnackbar(t('config.notFound'), SNACKBAR_SEVERITY.ERROR);
+        return;
+      }
+      setConfigData(config);
+      setOpenConfigModal(true);
+    } catch {
+      showSnackbar(t('config.editError'), SNACKBAR_SEVERITY.ERROR);
+    }
+  };
 
   useEffect(() => {
     setCreateAction({
@@ -63,6 +86,16 @@ const ExerciseConfigTab: React.FC = () => {
       const config = await exerciseService.getExerciseConfigById(Number(configId));
       if (!config) {
         showSnackbar(t('config.notFound'), SNACKBAR_SEVERITY.ERROR);
+        return;
+      }
+      if (!canMutateConfig(config)) {
+        showSnackbar(
+          t(
+            'config.systemReadOnly',
+            'Chế độ tập luyện mặc định của hệ thống chỉ quản trị viên được sửa.'
+          ),
+          SNACKBAR_SEVERITY.WARNING
+        );
         return;
       }
       setConfigData(config);
@@ -224,10 +257,11 @@ const ExerciseConfigTab: React.FC = () => {
         ...colLayout('center', 120),
         customBodyRender: (_value, tableMeta) => {
           const rowData = configDataRes?.rows?.[tableMeta.rowIndex];
+          const mutable = canMutateConfig(rowData);
 
           return (
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-              {canEdit && (
+              {mutable ? (
                 <Tooltip title={t('common.edit')}>
                   <IconButton
                     size="small"
@@ -235,6 +269,16 @@ const ExerciseConfigTab: React.FC = () => {
                     onClick={() => handleEditConfig(rowData?.id)}
                   >
                     <Edit fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Tooltip title={t('common.view', 'Xem')}>
+                  <IconButton
+                    size="small"
+                    color="default"
+                    onClick={() => void handleViewConfig(rowData?.id)}
+                  >
+                    <Visibility fontSize="small" />
                   </IconButton>
                 </Tooltip>
               )}
@@ -245,15 +289,17 @@ const ExerciseConfigTab: React.FC = () => {
                   </IconButton>
                 </Tooltip>
               )}
-              <Tooltip title={t('common.delete')}>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleDeleteConfig(rowData?.id)}
-                >
-                  <Delete fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              {mutable && (
+                <Tooltip title={t('common.delete')}>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleDeleteConfig(rowData?.id)}
+                  >
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           );
         },
@@ -302,6 +348,7 @@ const ExerciseConfigTab: React.FC = () => {
         open={openConfigModal}
         onClose={handleCloseConfig}
         configData={configData}
+        readOnly={Boolean(configData && !canMutateConfig(configData))}
       />
 
       {openAssignmentModal && (

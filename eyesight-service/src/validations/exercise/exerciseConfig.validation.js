@@ -285,6 +285,7 @@ const getExerciseConfigs = {
     name: Joi.string(),
     patientId: Joi.number().integer(),
     sortBy: Joi.string(),
+    order: Joi.string().valid('ASC', 'DESC', 'asc', 'desc'),
     limit: Joi.number().integer(),
     page: Joi.number().integer(),
   }),

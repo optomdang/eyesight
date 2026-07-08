@@ -84,6 +84,16 @@ describe('Performance Optimization Utilities', () => {
       const result = buildOptimizedOrderClause('createdAt', 'ASC');
       expect(result).toEqual([['createdAt', 'ASC']]);
     });
+
+    test('should accept split order param', () => {
+      const result = buildSortBy('exercise.name', ['exercise.name'], 'DESC');
+      expect(result).toEqual([['exercise', 'name', 'DESC']]);
+    });
+
+    test('should accept field:direction in sortBy', () => {
+      const result = buildSortBy('name:ASC', ['name']);
+      expect(result).toEqual([['name', 'ASC']]);
+    });
   });
 
   describe('buildOptimizedPagination', () => {

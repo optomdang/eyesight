@@ -13,9 +13,16 @@ interface ExerciseConfigFormProps {
   open: boolean;
   onClose: () => void;
   configData?: ExerciseConfig;
+  /** When true, doctors viewing system defaults cannot save changes. */
+  readOnly?: boolean;
 }
 
-const ExerciseConfigForm: React.FC<ExerciseConfigFormProps> = ({ open, onClose, configData }) => {
+const ExerciseConfigForm: React.FC<ExerciseConfigFormProps> = ({
+  open,
+  onClose,
+  configData,
+  readOnly = false,
+}) => {
   const { t } = useTranslation();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const { showSnackbar } = useSnackbar();
@@ -40,6 +47,10 @@ const ExerciseConfigForm: React.FC<ExerciseConfigFormProps> = ({ open, onClose, 
   };
 
   const handleSubmit = async (values: Partial<ExerciseConfig>) => {
+    if (readOnly) {
+      onClose();
+      return;
+    }
     try {
       const cleanedValues = normalizeExerciseConfigPayload(values, { forUpdate: Boolean(values?.id) });
 
@@ -67,7 +78,7 @@ const ExerciseConfigForm: React.FC<ExerciseConfigFormProps> = ({ open, onClose, 
       onClose={onClose}
       onSubmit={handleSubmit}
       configData={configData}
-      readOnly={false}
+      readOnly={readOnly}
       submitButtonText={configData ? t('config.update') : t('config.create')}
       exercises={exercises}
     />

@@ -122,7 +122,7 @@ const queryTreatmentPackages = async (originalFilter, options) => {
   }
 
   const { limit, page, offset } = sanitizePagination(options.limit, options.page, 100);
-  const order = buildSortBy(options.sortBy, ['name', 'code', 'createdAt', 'durationDays']);
+  const order = buildSortBy(options.sortBy, ['name', 'code', 'createdAt', 'durationDays'], options.order);
 
   const { count, rows } = await TreatmentPackage.findAndCountAll({
     where: filter,
