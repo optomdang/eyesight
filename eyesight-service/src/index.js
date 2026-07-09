@@ -10,6 +10,9 @@ logger.info('Starting application...');
 
 let server;
 
+const MAX_DB_RETRIES = 8;
+const DB_RETRY_BASE_MS = 2000;
+
 /**
  * Keep every existing center in sync with DEFAULT_EXERCISE_MODES.
  * When catalog adds new system training modes, each deploy creates the missing
@@ -32,20 +35,33 @@ const syncSystemExerciseModes = async () => {
   }
 };
 
-connectDB()
-  .then(() => {
+const connectDatabaseWithRetry = async (attempt = 1) => {
+  try {
+    await connectDB();
     logger.info('Connected to Postgres');
-    // Listen immediately — do NOT await catalog sync here. Blocking boot caused
-    // login timeouts on Render cold start (FE axios timeout = 10s).
-    server = app.listen(config.port, () => {
-      logger.info(`Listening to port ${config.port}`);
-      void syncSystemExerciseModes();
+    void syncSystemExerciseModes().catch((err) => {
+      logger.error('Unhandled sync error (non-fatal):', err);
     });
-  })
-  .catch((err) => {
-    logger.error('Database connection failed:', err);
-    process.exit(1);
-  });
+  } catch (err) {
+    logger.error(`Database connection failed (attempt ${attempt}/${MAX_DB_RETRIES}):`, err);
+    if (attempt < MAX_DB_RETRIES) {
+      const delayMs = Math.min(DB_RETRY_BASE_MS * attempt, 15000);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return connectDatabaseWithRetry(attempt + 1);
+    }
+    logger.error(
+      'Database connection failed after all retries — health check stays up; API calls need DB'
+    );
+  }
+};
+
+// Listen immediately so Render health check (/api/v1/version) passes during deploy.
+// Previously connectDB() blocked listen(); cold Neon + catalog sync caused deploy/login timeouts.
+server = app.listen(config.port, () => {
+  logger.info(`Listening to port ${config.port}`);
+});
+
+void connectDatabaseWithRetry();
 
 const exitHandler = () => {
   if (server) {

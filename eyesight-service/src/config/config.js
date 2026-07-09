@@ -68,8 +68,8 @@ const config = {
     timezone: '+07:00',
     logging: false,
     pool: {
-      max: 50,
-      min: 10,
+      max: envVars.NODE_ENV === 'production' ? 10 : 50,
+      min: envVars.NODE_ENV === 'production' ? 0 : 10,
       acquire: 30000,
       idle: 10000,
       evict: 10000,
