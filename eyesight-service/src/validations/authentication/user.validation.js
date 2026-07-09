@@ -7,7 +7,7 @@ const createUser = {
     password: Joi.string().required().custom(password),
     name: Joi.string().required(),
     dateOfBirth: Joi.date().iso().allow(null).optional(),
-    gender: Joi.string().valid('male', 'female', 'other').allow(null).optional(),
+    gender: Joi.string().valid('male', 'female', 'other').allow('', null).optional(),
     roleId: Joi.number(), // Optional, sẽ auto-detect từ userType và centerId
     phoneNumber: Joi.string().required(),
     zaloUserId: Joi.string().allow(null).optional(),
@@ -48,7 +48,7 @@ const createUser = {
       code: Joi.string(),
       clinicId: Joi.number(), // Alias cho defaultClinicId
       doctorId: Joi.number(),
-      severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe').allow(null).optional(),
+      severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe', 'critical').allow(null).optional(),
       severityNotes: Joi.string().allow('', null).optional(),
       treatmentStatus: Joi.string().valid('not_started', 'active', 'paused', 'completed').optional(),
       activeFrom: Joi.date().iso().allow(null).optional(),
@@ -172,7 +172,7 @@ const updateUser = {
       password: Joi.string().custom(password),
       name: Joi.string(),
       dateOfBirth: Joi.date().iso().allow(null).optional(),
-      gender: Joi.string().valid('male', 'female', 'other').allow(null).optional(),
+      gender: Joi.string().valid('male', 'female', 'other').allow('', null).optional(),
       roleId: Joi.number().required(),
       zaloUserId: Joi.string().allow(null).optional(),
       zaloPhoneNumber: Joi.string().allow(null).optional(),
@@ -215,7 +215,7 @@ const updateUser = {
         code: Joi.string(),
         clinicId: Joi.number(), // Alias cho defaultClinicId
         doctorId: Joi.number(),
-        severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe').allow(null).optional(),
+        severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe', 'critical').allow(null).optional(),
         severityNotes: Joi.string().allow('', null).optional(),
         treatmentStatus: Joi.string().valid('not_started', 'active', 'paused', 'completed').optional(),
         activeFrom: Joi.date().iso().allow(null).optional(),

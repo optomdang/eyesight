@@ -1,9 +1,9 @@
-// src/middlewares/error.js
 const httpStatus = require('http-status');
 const { Sequelize } = require('sequelize'); // Import Sequelize for error checking
 const config = require('../config/config');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
+const { translateJoiValidationMessage } = require('../utils/joiErrorMessage');
 
 /**
  * Dịch thông báo lỗi DB / Sequelize sang tiếng Việt cho người dùng.
@@ -51,9 +51,8 @@ const translateErrorMessage = (message) => {
     return 'Có trường dữ liệu không hợp lệ trong form.';
   }
 
-  if (message.includes('ValidationError') || message.includes('must be')) {
-    return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại form.';
-  }
+  const joiTranslated = translateJoiValidationMessage(message);
+  if (joiTranslated !== message) return joiTranslated;
 
   return message;
 };

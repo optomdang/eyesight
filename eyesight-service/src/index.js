@@ -33,11 +33,13 @@ const syncSystemExerciseModes = async () => {
 };
 
 connectDB()
-  .then(async () => {
+  .then(() => {
     logger.info('Connected to Postgres');
-    await syncSystemExerciseModes();
+    // Listen immediately — do NOT await catalog sync here. Blocking boot caused
+    // login timeouts on Render cold start (FE axios timeout = 10s).
     server = app.listen(config.port, () => {
       logger.info(`Listening to port ${config.port}`);
+      void syncSystemExerciseModes();
     });
   })
   .catch((err) => {

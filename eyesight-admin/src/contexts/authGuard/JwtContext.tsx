@@ -137,7 +137,11 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
   const login = async (email: string, password: string) => {
     try {
       // Public endpoint — must not go through requestWithAuth (401 would trigger refresh → "Authentication failed")
-      const response = await axiosClient.post('auth/login', { email, password });
+      const response = await axiosClient.post(
+        'auth/login',
+        { email, password },
+        { timeout: 30000 },
+      );
       const { tokens, user } = response.data;
 
       setSession(tokens);

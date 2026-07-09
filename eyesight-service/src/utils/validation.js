@@ -68,7 +68,7 @@ const standardEnums = {
   eye: Joi.string().valid('left', 'right', 'both').optional(),
   examType: Joi.string().valid('far', 'near', 'contrast', 'stereopsis').optional(),
   examStatus: Joi.string().valid('incomplete', 'completed').optional(),
-  severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe').allow(null).optional(),
+  severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe', 'critical').allow(null).optional(),
 };
 
 /**
