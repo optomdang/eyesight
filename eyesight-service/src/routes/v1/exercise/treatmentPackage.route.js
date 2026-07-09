@@ -12,8 +12,8 @@ router
   .route('/')
   .post(
     auth(allRights.manageExercises.code),
-    validate(treatmentPackageValidation.createTreatmentPackage),
     injectData('body'),
+    validate(treatmentPackageValidation.createTreatmentPackage),
     treatmentPackageController.createTreatmentPackage
   )
   .get(
@@ -38,8 +38,8 @@ router
   )
   .patch(
     auth(allRights.manageExercises.code),
-    validate(treatmentPackageValidation.updateTreatmentPackage),
     injectData('body'),
+    validate(treatmentPackageValidation.updateTreatmentPackage),
     treatmentPackageController.updateTreatmentPackage
   )
   .delete(
@@ -53,8 +53,8 @@ router
   .route('/:packageId/assign')
   .post(
     auth(allRights.manageExercises.code),
-    validate(treatmentPackageValidation.assignTreatmentPackage),
     injectData('body'),
+    validate(treatmentPackageValidation.assignTreatmentPackage),
     treatmentPackageController.assignTreatmentPackage
   );
 

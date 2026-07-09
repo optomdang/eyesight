@@ -5,6 +5,8 @@ const injectData = require('../middlewares/injectData');
 /**
  * Standardized middleware patterns for routes
  * Ensures consistent ordering: auth -> validate -> injectData -> controller
+ * Exception: POST/create routes that require centerId from JWT should call injectData before validate
+ * (see treatmentPackage.route.js and exercise.route.js create).
  */
 
 /**

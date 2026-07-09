@@ -25,6 +25,7 @@ const getTreatmentPackages = {
     ...standardQueryParams,
     name: Joi.string().optional(),
     code: Joi.string().optional(),
+    centerId: standardTenantFields.centerId.optional(),
   }),
 };
 
