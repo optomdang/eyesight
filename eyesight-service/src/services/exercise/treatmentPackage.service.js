@@ -151,6 +151,44 @@ const removePatientAssignmentsForDroppedConfigs = async ({
   return { removedAssignments: assignments.length };
 };
 
+const removeOutOfPackageAssignmentsForPatient = async ({
+  patientId,
+  centerId,
+  allowedConfigIds,
+  actorUserId,
+  transaction = null,
+}) => {
+  const allowed = new Set(normalizeConfigIds(allowedConfigIds));
+  if (!allowed.size) return 0;
+
+  const assignments = await ExerciseAssignment.findAll({
+    where: { patientId, centerId },
+    transaction,
+  });
+  const toRemove = assignments.filter((assignment) => !allowed.has(Number(assignment.exerciseConfigId)));
+
+  await Promise.all(
+    toRemove.map(async (assignment) => {
+      const snapshot = assignment.get({ plain: true });
+      await assignment.destroy({ transaction });
+      await auditLogService.logEntityAuditEvent({
+        action: 'exerciseAssignment.delete',
+        entityType: 'exerciseAssignment',
+        entityId: snapshot.id,
+        centerId: snapshot.centerId,
+        actorUserId: actorUserId || null,
+        metadata: {
+          patientId: snapshot.patientId,
+          exerciseConfigId: snapshot.exerciseConfigId,
+          reason: 'treatment_package_changed',
+        },
+      });
+    })
+  );
+
+  return toRemove.length;
+};
+
 const createTreatmentPackage = async (body) => {
   const exerciseConfigIds = normalizeConfigIds(body.exerciseConfigIds);
   await validateConfigIdsBelongToCenter(exerciseConfigIds, body.centerId);
@@ -303,9 +341,16 @@ const deleteTreatmentPackageByIds = async (body) => {
   await Promise.all(ids.map((id) => deleteTreatmentPackageById(id, body)));
 };
 
-const assignPackageToPatient = async ({ patientId, treatmentPackageId, centerId, assignedBy }) => {
+const assignPackageToPatient = async ({
+  patientId,
+  treatmentPackageId,
+  centerId,
+  assignedBy,
+  transaction = null,
+}) => {
   const pkg = await TreatmentPackage.findOne({
     where: { id: treatmentPackageId, centerId, deleted: false },
+    transaction,
   });
   if (!pkg) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy gói điều trị');
@@ -316,17 +361,28 @@ const assignPackageToPatient = async ({ patientId, treatmentPackageId, centerId,
 
   await PatientTreatmentPackage.update(
     { status: 'cancelled', deleted: true },
-    { where: { patientId, centerId, deleted: false, status: 'active' } }
+    { where: { patientId, centerId, deleted: false, status: 'active' }, transaction }
   );
 
-  const assignment = await PatientTreatmentPackage.create({
+  const assignment = await PatientTreatmentPackage.create(
+    {
+      patientId,
+      treatmentPackageId,
+      centerId,
+      assignedAt,
+      expiresAt,
+      assignedBy,
+      status: 'active',
+    },
+    { transaction }
+  );
+
+  await removeOutOfPackageAssignmentsForPatient({
     patientId,
-    treatmentPackageId,
     centerId,
-    assignedAt,
-    expiresAt,
-    assignedBy,
-    status: 'active',
+    allowedConfigIds: pkg.exerciseConfigIds,
+    actorUserId: assignedBy,
+    transaction,
   });
 
   return assignment;

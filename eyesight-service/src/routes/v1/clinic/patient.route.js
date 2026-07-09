@@ -83,6 +83,14 @@ router.route('/:patientId/resume').patch(
   })
 );
 
+router.route('/:patientId/active-treatment-package').get(
+  ...routePatterns.get({
+    right: allRights.getPatients.code,
+    validation: patientValidation.getPatientActiveTreatmentPackage,
+    controller: patientController.getPatientActiveTreatmentPackage,
+  })
+);
+
 // Specialized endpoint: Medical record update
 router
   .route('/:patientId/medical-record')

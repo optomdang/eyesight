@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Alert,
 } from '@mui/material';
 import { Close, Visibility } from '@mui/icons-material';
 import { useForm, type FieldErrors } from 'react-hook-form';
@@ -56,6 +57,22 @@ import CustomTextField from 'src/components/forms/theme-elements/CustomTextField
 import { patientAssignmentFormSchema, type PatientAssignmentFormData } from 'src/validations';
 import { normalizeExerciseConfigPayload } from 'src/utils/exerciseConfigPayload';
 import { fetchPatientWithCausesCheck } from 'src/utils/patientClinicalPrerequisites';
+import { getPatientActiveTreatmentPackage } from 'src/services/treatmentPackage.service';
+
+const sortExerciseConfigs = (rows: ExerciseConfig[]) => {
+  const typeOrder: Record<string, number> = { admin: 0, doctor: 1, patient: 2 };
+  return [...rows].sort((a, b) => {
+    const aOrder = typeOrder[a.configType] ?? 99;
+    const bOrder = typeOrder[b.configType] ?? 99;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+};
+
+const filterConfigsByPackage = (configs: ExerciseConfig[], allowedIds: number[] | null) => {
+  if (!allowedIds?.length) return configs;
+  return configs.filter((config) => config.id != null && allowedIds.includes(config.id));
+};
 
 interface PatientAssignmentModalProps {
   open: boolean;
@@ -83,6 +100,8 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingAssignment, setLoadingAssignment] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [allowedConfigIds, setAllowedConfigIds] = useState<number[] | null>(null);
+  const [activePackageName, setActivePackageName] = useState<string | null>(null);
 
   const isEditMode = Boolean(assignmentId);
 
@@ -286,6 +305,15 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
   useEffect(() => {
     if (open) {
       loadExercises();
+      getPatientActiveTreatmentPackage(patient.id)
+        .then((active) => {
+          setAllowedConfigIds(active?.allowedConfigIds ?? null);
+          setActivePackageName(active?.treatmentPackage?.name ?? null);
+        })
+        .catch(() => {
+          setAllowedConfigIds(null);
+          setActivePackageName(null);
+        });
       if (isEditMode && assignmentId) {
         loadAssignmentData();
       } else {
@@ -321,6 +349,9 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
         setSelectedConfig(null);
         setAvailableConfigs([]);
       }
+    } else {
+      setAllowedConfigIds(null);
+      setActivePackageName(null);
     }
   }, [open, isEditMode, assignmentId, reset]);
 
@@ -376,14 +407,8 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
             exerciseId: assignmentData.exerciseConfig.exerciseId,
             limit: 100,
           });
-          const typeOrder: any = { admin: 0, doctor: 1, patient: 2 };
           setAvailableConfigs(
-            response.rows.sort((a, b) => {
-              const aOrder = typeOrder[a.configType] ?? 99;
-              const bOrder = typeOrder[b.configType] ?? 99;
-              if (aOrder !== bOrder) return aOrder - bOrder;
-              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            })
+            filterConfigsByPackage(sortExerciseConfigs(response.rows), allowedConfigIds)
           );
 
           // Set selectedConfig to current config for edit mode
@@ -414,6 +439,19 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!open || !values.exerciseId) return;
+
+    exerciseService
+      .getExerciseConfigs({ exerciseId: values.exerciseId, limit: 100 })
+      .then((response) => {
+        setAvailableConfigs(
+          filterConfigsByPackage(sortExerciseConfigs(response.rows), allowedConfigIds)
+        );
+      })
+      .catch(() => setAvailableConfigs([]));
+  }, [allowedConfigIds, open, values.exerciseId]);
+
   const handleExerciseSelect = (event: any) => {
     const { value: exerciseId } = event.target;
 
@@ -421,14 +459,8 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
       exerciseService
         .getExerciseConfigs({ exerciseId, limit: 100 })
         .then((response) => {
-          const typeOrder: any = { admin: 0, doctor: 1, patient: 2 };
           setAvailableConfigs(
-            response.rows.sort((a, b) => {
-              const aOrder = typeOrder[a.configType] ?? 99;
-              const bOrder = typeOrder[b.configType] ?? 99;
-              if (aOrder !== bOrder) return aOrder - bOrder;
-              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            })
+            filterConfigsByPackage(sortExerciseConfigs(response.rows), allowedConfigIds)
           );
         })
         .catch(() => setAvailableConfigs([]));
@@ -506,6 +538,12 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
         </DialogTitle>
 
         <DialogContent dividers>
+          {activePackageName && allowedConfigIds?.length ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Gói điều trị <strong>{activePackageName}</strong>: chỉ được giao tối đa{' '}
+              {allowedConfigIds.length} chế độ tập thuộc gói này.
+            </Alert>
+          ) : null}
           <form onSubmit={handleSubmit(onSubmit)}>
             {/* STEP 1: Exercise Selection */}
             <Box sx={{ mb: 3 }}>

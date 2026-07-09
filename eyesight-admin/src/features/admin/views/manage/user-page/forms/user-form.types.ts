@@ -63,6 +63,7 @@ export interface PatientFormData {
   treatmentStatus?: boolean;
   activeFrom?: string; // Treatment start date
   activeTo?: string; // Treatment end date
+  treatmentPackageId?: number;
 }
 
 // Props for sub-form components

@@ -55,6 +55,15 @@ export const patientObjectSchema = Yup.object({
   activeTo: Yup.string()
     .transform((value) => value || undefined)
     .optional(),
+  treatmentPackageId: Yup.number()
+    .transform((value) => (isNaN(value) ? undefined : value))
+    .test('required-on-create', 'Vui lòng chọn gói điều trị', function (value) {
+      const root = this.from?.[1]?.value;
+      if (!root?.id && root?.userType === 'patient' && !value) {
+        return false;
+      }
+      return true;
+    }),
 });
 
 // Main user schema with nested objects

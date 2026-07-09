@@ -8,6 +8,7 @@ const auditLogService = require('../system/auditLog.service');
 const { getRoleByCodeAndCenterId } = require('./role.service');
 const doctorService = require('../clinic/doctor.service');
 const patientService = require('../clinic/patient.service');
+const treatmentPackageService = require('../exercise/treatmentPackage.service');
 const { FILTERS } = require('../../utils/query');
 const {
   standardQuery,
@@ -72,11 +73,25 @@ const createUser = async (userBody) => {
       doctor.updatedBy = userData.updatedBy; // Ensure updatedBy is set for Doctor
       await doctorService.createDoctor(doctor, transaction);
     } else if (userData.userType === 'patient') {
-      patient.userId = user.id; // Ensure userId is set for Patient
-      patient.centerId = user.centerId; // Ensure centerId is set for Patient
-      patient.clinicId = user.defaultClinicId; // Ensure clinicId is set for Patient
-      patient.updatedBy = userData.updatedBy; // Ensure updatedBy is set for Patient
-      await patientService.createPatient(patient, transaction);
+      const { treatmentPackageId, ...patientBody } = patient || {};
+      if (!treatmentPackageId) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Gói điều trị là bắt buộc');
+      }
+
+      patientBody.userId = user.id;
+      patientBody.centerId = user.centerId;
+      patientBody.clinicId = user.defaultClinicId;
+      patientBody.updatedBy = userData.updatedBy;
+
+      const createdPatient = await patientService.createPatient(patientBody, transaction);
+
+      await treatmentPackageService.assignPackageToPatient({
+        patientId: createdPatient.id,
+        treatmentPackageId,
+        centerId: user.centerId,
+        assignedBy: userData.updatedBy,
+        transaction,
+      });
     }
 
     // Return user with includes for complete data
@@ -236,8 +251,9 @@ const getUserByEmail = async (email) => {
  * @param {Object} updateBody
  * @returns {Promise<User>}
  */
-const updateUserById = async (userId, updateBody) => {
+const updateUserById = async (userId, updateBody, options = {}) => {
   const { doctor, patient, ...userData } = updateBody;
+  const actorUserType = options.actorUserType;
 
   const user = await getUserById(userId);
   if (!user) {
@@ -263,9 +279,28 @@ const updateUserById = async (userId, updateBody) => {
 
     // Update patient data if provided
     if (patient && patient.id) {
-      patient.userId = user.id;
-      patient.centerId = user.centerId;
-      await patientService.updatePatientById(patient.id, patient, transaction);
+      const { treatmentPackageId, ...patientBody } = patient;
+      patientBody.userId = user.id;
+      patientBody.centerId = user.centerId;
+      await patientService.updatePatientById(patient.id, patientBody, transaction);
+
+      if (treatmentPackageId !== undefined && treatmentPackageId !== null && treatmentPackageId !== '') {
+        if (actorUserType !== 'admin') {
+          throw new ApiError(httpStatus.FORBIDDEN, 'Chỉ quản trị viên mới được đổi gói điều trị');
+        }
+
+        const active = await treatmentPackageService.getActivePatientPackage(patient.id);
+        const currentPackageId = active?.treatmentPackage?.id;
+        if (Number(treatmentPackageId) !== Number(currentPackageId)) {
+          await treatmentPackageService.assignPackageToPatient({
+            patientId: patient.id,
+            treatmentPackageId: Number(treatmentPackageId),
+            centerId: user.centerId,
+            assignedBy: updateBody.updatedBy,
+            transaction,
+          });
+        }
+      }
     }
 
     // Reload the user to get fresh data including avatar

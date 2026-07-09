@@ -114,7 +114,12 @@ const updateUser = catchAsync(async (req, res) => {
   if (targetUser.centerId !== req.user.centerId) {
     throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền cập nhật tài khoản này');
   }
-  const user = await userService.updateUserById(req.params.userId, req.body);
+  if (req.body.patient?.treatmentPackageId !== undefined && req.user.userType !== 'admin') {
+    delete req.body.patient.treatmentPackageId;
+  }
+  const user = await userService.updateUserById(req.params.userId, req.body, {
+    actorUserType: req.user.userType,
+  });
   res.send(user);
 });
 

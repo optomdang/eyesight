@@ -3,6 +3,7 @@ const pick = require('../../utils/pick');
 const ApiError = require('../../utils/ApiError');
 const catchAsync = require('../../utils/catchAsync');
 const { patientService, doctorService } = require('../../services');
+const treatmentPackageService = require('../../services/exercise/treatmentPackage.service');
 const examAssignmentService = require('../../services/clinic/examAssignment.service');
 
 // NOTE: Query filtering is intentionally allow-listed.
@@ -183,6 +184,19 @@ const updateMedicalRecord = catchAsync(async (req, res) => {
   res.send(updated);
 });
 
+const getPatientActiveTreatmentPackage = catchAsync(async (req, res) => {
+  const patient = await patientService.getPatientById(req.params.patientId);
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Bệnh nhân không tồn tại');
+  }
+  if (patient.centerId !== req.user.centerId) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to access this patient');
+  }
+
+  const active = await treatmentPackageService.getActivePatientPackage(req.params.patientId);
+  res.send(active);
+});
+
 module.exports = {
   createPatient,
   getPatients,
@@ -197,4 +211,5 @@ module.exports = {
   getPatientByUserId,
   getMyPatients,
   updateMedicalRecord,
+  getPatientActiveTreatmentPackage,
 };

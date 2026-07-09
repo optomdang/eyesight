@@ -43,10 +43,15 @@ jest.mock('../../../src/services/clinic/patient.service', () => ({
   updatePatientById: jest.fn(),
 }));
 
+jest.mock('../../../src/services/exercise/treatmentPackage.service', () => ({
+  assignPackageToPatient: jest.fn(),
+}));
+
 const { User } = require('../../../src/models');
 const { getRoleByCodeAndCenterId } = require('../../../src/services/authentication/role.service');
 const doctorService = require('../../../src/services/clinic/doctor.service');
 const patientService = require('../../../src/services/clinic/patient.service');
+const treatmentPackageService = require('../../../src/services/exercise/treatmentPackage.service');
 const userService = require('../../../src/services/authentication/user.service');
 
 describe('User Service', () => {
@@ -65,6 +70,7 @@ describe('User Service', () => {
       patient: {
         code: 'P001',
         name: 'Test Patient',
+        treatmentPackageId: 1,
       },
     };
 
@@ -82,6 +88,7 @@ describe('User Service', () => {
       User.create.mockResolvedValue(mockCreatedUser);
       User.findByPk.mockResolvedValue(mockCreatedUser);
       patientService.createPatient.mockResolvedValue({ id: 1 });
+      treatmentPackageService.assignPackageToPatient.mockResolvedValue({ id: 1 });
 
       const result = await userService.createUser(mockUserData);
 
@@ -89,7 +96,23 @@ describe('User Service', () => {
       expect(User.isPhoneNumberTaken).toHaveBeenCalledWith(mockUserData.phoneNumber);
       expect(getRoleByCodeAndCenterId).toHaveBeenCalledWith('patient', 1);
       expect(patientService.createPatient).toHaveBeenCalled();
+      expect(treatmentPackageService.assignPackageToPatient).toHaveBeenCalled();
       expect(result).toBeDefined();
+    });
+
+    test('should throw error if treatment package missing for patient', async () => {
+      User.isEmailTaken.mockResolvedValue(false);
+      User.isPhoneNumberTaken.mockResolvedValue(false);
+      getRoleByCodeAndCenterId.mockResolvedValue(mockRole);
+      User.create.mockResolvedValue(mockCreatedUser);
+
+      const dataWithoutPackage = {
+        ...mockUserData,
+        patient: { code: 'P001', name: 'Test Patient' },
+      };
+
+      await expect(userService.createUser(dataWithoutPackage)).rejects.toThrow('Gói điều trị là bắt buộc');
+      expect(patientService.createPatient).not.toHaveBeenCalled();
     });
 
     test('should throw error if email already exists', async () => {

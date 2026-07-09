@@ -27,6 +27,7 @@ import { userSchema } from 'src/validations';
 import { UserFormProps, UserType, UnifiedUserFormData } from './user-form.types';
 import { parseUserData } from './user-form.utils';
 import { computeTreatmentStatus } from 'src/utils/treatmentStatus';
+import { getPatientActiveTreatmentPackage } from 'src/services/treatmentPackage.service';
 import BasicInfoFields from './BasicInfoFields';
 import DoctorFields from './DoctorFields';
 import PatientFields from './PatientFields';
@@ -118,6 +119,9 @@ function UserModal({ open, onClose, rowData, userType, readOnly = false }: UserF
             activeFrom: values.patient?.activeFrom,
             activeTo: values.patient?.activeTo,
           };
+          if (user?.userType === 'admin' && values.patient?.treatmentPackageId) {
+            updateData.patient.treatmentPackageId = values.patient.treatmentPackageId;
+          }
         }
 
         await userService.updateUser(values.id, updateData);
@@ -146,6 +150,7 @@ function UserModal({ open, onClose, rowData, userType, readOnly = false }: UserF
             clinicId: values.defaultClinicId,
             severityLevel: values.patient?.severityLevel,
             severityNotes: values.patient?.severityNotes,
+            treatmentPackageId: values.patient?.treatmentPackageId,
             // Form toggle (boolean) → backend string enum (SOT).
             treatmentStatus: computeTreatmentStatus({
               paused: values.patient?.treatmentStatus === false,
@@ -184,6 +189,16 @@ function UserModal({ open, onClose, rowData, userType, readOnly = false }: UserF
         const data = await userService.getUser(Number(rowData));
         // parseUserData now handles everything including dates, doctor, patient
         const formData = parseUserData(data);
+        if (formData.patient?.id) {
+          try {
+            const active = await getPatientActiveTreatmentPackage(formData.patient.id);
+            if (active?.treatmentPackage?.id) {
+              formData.patient.treatmentPackageId = active.treatmentPackage.id;
+            }
+          } catch {
+            // ignore — package field stays empty
+          }
+        }
         reset(formData);
       } else if (!rowData && open) {
         // Reset to default values for create mode

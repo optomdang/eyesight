@@ -310,6 +310,12 @@ const resumePatientTreatment = {
   }),
 };
 
+const getPatientActiveTreatmentPackage = {
+  params: Joi.object().keys({
+    patientId: Joi.number().integer().required(),
+  }),
+};
+
 module.exports = {
   createPatient,
   getPatients,
@@ -321,4 +327,5 @@ module.exports = {
   deletePatients,
   getPatientByUserId,
   updateMedicalRecord,
+  getPatientActiveTreatmentPackage,
 };

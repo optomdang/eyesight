@@ -51,6 +51,7 @@ const createUser = {
       severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe', 'critical').allow(null).optional(),
       severityNotes: Joi.string().allow('', null).optional(),
       treatmentStatus: Joi.string().valid('not_started', 'active', 'paused', 'completed').optional(),
+      treatmentPackageId: Joi.number().integer(),
       activeFrom: Joi.date().iso().allow(null).optional(),
       activeTo: Joi.date().iso().allow(null).optional(),
       examResults: Joi.object()
@@ -218,6 +219,7 @@ const updateUser = {
         severityLevel: Joi.string().valid('normal', 'mild', 'moderate', 'severe', 'critical').allow(null).optional(),
         severityNotes: Joi.string().allow('', null).optional(),
         treatmentStatus: Joi.string().valid('not_started', 'active', 'paused', 'completed').optional(),
+        treatmentPackageId: Joi.number().integer(),
         activeFrom: Joi.date().iso().allow(null).optional(),
         activeTo: Joi.date().iso().allow(null).optional(),
         examResults: Joi.object()

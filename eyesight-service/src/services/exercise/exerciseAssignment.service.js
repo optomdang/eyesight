@@ -14,6 +14,7 @@ const { standardQuery, withTransaction } = require('../../utils/patterns');
 const { getCurrentCycleDateRange } = require('../../utils/common');
 const { provisionExerciseSessions } = require('../../utils/sessionProvisionUtils');
 const auditLogService = require('../system/auditLog.service');
+const treatmentPackageService = require('./treatmentPackage.service');
 
 /**
  * Calculate compliance percentage for an assignment
@@ -116,6 +117,19 @@ const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentDa
   );
   const patientIdsToCreate = uniquePatientIds.filter((patientId) => !existingAssignmentsByPatientId.has(patientId));
   const assignmentsToRemove = existingAssignments.filter((assignment) => !uniquePatientIds.includes(assignment.patientId));
+
+  for (const patientId of patientIdsToCreate) {
+    const allowed = await treatmentPackageService.isExerciseConfigAccessibleForPatient(
+      patientId,
+      exerciseConfigId
+    );
+    if (!allowed) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Chế độ tập luyện không thuộc gói điều trị của bệnh nhân'
+      );
+    }
+  }
 
   // Prepare assignment data
   const assignmentsToCreate = patientIdsToCreate.map((patientId) => ({
