@@ -1,21 +1,23 @@
 /**
  * Far Acuity Exercise — adaptive 2D state machine.
  *
- * Axes:
- *   farLevel    1–20  (index into farVisionLevels; higher = smaller letters)
- *   contrastLevel 1–16 (index into contrastVisionLevels; higher = lower contrast)
+ * Two training modes:
  *
- * Adaptive progression ceiling for contrast is logCS 1.65 (level 12): harder than
- * that is only for doctor-designated starts / preview. Lower contrast beyond that
- * is rarely usable for adaptive training.
- *
- * Round rules (accuracy = correct / 5, pass = accuracy > 0.5):
- *   Pass, contrastLevel < 12  → contrastLevel += 1; new letters
- *   Pass, contrastLevel ≥ 12, farLevel < 20  → farLevel += 1, contrastLevel = 1, new letters
+ * ## 'contrast' (Thị lực tương phản)
+ *   Axes: farLevel (1–20) × contrastLevel (1–16, higher = harder/more faded)
+ *   Pass, contrastLevel < CONTRAST_LEVEL_MAX  → contrastLevel += 1
+ *   Pass, contrastLevel ≥ max, farLevel < max  → farLevel += 1, contrastLevel = 1
  *   Pass at maximum difficulty → stay
- *   Fail, contrastLevel > 1   → contrastLevel -= 1; new letters
- *   Fail, contrastLevel === 1, farLevel > 1  → farLevel -= 1, new letters
+ *   Fail, contrastLevel > 1   → contrastLevel -= 1
+ *   Fail, contrastLevel === 1, farLevel > 1  → farLevel -= 1, contrastLevel = CONTRAST_LEVEL_MAX
  *   Fail at minimum difficulty → stay
+ *
+ * ## 'acuity' (Thị lực xa / Thị lực gần)
+ *   Axis: farLevel only; contrastLevel locked at 1 (100% contrast)
+ *   Correct → passStreak += 1; failStreak = 0; new random letters
+ *   passStreak reaches ACUITY_STREAK_TARGET → farLevel += 1, passStreak = 0
+ *   Wrong  → failStreak += 1; passStreak = 0; new random letters
+ *   failStreak reaches ACUITY_FAIL_TARGET → farLevel -= 1 (if > min), failStreak = 0
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -34,6 +36,11 @@ export const FAR_ACUITY_MAX_LOG_CS = 1.65;
 export const CONTRAST_LEVEL_MAX =
   contrastVisionLevels.find((l) => parseFloat(l.score) === FAR_ACUITY_MAX_LOG_CS)?.level ??
   CONTRAST_LEVEL_ABSOLUTE_MAX;
+
+/** Acuity mode: consecutive correct rounds required before advancing to the next size level. */
+export const ACUITY_STREAK_TARGET = 10;
+/** Acuity mode: consecutive fail rounds at a size before dropping back to the previous (easier) size. */
+export const ACUITY_FAIL_TARGET = 5;
 
 export type FarAcuityCharType = 'E' | 'C' | 'A' | 'N' | 'S';
 
@@ -57,9 +64,10 @@ export interface FarAcuityEngineState {
   farLevel: number;
   contrastLevel: number;
   letters: FarAcuityLetter[];
-  /** How many times the current (farLevel, contrastLevel) combo has been passed in a row.
-   *  Used to decide whether to keep or refresh letters on pass. */
+  /** Consecutive correct rounds at the current level (acuity mode: drives level advance). */
   passStreak: number;
+  /** Consecutive fail rounds at the current level (acuity mode: drives level drop). */
+  failStreak: number;
   roundsCompleted: number;
   peakFarLevel: number;
   peakContrastLevel: number;
@@ -84,6 +92,12 @@ export interface FarAcuityEngineReturn {
   regenerateLetters: () => void;
   /** True when all 5 answers are filled */
   allAnswered: boolean;
+  /** Active training mode (contrast or acuity). */
+  trainingMode: 'contrast' | 'acuity';
+  /** Number of consecutive correct answers needed to advance level in acuity mode. */
+  streakTarget: number;
+  /** Number of consecutive fail rounds at a size before dropping back (acuity mode). */
+  failTarget: number;
 }
 
 function generateLetters(charType: FarAcuityCharType): FarAcuityLetter[] {
@@ -107,6 +121,13 @@ export interface UseFarAcuityEngineOptions {
   initialState?: FarAcuityEngineState;
   /** Which acuity table to use for level bounds and display. */
   visionType?: FarAcuityVisionType;
+  /**
+   * 'contrast' → adaptive contrast + size training (Thị lực tương phản).
+   * 'acuity'   → streak-based size advancement only, contrast locked at 100%
+   *              (Thị lực xa / Thị lực gần).
+   * Defaults to 'contrast'.
+   */
+  trainingMode?: 'contrast' | 'acuity';
 }
 
 export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): FarAcuityEngineReturn {
@@ -116,6 +137,8 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
   const visionType = options.visionType ?? 'far';
   const acuityLevelMaxRef = useRef(getAcuityLevelMax(visionType));
   acuityLevelMaxRef.current = getAcuityLevelMax(visionType);
+  const trainingModeRef = useRef<'contrast' | 'acuity'>(options.trainingMode ?? 'contrast');
+  trainingModeRef.current = options.trainingMode ?? 'contrast';
 
   const [state, setState] = useState<FarAcuityEngineState>(() => {
     if (options.initialState) return options.initialState;
@@ -130,6 +153,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
       contrastLevel,
       letters: generateLetters(charType),
       passStreak: 0,
+      failStreak: 0,
       roundsCompleted: 0,
       peakFarLevel: farLevel,
       peakContrastLevel: contrastLevel,
@@ -166,29 +190,58 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
       let nextFarLevel = prevFarLevel;
       let nextContrastLevel = prevContrastLevel;
       let nextPassStreak = prev.passStreak;
+      let nextFailStreak = prev.failStreak ?? 0;
       let lettersChanged = false;
 
-      if (passed) {
-        if (prevContrastLevel < CONTRAST_LEVEL_MAX) {
-          nextContrastLevel = prevContrastLevel + 1;
-          nextPassStreak = prev.passStreak + 1;
-        } else if (prevFarLevel < acuityLevelMaxRef.current) {
-          nextFarLevel = prevFarLevel + 1;
-          nextContrastLevel = CONTRAST_LEVEL_MIN;
+      if (trainingModeRef.current === 'acuity') {
+        // ── Acuity mode: contrast stays at 100%, streak-based size advancement ──
+        nextContrastLevel = CONTRAST_LEVEL_MIN;
+        if (passed) {
+          nextFailStreak = 0;
+          const newStreak = prev.passStreak + 1;
+          if (newStreak >= ACUITY_STREAK_TARGET && prevFarLevel < acuityLevelMaxRef.current) {
+            // 10 correct in a row → advance to harder (smaller) size
+            nextFarLevel = prevFarLevel + 1;
+            nextPassStreak = 0;
+          } else {
+            nextPassStreak = Math.min(newStreak, ACUITY_STREAK_TARGET);
+          }
+        } else {
           nextPassStreak = 0;
+          const newFailStreak = (prev.failStreak ?? 0) + 1;
+          if (newFailStreak >= ACUITY_FAIL_TARGET && prevFarLevel > FAR_LEVEL_MIN) {
+            // 5 fails in a row → drop back to easier (larger) size
+            nextFarLevel = prevFarLevel - 1;
+            nextFailStreak = 0;
+          } else {
+            nextFailStreak = newFailStreak;
+          }
         }
+        lettersChanged = true; // always fresh letters for variety
       } else {
-        nextPassStreak = 0;
-        if (prevContrastLevel > CONTRAST_LEVEL_MIN) {
-          nextContrastLevel = prevContrastLevel - 1;
-        } else if (prevFarLevel > FAR_LEVEL_MIN) {
-          nextFarLevel = prevFarLevel - 1;
+        // ── Contrast mode: adaptive contrast + size staircase ──
+        if (passed) {
+          if (prevContrastLevel < CONTRAST_LEVEL_MAX) {
+            nextContrastLevel = prevContrastLevel + 1;
+            nextPassStreak = prev.passStreak + 1;
+          } else if (prevFarLevel < acuityLevelMaxRef.current) {
+            nextFarLevel = prevFarLevel + 1;
+            nextContrastLevel = CONTRAST_LEVEL_MIN;
+            nextPassStreak = 0;
+          }
+        } else {
+          nextPassStreak = 0;
+          if (prevContrastLevel > CONTRAST_LEVEL_MIN) {
+            nextContrastLevel = prevContrastLevel - 1;
+          } else if (prevFarLevel > FAR_LEVEL_MIN) {
+            // Drop a size AND reset contrast to hardest: patient must now work up
+            // the full contrast ladder at the easier size.
+            nextFarLevel = prevFarLevel - 1;
+            nextContrastLevel = CONTRAST_LEVEL_MAX;
+          }
         }
+        lettersChanged = nextContrastLevel !== prevContrastLevel || nextFarLevel !== prevFarLevel;
       }
-
-      // Always new letters when logCS or Snellen level changes
-      lettersChanged =
-        nextContrastLevel !== prevContrastLevel || nextFarLevel !== prevFarLevel;
 
       const newLetters = lettersChanged
         ? generateLetters(charTypeRef.current)
@@ -212,6 +265,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
         contrastLevel: nextContrastLevel,
         letters: newLetters,
         passStreak: nextPassStreak,
+        failStreak: nextFailStreak,
         roundsCompleted: prev.roundsCompleted + 1,
         peakFarLevel: nextPeakFarLevel,
         peakContrastLevel: nextPeakContrastLevel,
@@ -245,6 +299,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
           contrastLevel,
           letters: generateLetters(charTypeRef.current),
           passStreak: 0,
+          failStreak: 0,
           roundsCompleted: 0,
           peakFarLevel: farLevel,
           peakContrastLevel: contrastLevel,
@@ -259,6 +314,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
       ...prev,
       letters: generateLetters(charTypeRef.current),
       passStreak: 0,
+      failStreak: 0,
     }));
   }, []);
 
@@ -273,6 +329,9 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
     resetSession,
     regenerateLetters,
     allAnswered,
+    trainingMode: trainingModeRef.current,
+    streakTarget: ACUITY_STREAK_TARGET,
+    failTarget: ACUITY_FAIL_TARGET,
   };
 }
 

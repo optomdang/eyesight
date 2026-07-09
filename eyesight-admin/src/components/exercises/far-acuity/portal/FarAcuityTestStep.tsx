@@ -34,6 +34,8 @@ interface FarAcuityTestStepProps {
   eyeLabel: string;
   acuityScore: string;
   contrastPercent: number;
+  /** 'contrast' shows contrast %, 'acuity' hides contrast info */
+  trainingMode?: 'contrast' | 'acuity';
   /** E/C/S: index of next char to fill via direction buttons */
   currentBatchCharIndex: number;
   currentBatch: number;
@@ -60,6 +62,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
   eyeLabel,
   acuityScore,
   contrastPercent,
+  trainingMode = 'contrast',
   currentBatchCharIndex,
   currentBatch,
   inputValues,
@@ -183,24 +186,26 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
             >
               {snellenLabel}
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                position: 'absolute',
-                top: '50%',
-                right: '20px',
-                transform: 'translateY(-50%)',
-                color: 'text.primary',
-                fontWeight: 'medium',
-                fontSize: '0.9rem',
-                zIndex: 1000,
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-              }}
-            >
-              {logCsLabel}
-            </Typography>
+            {trainingMode === 'contrast' && (
+              <Typography
+                variant="body2"
+                sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '20px',
+                  transform: 'translateY(-50%)',
+                  color: 'text.primary',
+                  fontWeight: 'medium',
+                  fontSize: '0.9rem',
+                  zIndex: 1000,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                }}
+              >
+                {logCsLabel}
+              </Typography>
+            )}
             <Box
               sx={{
                 display: 'flex',
@@ -252,7 +257,9 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
           <Typography variant="body2">
             <strong>{eyeLabel}</strong> – {t('exam.level')}{' '}
             <strong>
-              {acuityScore} (Contrast = {contrastPercent.toFixed(2)}%)
+              {trainingMode === 'contrast'
+                ? `${acuityScore} (Contrast = ${contrastPercent.toFixed(2)}%)`
+                : acuityScore}
             </strong>
           </Typography>
         </Box>

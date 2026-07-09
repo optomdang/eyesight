@@ -91,6 +91,9 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     return exerciseConfig?.visionType === 'near' ? 'near' : 'far';
   }, [exerciseConfig?.visionType]);
 
+  /** True when the exercise config is "Thị lực tương phản" (contrast sensitivity training). */
+  const isContrastMode = exerciseConfig?.visionType === 'contrast';
+
   const eye = useMemo(
     () =>
       resolveAssignmentTrainingEye({
@@ -164,10 +167,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [currentResultId]);
 
   // ── Engine ────────────────────────────────────────────────────────────────
-  // Contrast: override level = contrast step (logCS). Far letter size uses a stable
-  // acuity level (sandbox stashes it in lastAchievedVisionLevel; live patients use exam far).
+  // Contrast mode: override level = contrast step (logCS); far letter size anchored to exam far.
+  // Acuity mode:   starts at the patient's current exam level; contrast locked at 100%.
   const initialAcuityLevel = useMemo(() => {
-    if (trainingVisionType === 'contrast') {
+    if (isContrastMode) {
       if (sandboxMode && assignment?.lastAchievedVisionLevel != null) {
         return assignment.lastAchievedVisionLevel;
       }
@@ -195,6 +198,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       }) ?? 1
     );
   }, [
+    isContrastMode,
     sandboxMode,
     exerciseConfig?.difficultyBaselineSource,
     assignment?.levelOverride,
@@ -207,7 +211,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   ]);
 
   const initialContrastLevel = useMemo(() => {
-    if (trainingVisionType !== 'contrast') return 1;
+    if (!isContrastMode) return 1;
     if (assignment?.levelOverride && assignment.visionLevel != null && assignment.visionLevel > 0) {
       return assignment.visionLevel;
     }
@@ -224,7 +228,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       }) ?? 1
     );
   }, [
-    trainingVisionType,
+    isContrastMode,
     exerciseConfig?.difficultyBaselineSource,
     assignment?.levelOverride,
     assignment?.visionLevel,
@@ -239,8 +243,21 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     initialContrastLevel,
     charType,
     visionType: trainingVisionType === 'near' ? 'near' : 'far',
+    trainingMode: isContrastMode ? 'contrast' : 'acuity',
   });
-  const { state, setAnswer, submitRound, allAnswered, serializeForPause, restoreFromSnapshot, resetSession, regenerateLetters } = engine;
+  const {
+    state,
+    setAnswer,
+    submitRound,
+    allAnswered,
+    serializeForPause,
+    restoreFromSnapshot,
+    resetSession,
+    regenerateLetters,
+    trainingMode,
+    streakTarget,
+    failTarget,
+  } = engine;
 
   const {
     totalCoins,
@@ -541,18 +558,28 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
 
   // ── Pause ──────────────────────────────────────────────────────────────────
   const handlePauseExercise = useCallback(async () => {
-    if (!executionRef.current || !currentResultIdRef.current || isPausing || executionRef.current.completed) return;
+    if (!executionRef.current || executionRef.current.completed || isPausing) return;
+    const resultId = currentResultIdRef.current;
+    if (!sandboxMode && !resultId) {
+      showSnackbar('Chưa khởi tạo phiên tập — vui lòng tải lại trang', 'error');
+      throw new Error('Pause failed: missing result');
+    }
     setIsPausing(true);
     try {
       const metrics = buildMetrics();
-      if (!metrics) return;
+      if (!metrics) {
+        throw new Error('Pause failed: metrics unavailable');
+      }
       const exerciseState = {
         ...serializeForPause(),
         gamification: getGamificationSnapshot(),
       };
-      await pauseExercise(assignmentId, sessionId, currentResultIdRef.current, {
-        ...metrics,
+      if (sandboxMode) return;
+      await pauseExercise(assignmentId, sessionId, resultId as number, {
         exerciseState,
+        score: metrics.score,
+        duration: metrics.duration,
+        accuracy: metrics.accuracy,
       });
       showSnackbar('Đã tạm dừng bài tập thành công', 'success');
     } catch {
@@ -561,21 +588,16 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     } finally {
       setIsPausing(false);
     }
-  }, [assignmentId, sessionId, isPausing, buildMetrics, serializeForPause, getGamificationSnapshot, showSnackbar]);
-
-  const handlePauseClick = useCallback(async () => {
-    try {
-      timeoutTriggeredRef.current = true;
-      if (inactivityTimerRef.current) { clearTimeout(inactivityTimerRef.current); inactivityTimerRef.current = null; }
-      await handlePauseExercise();
-      if (executionRef.current) executionRef.current.completed = true;
-      setIsActive(false);
-      if (!sandboxMode) navigate('/portal/exercises');
-      else onSandboxExit?.();
-    } catch {
-      timeoutTriggeredRef.current = false;
-    }
-  }, [handlePauseExercise, sandboxMode, navigate, onSandboxExit]);
+  }, [
+    assignmentId,
+    sessionId,
+    sandboxMode,
+    isPausing,
+    buildMetrics,
+    serializeForPause,
+    getGamificationSnapshot,
+    showSnackbar,
+  ]);
 
   // ── End / exit dialogs ────────────────────────────────────────────────────
   const handleEndConfirm = useCallback(async () => {
@@ -585,13 +607,28 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [completeExerciseResult]);
 
   const handleExitConfirm = useCallback(async () => {
+    setShowExitDialog(false);
     try {
-      if (isGameActive() && currentResultId) await handlePauseExercise();
-    } finally {
-      setShowExitDialog(false);
-      if (blocker.state === 'blocked') blocker.proceed();
+      timeoutTriggeredRef.current = true;
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      await handlePauseExercise();
+      if (executionRef.current) executionRef.current.completed = true;
+      setIsActive(false);
+      if (blocker.state === 'blocked') {
+        blocker.proceed();
+      } else if (!sandboxMode) {
+        navigate('/portal/exercises');
+      } else {
+        onSandboxExit?.();
+      }
+    } catch {
+      timeoutTriggeredRef.current = false;
+      if (blocker.state === 'blocked') blocker.reset();
     }
-  }, [isGameActive, currentResultId, handlePauseExercise, blocker]);
+  }, [handlePauseExercise, blocker, sandboxMode, navigate, onSandboxExit]);
 
   const handleCompletionClose = useCallback(() => {
     setShowCompletionDialog(false);
@@ -777,13 +814,61 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             <Typography variant="caption" color="text.secondary">Thị lực</Typography>
           </Box>
 
-          {/* logCS */}
-          <Box textAlign="center">
-            <Typography variant="h6" fontWeight="bold">
-              {contrastInfo.score}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">logCS</Typography>
-          </Box>
+          {/* logCS (contrast mode) or streak progress bar (acuity mode) */}
+          {trainingMode === 'contrast' ? (
+            <Box textAlign="center">
+              <Typography variant="h6" fontWeight="bold">
+                {contrastInfo.score}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">logCS</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ textAlign: 'center', minWidth: 110 }}>
+              {/* Pass streak bar */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25, justifyContent: 'center' }}>
+                <Typography variant="caption" fontWeight="bold" sx={{ color: 'primary.main', lineHeight: 1 }}>
+                  ✓ {state.passStreak}/{streakTarget}
+                </Typography>
+                {(state.failStreak ?? 0) > 0 && (
+                  <Typography variant="caption" fontWeight="bold" sx={{ color: 'error.main', lineHeight: 1 }}>
+                    · ✗ {state.failStreak}/{failTarget}
+                  </Typography>
+                )}
+              </Box>
+              <Box
+                sx={{
+                  width: 110,
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: 'grey.200',
+                  overflow: 'hidden',
+                }}
+              >
+                {(state.failStreak ?? 0) > 0 ? (
+                  <Box
+                    sx={{
+                      height: '100%',
+                      borderRadius: 4,
+                      width: `${((state.failStreak ?? 0) / failTarget) * 100}%`,
+                      bgcolor: 'error.main',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      height: '100%',
+                      borderRadius: 4,
+                      width: `${(state.passStreak / streakTarget) * 100}%`,
+                      bgcolor: state.passStreak >= streakTarget ? 'success.main' : 'primary.main',
+                      transition: 'width 0.3s ease, background-color 0.2s ease',
+                    }}
+                  />
+                )}
+              </Box>
+              <Typography variant="caption" color="text.secondary">Tiến độ</Typography>
+            </Box>
+          )}
 
           {/* Eye */}
           <Box textAlign="center">
@@ -811,8 +896,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             <Button
               size="small"
               variant="outlined"
-              onClick={handlePauseClick}
-              disabled={isPausing || !isGameActive()}
+              onClick={() => setShowExitDialog(true)}
+              disabled={isPausing || !isGameActive() || (!sandboxMode && !currentResultId)}
             >
               {isPausing ? 'Đang lưu...' : 'Tạm dừng'}
             </Button>
@@ -851,6 +936,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
               eyeLabel={eyeLabel}
               acuityScore={acuityInfo.score}
               contrastPercent={contrastInfo.contrastPercent}
+              trainingMode={trainingMode}
               currentBatchCharIndex={currentBatchCharIndex}
               currentBatch={currentBatch}
               inputValues={inputValues}
