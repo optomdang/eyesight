@@ -1,23 +1,28 @@
 /**
- * VT Quest — In-game HUD overlay (stars, coins, energy bar, timer).
+ * VT Quest — In-game HUD overlay (stars, coins, streak bar, timer).
  * Shown during trials and on the world map.
  */
 
 import React from 'react';
 import { Box, LinearProgress, Typography } from '@mui/material';
 import { COPY } from '../../gamification/copy.vi';
-import { isStreakMilestone, thresholdToPowerLevel } from '../../gamification/rewards';
-import type { VtSessionState, VtWorld } from 'src/types/core/vtQuest';
+import { isStreakMilestone, STREAK_MILESTONES } from '../../gamification/rewards';
+import type { VtSessionState } from 'src/types/core/vtQuest';
 
 interface QuestHudProps {
   session: VtSessionState;
   timeRemainingMs: number | null;
-  currentWorld: VtWorld;
-  latestThreshold: number | null;
   onPauseRequest: () => void;
   onStopRequest: () => void;
   pauseDisabled?: boolean;
   stopDisabled?: boolean;
+}
+
+/** Progress toward the next streak milestone (0–100). */
+function streakProgress(combo: number): { progress: number; nextMilestone: number } {
+  const next = (STREAK_MILESTONES as readonly number[]).find((m) => m > combo);
+  if (!next) return { progress: 100, nextMilestone: combo };
+  return { progress: Math.min(100, (combo / next) * 100), nextMilestone: next };
 }
 
 function formatTime(ms: number): string {
@@ -30,15 +35,14 @@ function formatTime(ms: number): string {
 const QuestHud: React.FC<QuestHudProps> = ({
   session,
   timeRemainingMs,
-  currentWorld,
-  latestThreshold,
   onPauseRequest,
   onStopRequest,
   pauseDisabled = false,
   stopDisabled = false,
 }) => {
-  const powerLevel = thresholdToPowerLevel(latestThreshold, currentWorld);
-  const comboMilestone = session.currentCombo > 0 && isStreakMilestone(session.currentCombo);
+  const combo = session.currentCombo;
+  const comboMilestone = combo > 0 && isStreakMilestone(combo);
+  const { progress: streakPct, nextMilestone } = streakProgress(combo);
 
   return (
     <Box
@@ -73,45 +77,33 @@ const QuestHud: React.FC<QuestHudProps> = ({
         </Typography>
       </Box>
 
-      {/* Energy bar */}
+      {/* Streak progress bar */}
       <Box sx={{ flex: 1 }}>
-        <Typography variant="caption" sx={{ color: '#4ECDC4', fontWeight: 600, fontSize: 10 }}>
-          {COPY.powerLabel}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
+          <Typography variant="caption" sx={{ color: '#4ECDC4', fontWeight: 600, fontSize: 10 }}>
+            {combo > 0 && comboMilestone
+              ? COPY.streakMilestoneHud(combo)
+              : COPY.comboLabel(combo)}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)', fontSize: 9 }}>
+            {combo} / {nextMilestone}
+          </Typography>
+        </Box>
         <LinearProgress
           variant="determinate"
-          value={powerLevel}
+          value={streakPct}
           sx={{
             height: 8,
             borderRadius: 4,
             bgcolor: 'rgba(255,255,255,0.1)',
             '& .MuiLinearProgress-bar': {
-              bgcolor: powerLevel > 60 ? '#4ECDC4' : powerLevel > 30 ? '#FFD93D' : '#FF6B6B',
+              bgcolor: comboMilestone ? '#FF6B6B' : combo >= 5 ? '#4ECDC4' : '#FFD93D',
               borderRadius: 4,
+              transition: 'width 0.35s ease, background-color 0.2s ease',
             },
           }}
         />
       </Box>
-
-      {/* Combo indicator */}
-      {session.currentCombo >= 3 && (
-        <Typography
-          sx={{
-            color: comboMilestone ? '#FF6B6B' : '#FFD93D',
-            fontWeight: 800,
-            fontSize: comboMilestone ? 14 : 13,
-            animation: 'pulse 0.5s ease-in-out infinite',
-            '@keyframes pulse': {
-              '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-              '50%': { opacity: 0.7, transform: 'scale(1.15)' },
-            },
-          }}
-        >
-          {comboMilestone
-            ? COPY.streakMilestoneHud(session.currentCombo)
-            : COPY.comboLabel(session.currentCombo)}
-        </Typography>
-      )}
 
       {/* Timer */}
       {timeRemainingMs !== null && (

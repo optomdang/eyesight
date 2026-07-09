@@ -115,6 +115,10 @@ export interface DataTableContextState<T> {
 export interface DataTableProviderProps {
   children: React.ReactNode;
   endpoint: string;
+  /** Initial rows-per-page value. Defaults to 10. */
+  defaultRowsPerPage?: number;
+  /** Initial filter values applied on first load. */
+  filter?: Record<string, string>;
 }
 
 // ==================== AUTH ====================

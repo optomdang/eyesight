@@ -117,6 +117,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
 
   // ── charType + setup phase ────────────────────────────────────────────────
+  const charTypeStorageKey = `far_acuity_char_type_${assignmentId}`;
+
   const [setupPhase, setSetupPhase] = useState<'charType' | 'active'>('charType');
   const [charType, setCharType] = useState<ExamCharType>('E');
   const [suggestedCharType, setSuggestedCharType] = useState<ExamCharType | null>(null);
@@ -127,14 +129,21 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
   const [inputFocusKey, setInputFocusKey] = useState(0);
 
+  // Resolve initial charType: Priority 1 = matching exam type, Priority 2 = localStorage
   useEffect(() => {
     if (sandboxMode) return;
-    resolvePatientExamCharType()
-      .then((resolved) => {
-        setSuggestedCharType(resolved);
-        setCharType(resolved);
+    const cached = localStorage.getItem(charTypeStorageKey) as ExamCharType | null;
+    resolvePatientExamCharType(exerciseConfig?.visionType)
+      .then((fromExam) => {
+        setSuggestedCharType(fromExam);
+        // Priority 1: exam charType always wins for suggestion display
+        // If cached exists it becomes the pre-selected default (Priority 2), but suggestion shown
+        setCharType(cached ?? fromExam);
       })
-      .catch(() => setCharType('E'));
+      .catch(() => {
+        if (cached) setCharType(cached);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxMode]);
 
   const resetInputState = useCallback(() => {
@@ -276,6 +285,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const restoredRef = useRef(false);
 
   const handleCharTypeConfirm = useCallback(() => {
+    localStorage.setItem(charTypeStorageKey, charType);
     setSetupPhase('active');
     resetSession({
       farLevel: initialAcuityLevel ?? 1,
@@ -286,7 +296,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     if (charType === 'A' || charType === 'N') {
       setInputFocusKey((k) => k + 1);
     }
-  }, [initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
+  }, [charTypeStorageKey, initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
 
   // ── Visual sizing ─────────────────────────────────────────────────────────
   const distance = useMemo(
@@ -572,6 +582,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       }
       const exerciseState = {
         ...serializeForPause(),
+        charType,
         gamification: getGamificationSnapshot(),
       };
       if (sandboxMode) return;
@@ -673,6 +684,9 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             restoreFromSnapshot(result.exerciseState);
             if (result.exerciseState.gamification) {
               restoreGamification(result.exerciseState.gamification);
+            }
+            if (result.exerciseState.charType) {
+              setCharType(result.exerciseState.charType as ExamCharType);
             }
             restoredRef.current = true;
             setSetupPhase('active');

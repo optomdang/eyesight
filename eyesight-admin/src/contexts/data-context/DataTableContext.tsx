@@ -15,7 +15,7 @@ import { useConfirm } from 'src/hooks/useConfirm';
 const DataTableContext = createContext<DataTableContextState<any> | undefined>(undefined);
 
 // Tạo provider component với generic type
-const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) => {
+const DataTableProvider = <T,>({ children, endpoint, defaultRowsPerPage = 10, filter: initialFilter }: DataTableProviderProps) => {
   const [dataRes, setDataRes] = useState<PaginatedResponse<T>>({
     count: 0,
     limit: 0,
@@ -23,12 +23,12 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
     rows: [],
     totalPages: 0,
   });
-  const [filter, setFilter] = useState<FilterTable>({});
+  const [filter, setFilter] = useState<FilterTable>(initialFilter ?? {});
   const [loading, setLoading] = useState(false);
   const [tableKey, setTableKey] = useState(0);
   const [tableState, setTableState] = useState<Partial<MUIDataTableState>>({
     page: 0,
-    rowsPerPage: 10,
+    rowsPerPage: defaultRowsPerPage,
     sortOrder: undefined,
   });
   const { showSnackbar } = useSnackbar();
@@ -38,12 +38,12 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
   useEffect(() => {
     setTableState({
       page: 0,
-      rowsPerPage: 10,
-      sortOrder: undefined, // Clear sort when changing pages
+      rowsPerPage: defaultRowsPerPage,
+      sortOrder: undefined,
     });
-    setFilter({});
+    setFilter(initialFilter ?? {});
     setDataRes({ count: 0, limit: 0, page: 0, rows: [], totalPages: 0 });
-  }, [endpoint]);
+  }, [endpoint]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hàm tạo query string
   const getQueryString = useCallback(
@@ -66,7 +66,7 @@ const DataTableProvider = <T,>({ children, endpoint }: DataTableProviderProps) =
       // Thêm các tham số filter
       Object.entries(filterOverride ?? filter).forEach(([key, value]) => {
         if (value) {
-          params.append(key, value);
+          params.append(key, String(value));
         }
       });
       return params.toString();

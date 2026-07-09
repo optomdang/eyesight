@@ -20,12 +20,12 @@ import { shouldShowFieldError } from 'src/utils';
 import { ScreenInfo, calculatePPI } from 'src/utils/visionUtils';
 import {
   getDefaultDeviceProfile,
-  getLastScreenConfig,
   saveDeviceProfile,
   markDeviceProfileUsed,
   saveLastScreenConfig,
   type DeviceProfile,
 } from 'src/services/deviceProfile.service';
+import { getPreferredScreenInfo } from 'src/services/screenCalibration.service';
 import { exerciseSetupSchema, type ExerciseSetupFormData } from 'src/validations';
 import { HelpTooltip } from 'src/components/shared/HelpTooltip';
 import DeviceProfileManager from 'src/features/portal/views/exerciseResult/components/DeviceProfileManager';
@@ -99,7 +99,13 @@ const ScreenSetupForm: React.FC<ScreenSetupFormProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showSnackbar } = useSnackbar();
-  const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const preferredScreen = getPreferredScreenInfo();
+  const [selectedPreset, setSelectedPreset] = useState<string>(() => {
+    const match = commonScreenSizes.find(
+      (p) => Math.abs(p.diagonal - preferredScreen.diagonalInch) < 0.05
+    );
+    return match?.label ?? '';
+  });
   const [profileManagerOpen, setProfileManagerOpen] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
 
@@ -113,9 +119,9 @@ const ScreenSetupForm: React.FC<ScreenSetupFormProps> = ({
   } = useForm<ExerciseSetupFormData>({
     resolver: yupResolver(exerciseSetupSchema),
     defaultValues: {
-      diagonalInch: 15.6,
-      screenWidth: 1920,
-      screenHeight: 1080,
+      diagonalInch: preferredScreen.diagonalInch,
+      screenWidth: preferredScreen.screenWidth,
+      screenHeight: preferredScreen.screenHeight,
     },
   });
 
@@ -139,17 +145,23 @@ const ScreenSetupForm: React.FC<ScreenSetupFormProps> = ({
     [setValue],
   );
 
-  // Load default device profile on mount
+  // Load calibrated screen (priority) or last saved config on mount
   useEffect(() => {
-    const lastScreenConfig = getLastScreenConfig();
-    if (lastScreenConfig) {
-      applyScreenConfig(lastScreenConfig);
-      return;
-    }
+    const screenConfig = getPreferredScreenInfo();
+    applyScreenConfig(screenConfig);
+
+    const matchingPreset = commonScreenSizes.find(
+      (p) => Math.abs(p.diagonal - screenConfig.diagonalInch) < 0.05
+    );
+    setSelectedPreset(matchingPreset?.label ?? '');
 
     const defaultProfile = getDefaultDeviceProfile();
-    if (defaultProfile) {
-      applyScreenConfig(defaultProfile);
+    if (
+      defaultProfile &&
+      defaultProfile.diagonalInch === screenConfig.diagonalInch &&
+      defaultProfile.screenWidth === screenConfig.screenWidth &&
+      defaultProfile.screenHeight === screenConfig.screenHeight
+    ) {
       setCurrentProfileId(defaultProfile.id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

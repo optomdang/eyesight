@@ -2,8 +2,8 @@
  * Resolve the best charType to use for the far-acuity exercise.
  *
  * Priority:
- *   1. Most-recent completed far exam with a non-empty charType.
- *   2. Most-recent completed contrast exam with a non-empty charType.
+ *   1. Most-recent completed exam whose examType matches the exercise visionType.
+ *   2. Most-recent completed exam of any other relevant type (far / contrast / near).
  *   3. Fallback: 'E' (E-chart, universally understood).
  */
 
@@ -19,7 +19,6 @@ function isValidCharType(v: unknown): v is ExamCharType {
 
 function pickCharType(results: any[]): ExamCharType | null {
   if (!Array.isArray(results)) return null;
-  // Sort by completedAt desc (most recent first)
   const sorted = [...results].sort((a, b) => {
     const da = a.completedAt ? new Date(a.completedAt).getTime() : 0;
     const db = b.completedAt ? new Date(b.completedAt).getTime() : 0;
@@ -33,31 +32,46 @@ function pickCharType(results: any[]): ExamCharType | null {
 }
 
 /**
- * Fetch the charType from the patient's most recent completed exams.
- * Returns the charType string or the default 'E'.
+ * Map exercise visionType to the primary exam type to query first, plus fallbacks.
+ * For 'near' exercises look at near exams first; for 'contrast' look at contrast first, etc.
  */
-export async function resolvePatientExamCharType(): Promise<ExamCharType> {
+function examTypesForVisionType(visionType?: string | null): string[] {
+  switch (visionType) {
+    case 'near':
+      return ['near', 'far', 'contrast'];
+    case 'contrast':
+      return ['contrast', 'far', 'near'];
+    case 'far':
+    default:
+      return ['far', 'contrast', 'near'];
+  }
+}
+
+/**
+ * Fetch the charType from the patient's most recent completed exam that matches
+ * the exercise visionType. Returns the charType string or the default 'E'.
+ *
+ * @param visionType  'far' | 'near' | 'contrast' from PortalExerciseConfig.visionType
+ */
+export async function resolvePatientExamCharType(visionType?: string | null): Promise<ExamCharType> {
+  const examTypes = examTypesForVisionType(visionType);
+
   try {
-    const [farResponse, contrastResponse] = await Promise.allSettled([
-      getMyExamResults({ examType: 'far', status: 'completed', limit: 5 }),
-      getMyExamResults({ examType: 'contrast', status: 'completed', limit: 5 }),
-    ]);
+    const responses = await Promise.allSettled(
+      examTypes.map((examType) =>
+        getMyExamResults({ examType, status: 'completed', limit: 5 })
+      )
+    );
 
-    const farResults =
-      farResponse.status === 'fulfilled'
-        ? (farResponse.value?.data ?? farResponse.value?.items ?? farResponse.value ?? [])
-        : [];
-
-    const farCharType = pickCharType(Array.isArray(farResults) ? farResults : []);
-    if (farCharType) return farCharType;
-
-    const contrastResults =
-      contrastResponse.status === 'fulfilled'
-        ? (contrastResponse.value?.data ?? contrastResponse.value?.items ?? contrastResponse.value ?? [])
-        : [];
-
-    const contrastCharType = pickCharType(Array.isArray(contrastResults) ? contrastResults : []);
-    if (contrastCharType) return contrastCharType;
+    for (const resp of responses) {
+      if (resp.status !== 'fulfilled') continue;
+      const raw = resp.value;
+      const items: any[] = Array.isArray(raw)
+        ? raw
+        : (raw?.data ?? raw?.items ?? raw?.rows ?? []);
+      const found = pickCharType(Array.isArray(items) ? items : []);
+      if (found) return found;
+    }
   } catch {
     // Network error — fall through to default
   }

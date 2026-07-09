@@ -359,7 +359,7 @@ const AssignmentPage: React.FC = () => {
           customActions={renderCustomActions}
           options={{
             selectableRows: 'none',
-            rowsPerPageOptions: [5, 10, 25],
+            rowsPerPageOptions: [10, 25, 50],
             elevation: 0,
           }}
         />

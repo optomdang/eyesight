@@ -318,13 +318,6 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     enableSound: enableFeedbackSound,
   });
 
-  // --- Latest threshold for HUD energy bar ---
-  const latestThreshold = useMemo(() => {
-    const stages = engineState.session.completedStages;
-    if (stages.length === 0) return null;
-    const last = stages[stages.length - 1];
-    return last.threshold;
-  }, [engineState.session.completedStages]);
 
   // --- Duration countdown ---
   useEffect(() => {
@@ -735,25 +728,6 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     setShowStopDialog(true);
   }, []);
 
-  const handlePauseClick = useCallback(async () => {
-    if (sandboxMode) {
-      onSandboxExit?.();
-      return;
-    }
-
-    timeoutTriggeredRef.current = true;
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
-
-    try {
-      await handlePauseExercise();
-      navigate('/portal/exercises');
-    } catch {
-      timeoutTriggeredRef.current = false;
-    }
-  }, [handlePauseExercise, navigate, sandboxMode, onSandboxExit]);
 
   // --- Navigation blocker ---
   const blocker = useBlocker(
@@ -874,8 +848,6 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
         <QuestHud
           session={engineState.session}
           timeRemainingMs={timeRemaining}
-          currentWorld={engineState.session.currentWorld}
-          latestThreshold={latestThreshold}
           pauseDisabled={sessionControlsDisabled}
           stopDisabled={sessionControlsDisabled}
           onPauseRequest={handlePauseRequest}

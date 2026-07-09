@@ -18,7 +18,7 @@ interface FarAcuityCharTypeStepProps {
   charType: ExamCharType;
   onCharTypeChange: (value: ExamCharType) => void;
   onConfirm: () => void;
-  /** Pre-filled from latest far exam */
+  /** Suggested from matching exam type (highest priority). */
   suggestedCharType?: ExamCharType | null;
   /** Render Select menu inside fullscreen root (browser fullscreen blocks body portal). */
   menuContainerRef?: RefObject<HTMLElement | null>;
@@ -50,15 +50,18 @@ const FarAcuityCharTypeStep: React.FC<FarAcuityCharTypeStepProps> = ({
       <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
         {t('exam.charType', 'Loại ký tự kiểm tra')}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-        Chọn loại ký tự giống bài test thị lực nhìn xa. Bạn sẽ đọc 5 ký tự và xác nhận đáp án
-        mỗi lượt; hệ thống tự điều chỉnh độ tương phản và cỡ chữ.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
+        Chọn loại ký tự giống bài kiểm tra thị lực tương ứng. Bạn sẽ đọc 5 ký tự và xác nhận
+        đáp án mỗi lượt; hệ thống tự điều chỉnh độ tương phản và cỡ chữ.
       </Typography>
 
       {suggestedCharType && suggestedCharType !== charType && (
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
-          Gợi ý từ bài khám gần nhất:{' '}
-          <strong>{suggestedCharType}</strong>
+        <Typography
+          variant="caption"
+          color="primary.main"
+          sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}
+        >
+          💡 Bài khám gợi ý: <strong>{suggestedCharType}</strong>
         </Typography>
       )}
 

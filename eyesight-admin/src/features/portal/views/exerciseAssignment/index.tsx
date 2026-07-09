@@ -4,7 +4,7 @@ import AssignmentPage from './AssignmentPage';
 
 const Assignments: React.FC = () => {
   return (
-    <DataTableProvider endpoint="me/assignments">
+    <DataTableProvider endpoint="me/assignments" defaultRowsPerPage={25}>
       <AssignmentPage />
     </DataTableProvider>
   );

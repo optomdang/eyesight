@@ -34,19 +34,23 @@ const getMyAssignments = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient record not found');
   }
 
-  const filter = { patientId: patient.id, status: 'active', ...pick(req.query, filterKeys) };
+  // Apply treatment package filter at query level so pagination count is accurate.
+  const activePackage = await treatmentPackageService.getActivePatientPackage(patient.id);
+  const packageFilter =
+    activePackage && activePackage.allowedConfigIds?.length
+      ? { exerciseConfigId: activePackage.allowedConfigIds.map(Number) }
+      : {};
+
+  const filter = {
+    patientId: patient.id,
+    status: 'active',
+    ...packageFilter,
+    ...pick(req.query, filterKeys),
+  };
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   const result = await exerciseAssignmentService.getPatientAssignments(filter, options);
-  const filteredRows = await treatmentPackageService.filterAssignmentsByTreatmentPackage(
-    patient.id,
-    result.rows
-  );
 
-  res.send({
-    ...result,
-    rows: filteredRows,
-    count: filteredRows.length,
-  });
+  res.send(result);
 });
 
 /**

@@ -12,6 +12,7 @@ import {
 } from 'src/utils/visionUtils';
 import useSnackbar from 'src/contexts/UseSnackbar';
 import ScreenSetupForm from 'src/components/forms/ScreenSetupForm';
+import { getPreferredScreenInfo } from 'src/services/screenCalibration.service';
 import ExerciseVisionRequiredAlert from './ExerciseVisionRequiredAlert';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
 import { resolveExerciseStartVisionLevel } from 'src/utils/exerciseDifficultyBaseline';
@@ -49,11 +50,7 @@ const ExerciseSetup: React.FC<ExerciseSetupProps> = ({
   const { examResults: freshExamResults, loading: examResultsLoading } = useFreshPatientExamResults();
   const { t } = useTranslation();
   const { showSnackbar } = useSnackbar();
-  const [screenValues, setScreenValues] = useState<ScreenInfo>({
-    diagonalInch: 15.6,
-    screenWidth: 1920,
-    screenHeight: 1080,
-  });
+  const [screenValues, setScreenValues] = useState<ScreenInfo>(() => getPreferredScreenInfo());
 
   const isVtQuest = isVtQuestFamily(exerciseConfig?.exercise?.exerciseType);
 
