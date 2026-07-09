@@ -4,13 +4,13 @@ import CustomDataTable from 'src/components/shared/CustomDataTable';
 import useDataTable from 'src/contexts/data-context/useDataTable';
 import TreatmentPackageForm from './forms/TreatmentPackageForm';
 import TreatmentPackageFilterForm from './forms/filter-form';
-import { Button, Box, Chip } from '@mui/material';
-import { Add } from '@mui/icons-material';
+import { Button, Box, Chip, IconButton, Tooltip } from '@mui/material';
+import { Add, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { TreatmentPackage } from 'src/types/core';
 import { useTranslation } from 'src/hooks/useTranslation';
 import { compactDataTableTitleSx } from 'src/utils/compactDataTableTitleSx';
-import { usePermission } from 'src/hooks/usePermission';
 import useAuth from 'src/contexts/authGuard/useAuth';
+import { useConfirm } from 'src/hooks/useConfirm';
 
 const useTreatmentPackageColumns = () => {
   return [
@@ -67,10 +67,9 @@ const useTreatmentPackageColumns = () => {
 
 const TreatmentPackagesTab = () => {
   const { t } = useTranslation();
-  const { hasPermission } = usePermission();
+  const { confirm } = useConfirm();
   const { user } = useAuth();
   const isAdmin = user?.userType === 'admin';
-  const canManageCustom = hasPermission('manageExercises');
   const columns = useTreatmentPackageColumns();
   const {
     dataRes,
@@ -97,17 +96,13 @@ const TreatmentPackagesTab = () => {
     setSelectedPackageId(null);
   };
 
-  const canMutatePackage = (pkg: TreatmentPackage) => {
-    if (pkg.packageType === 'system') return isAdmin;
-    return canManageCustom;
-  };
-
   const handleEditData = (rowData: TreatmentPackage) => {
+    if (!isAdmin) return;
     handleOpenModal(rowData.id);
   };
 
   const handleDeleteData = async (rowData: TreatmentPackage) => {
-    if (!canMutatePackage(rowData)) return;
+    if (!isAdmin) return;
     try {
       await removeData(rowData.id);
       fetchData();
@@ -115,6 +110,62 @@ const TreatmentPackagesTab = () => {
       console.error('Failed to delete treatment package:', err);
     }
   };
+
+  const handleDeleteWithConfirm = async (rowData: TreatmentPackage) => {
+    if (!isAdmin) return;
+
+    const confirmed = await confirm({
+      title: t('common.confirmDeleteTitle', 'Xác nhận xóa'),
+      message: t('common.confirmDelete', 'Bạn có chắc chắn muốn xóa?'),
+      confirmText: t('common.delete', 'Xóa'),
+      cancelText: t('common.cancel', 'Hủy'),
+      confirmColor: 'error',
+    });
+
+    if (!confirmed) return;
+    await handleDeleteData(rowData);
+  };
+
+  const renderRowActions = (row: TreatmentPackage) => (
+    <>
+      <Tooltip
+        title={
+          isAdmin
+            ? t('common.edit', 'Sửa')
+            : t('admin.adminOnlyAction', 'Chỉ quản trị viên mới có quyền thực hiện')
+        }
+        arrow
+      >
+        <span>
+          <IconButton
+            size="small"
+            disabled={!isAdmin}
+            onClick={() => handleEditData(row)}
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip
+        title={
+          isAdmin
+            ? t('common.delete', 'Xóa')
+            : t('admin.adminOnlyAction', 'Chỉ quản trị viên mới có quyền thực hiện')
+        }
+        arrow
+      >
+        <span>
+          <IconButton
+            size="small"
+            disabled={!isAdmin}
+            onClick={() => void handleDeleteWithConfirm(row)}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+    </>
+  );
 
   const handleBatchDelete = async (ids: (string | number)[]) => {
     try {
@@ -159,8 +210,7 @@ const TreatmentPackagesTab = () => {
         columns={columns}
         tableState={tableState}
         onTableChange={onTableChange}
-        onEditData={(row) => (canMutatePackage(row) ? handleEditData(row) : handleOpenModal(row.id))}
-        onDeleteData={(row) => (canMutatePackage(row) ? handleDeleteData(row) : undefined)}
+        customActions={renderRowActions}
         enableBatchDelete={isAdmin}
         onSelectionChange={setSelectedIds}
         resetKey={`${endpoint}-${tableKey}`}

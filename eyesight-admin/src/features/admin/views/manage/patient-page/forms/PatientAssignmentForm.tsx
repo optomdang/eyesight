@@ -31,6 +31,7 @@ import type {
   ColorScheme,
 } from 'src/types/core';
 import useSnackbar from 'src/contexts/UseSnackbar';
+import useAuth from 'src/contexts/authGuard/useAuth';
 import { getErrorMessage } from 'src/utils/errorHandler';
 import {
   SNACKBAR_SEVERITY,
@@ -91,6 +92,8 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const { showSnackbar } = useSnackbar();
+  const { user } = useAuth();
+  const isDoctor = user?.userType === 'doctor';
 
   // State for data loading
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
@@ -203,6 +206,13 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
       const effectiveVisionLevel = levelOverrideEnabled ? (data.visionLevel ?? null) : null;
 
       if (data.createCustomConfig) {
+        if (isDoctor) {
+          showSnackbar(
+            t('admin.adminOnlyAction', 'Chỉ quản trị viên mới có quyền thực hiện'),
+            SNACKBAR_SEVERITY.WARNING
+          );
+          return;
+        }
         const referentId =
           data.configReferentId ?? data.exerciseConfigId ?? availableConfigs[0]?.id ?? null;
         const exerciseType =
@@ -500,6 +510,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
     }
   };
   const handleCustomConfigChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDoctor) return;
     const checked = e.target.checked;
     setFormValue('createCustomConfig', checked);
     if (checked) {
@@ -586,6 +597,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                         checked={values.createCustomConfig}
                         onChange={handleCustomConfigChange}
                         color="primary"
+                        disabled={isDoctor}
                       />
                     }
                     label={t('config.createCustomConfig', 'Tạo cấu hình tùy chỉnh')}
@@ -636,6 +648,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   exerciseName={
                     availableExercises.find((ex) => ex.id === values.exerciseId)?.name ?? null
                   }
+                  lockTemplateFields={isDoctor}
                 />
                 {/* Patient-specific Vision Level Override Section */}
                 <Box sx={{ mt: 3 }}>

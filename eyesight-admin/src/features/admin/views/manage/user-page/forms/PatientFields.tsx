@@ -137,30 +137,21 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
 
       <Grid size={{ xs: 12, sm: 6 }}>
         {showPackageSelect ? (
-          <Box>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>
-              <LabelWithHelp
-                help={
-                  isCreate
-                    ? packageHelpText
-                    : 'Đổi gói sẽ gán lại thời hạn và gỡ các bài tập không thuộc gói mới.'
-                }
-              >
-                {t('patient.treatmentPackage', 'Gói điều trị')}
-                {isCreate ? ' *' : ''}
-              </LabelWithHelp>
-            </Typography>
-            <FormSelect
-              name="patient.treatmentPackageId"
-              control={control}
-              label=""
-              disabled={readOnly || loadingPackages}
-              options={[
-                { value: '', label: t('common.select', 'Chọn') },
-                ...packageOptions,
-              ]}
-            />
-          </Box>
+          <FormSelect
+            name="patient.treatmentPackageId"
+            control={control}
+            label={t('patient.treatmentPackage', 'Gói điều trị')}
+            hint={
+              isCreate
+                ? packageHelpText
+                : 'Đổi gói sẽ gán lại thời hạn và gỡ các bài tập không thuộc gói mới.'
+            }
+            disabled={readOnly || loadingPackages}
+            options={[
+              { value: '', label: t('common.select', 'Chọn') },
+              ...packageOptions,
+            ]}
+          />
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography variant="body2">
