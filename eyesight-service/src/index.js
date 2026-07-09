@@ -5,6 +5,9 @@ const { connectDB } = require('./config/db');
 const {
   backfillDefaultExerciseModesForAllCenters,
 } = require('./services/system/defaultExerciseModes.service');
+const {
+  backfillDefaultTreatmentPackagesForAllCenters,
+} = require('./services/system/defaultTreatmentPackages.service');
 
 logger.info('Starting application...');
 
@@ -30,8 +33,19 @@ const syncSystemExerciseModes = async () => {
         `System exercise modes up to date for ${result.centers} center(s) (${result.skipped} skipped)`
       );
     }
+
+    const pkgResult = await backfillDefaultTreatmentPackagesForAllCenters(null);
+    if (pkgResult.created > 0 || pkgResult.promoted > 0) {
+      logger.info(
+        `System treatment packages synced: +${pkgResult.created} created, ${pkgResult.promoted} promoted across ${pkgResult.centers} center(s)`
+      );
+    } else {
+      logger.info(
+        `System treatment packages up to date for ${pkgResult.centers} center(s) (${pkgResult.skipped} skipped)`
+      );
+    }
   } catch (err) {
-    logger.error('Failed to sync system exercise modes (non-fatal):', err);
+    logger.error('Failed to sync system catalog (non-fatal):', err);
   }
 };
 

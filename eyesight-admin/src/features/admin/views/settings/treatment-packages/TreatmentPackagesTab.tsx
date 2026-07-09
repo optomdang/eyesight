@@ -4,19 +4,39 @@ import CustomDataTable from 'src/components/shared/CustomDataTable';
 import useDataTable from 'src/contexts/data-context/useDataTable';
 import TreatmentPackageForm from './forms/TreatmentPackageForm';
 import TreatmentPackageFilterForm from './forms/filter-form';
-import { Button, Box } from '@mui/material';
+import { Button, Box, Chip } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { TreatmentPackage } from 'src/types/core';
 import { useTranslation } from 'src/hooks/useTranslation';
 import { compactDataTableTitleSx } from 'src/utils/compactDataTableTitleSx';
 import { usePermission } from 'src/hooks/usePermission';
+import useAuth from 'src/contexts/authGuard/useAuth';
 
 const useTreatmentPackageColumns = () => {
   return [
     {
       name: 'name',
       label: 'Tên gói',
-      options: { sort: true },
+      options: {
+        sort: true,
+        customBodyRender: (value: string, tableMeta: { rowData: unknown[] }) => {
+          // Columns: [STT/id, name, packageType, exerciseCount, ...]
+          const packageType = tableMeta.rowData[2] as string | undefined;
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <span>{value}</span>
+              {packageType === 'system' && (
+                <Chip label="Hệ thống" size="small" color="primary" variant="outlined" />
+              )}
+            </Box>
+          );
+        },
+      },
+    },
+    {
+      name: 'packageType',
+      label: 'packageType',
+      options: { display: false, sort: false },
     },
     {
       name: 'exerciseCount',
@@ -48,7 +68,9 @@ const useTreatmentPackageColumns = () => {
 const TreatmentPackagesTab = () => {
   const { t } = useTranslation();
   const { hasPermission } = usePermission();
-  const canManage = hasPermission('manageExercises');
+  const { user } = useAuth();
+  const isAdmin = user?.userType === 'admin';
+  const canManageCustom = hasPermission('manageExercises');
   const columns = useTreatmentPackageColumns();
   const {
     dataRes,
@@ -75,11 +97,17 @@ const TreatmentPackagesTab = () => {
     setSelectedPackageId(null);
   };
 
+  const canMutatePackage = (pkg: TreatmentPackage) => {
+    if (pkg.packageType === 'system') return isAdmin;
+    return canManageCustom;
+  };
+
   const handleEditData = (rowData: TreatmentPackage) => {
     handleOpenModal(rowData.id);
   };
 
   const handleDeleteData = async (rowData: TreatmentPackage) => {
+    if (!canMutatePackage(rowData)) return;
     try {
       await removeData(rowData.id);
       fetchData();
@@ -102,7 +130,7 @@ const TreatmentPackagesTab = () => {
       <Box sx={{ mb: 1 }}>
         <TreatmentPackageFilterForm />
         <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
-          {canManage && (
+          {isAdmin && (
             <Button
               variant="contained"
               color="primary"
@@ -113,7 +141,7 @@ const TreatmentPackagesTab = () => {
               {t('form.create')}
             </Button>
           )}
-          {canManage && selectedIds.length > 0 && (
+          {isAdmin && selectedIds.length > 0 && (
             <Button
               variant="contained"
               color="error"
@@ -131,9 +159,9 @@ const TreatmentPackagesTab = () => {
         columns={columns}
         tableState={tableState}
         onTableChange={onTableChange}
-        onEditData={canManage ? handleEditData : undefined}
-        onDeleteData={canManage ? handleDeleteData : undefined}
-        enableBatchDelete={canManage}
+        onEditData={(row) => (canMutatePackage(row) ? handleEditData(row) : handleOpenModal(row.id))}
+        onDeleteData={(row) => (canMutatePackage(row) ? handleDeleteData(row) : undefined)}
+        enableBatchDelete={isAdmin}
         onSelectionChange={setSelectedIds}
         resetKey={`${endpoint}-${tableKey}`}
         centerIndexColumn

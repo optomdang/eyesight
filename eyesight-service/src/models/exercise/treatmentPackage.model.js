@@ -27,6 +27,11 @@ TreatmentPackage.init(
       allowNull: false,
       defaultValue: [],
     },
+    packageType: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'custom',
+    },
     deleted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     createdBy: { type: DataTypes.INTEGER, allowNull: true },
     updatedBy: { type: DataTypes.INTEGER, allowNull: true },

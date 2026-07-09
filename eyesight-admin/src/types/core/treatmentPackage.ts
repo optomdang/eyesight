@@ -5,6 +5,7 @@ export interface TreatmentPackage {
   code: string;
   durationDays: number;
   exerciseConfigIds: number[];
+  packageType?: 'system' | 'custom';
   exerciseCount?: number;
   userCount?: number;
   improvementPercent?: number;

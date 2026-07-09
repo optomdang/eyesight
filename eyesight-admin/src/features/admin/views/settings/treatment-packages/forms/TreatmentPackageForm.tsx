@@ -24,12 +24,22 @@ import { LabelWithHelp, HelpTooltip } from 'src/components/shared/HelpTooltip';
 import * as exerciseService from 'src/services/exercise.service';
 import { useTranslation } from 'src/hooks/useTranslation';
 import { usePermission } from 'src/hooks/usePermission';
+import useAuth from 'src/contexts/authGuard/useAuth';
+import useSnackbar from 'src/contexts/UseSnackbar';
+import { getErrorMessage } from 'src/utils/errorHandler';
 
 function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): React.JSX.Element {
   const { createData, updateData, getRecordData, fetchData } = useDataTable<TreatmentPackage>();
   const { hasPermission } = usePermission();
+  const { user } = useAuth();
+  const { showSnackbar } = useSnackbar();
+  const isAdmin = user?.userType === 'admin';
+  const [packageType, setPackageType] = useState<'system' | 'custom' | undefined>(undefined);
+
+  const canEditFields =
+    isAdmin || (hasPermission('manageExercises') && packageType !== 'system');
+  const readOnly = Boolean(rowData && !canEditFields);
   const { t } = useTranslation();
-  const allowEdit = hasPermission('manageExercises');
 
   const [configs, setConfigs] = useState<ExerciseConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
@@ -82,6 +92,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
     const loadData = async () => {
       if (rowData && open) {
         const data = await getRecordData(rowData);
+        setPackageType(data.packageType || 'custom');
         reset({
           name: data.name || '',
           code: data.code || '',
@@ -89,6 +100,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
           exerciseConfigIds: data.exerciseConfigIds || [],
         });
       } else if (!rowData && open) {
+        setPackageType(undefined);
         reset({
           name: '',
           code: '',
@@ -101,22 +113,26 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
   }, [rowData, open, getRecordData, reset]);
 
   const onSubmit = async (values: TreatmentPackageFormData) => {
-    const payload = {
-      name: values.name,
-      code: values.code,
-      durationDays: values.durationDays,
-      exerciseConfigIds: (values.exerciseConfigIds || []).filter(
-        (id): id is number => typeof id === 'number'
-      ),
-    };
+    try {
+      const payload = {
+        name: values.name,
+        code: values.code,
+        durationDays: values.durationDays,
+        exerciseConfigIds: (values.exerciseConfigIds || []).filter(
+          (id): id is number => typeof id === 'number'
+        ),
+      };
 
-    if (rowData) {
-      await updateData(rowData, payload);
-    } else {
-      await createData(payload);
+      if (rowData) {
+        await updateData(rowData, payload);
+      } else {
+        await createData(payload);
+      }
+      onClose();
+      fetchData();
+    } catch (error) {
+      showSnackbar(getErrorMessage(error, t('common.saveError', 'Lưu thất bại')), 'error');
     }
-    onClose();
-    fetchData();
   };
 
   const handleToggleConfig = (configId: number, enabled: boolean) => {
@@ -134,7 +150,13 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{rowData ? 'Cập nhật gói điều trị' : 'Tạo gói điều trị'}</DialogTitle>
+      <DialogTitle>
+        {readOnly
+          ? 'Xem gói điều trị'
+          : rowData
+            ? 'Cập nhật gói điều trị'
+            : 'Tạo gói điều trị'}
+      </DialogTitle>
       <Divider />
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
@@ -144,7 +166,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
                 name="name"
                 control={control}
                 label="Tên gói *"
-                disabled={!allowEdit}
+                disabled={!canEditFields}
               />
             </Grid>
             <Grid size={12}>
@@ -152,7 +174,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
                 name="code"
                 control={control}
                 label="Mã gói *"
-                disabled={!allowEdit || Boolean(rowData)}
+                disabled={!canEditFields || Boolean(rowData)}
               />
             </Grid>
             <Grid size={12}>
@@ -172,7 +194,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
                     size="small"
                     error={Boolean(fieldState.error)}
                     helperText={fieldState.error?.message}
-                    disabled={!allowEdit}
+                    disabled={!canEditFields}
                     inputProps={{ min: 1, max: 3650 }}
                   />
                 )}
@@ -226,7 +248,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
                         <Switch
                           checked={selectedConfigIds.includes(config.id)}
                           onChange={(e) => handleToggleConfig(config.id, e.target.checked)}
-                          disabled={!allowEdit}
+                          disabled={!canEditFields}
                           color="primary"
                         />
                       }
@@ -241,7 +263,7 @@ function TreatmentPackageForm({ open, onClose, rowData }: FormDialogProps): Reac
           <Button onClick={onClose} variant="outlined" size="small">
             {t('common.cancel')}
           </Button>
-          {allowEdit && (
+          {canEditFields && (
             <Button type="submit" variant="contained" size="small" disabled={isSubmitting}>
               {t('common.save')}
             </Button>

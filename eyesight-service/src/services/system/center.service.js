@@ -19,6 +19,7 @@ const exerciseConfigService = require('../exercise/exerciseConfig.service');
 const {
   ensureDefaultExerciseModes,
 } = require('./defaultExerciseModes.service');
+const { ensureDefaultTreatmentPackages } = require('./defaultTreatmentPackages.service');
 
 /**
  * Create default roles for a center
@@ -142,6 +143,9 @@ const createCenter = async (centerBody) => {
 
     // Provision system catalog: base exercises + 15 admin training modes
     await ensureDefaultExerciseModes(center.id, centerBody.updatedBy, transaction);
+
+    // Provision system default treatment packages (Amblyopia tiers)
+    await ensureDefaultTreatmentPackages(center.id, centerBody.updatedBy, transaction);
 
     await auditLogService.logEntityAuditEvent({
       action: 'center.create',

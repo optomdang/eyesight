@@ -86,6 +86,71 @@ const validateConfigIdsBelongToCenter = async (configIds, centerId) => {
   }
 };
 
+const isSystemPackage = (pkg) => pkg?.packageType === 'system';
+
+const canUserMutateTreatmentPackage = (pkg, user) => {
+  if (!user) return false;
+  if (user.userType === 'admin') return true;
+  if (isSystemPackage(pkg)) return false;
+  return user.userType === 'doctor';
+};
+
+/**
+ * When admin removes configs from a package, drop matching exercise assignments
+ * for patients currently on that package. New configs are NOT auto-assigned.
+ */
+const removePatientAssignmentsForDroppedConfigs = async ({
+  treatmentPackageId,
+  centerId,
+  removedConfigIds,
+  actorUserId,
+}) => {
+  if (!removedConfigIds.length) return { removedAssignments: 0 };
+
+  const activePatients = await PatientTreatmentPackage.findAll({
+    where: {
+      treatmentPackageId,
+      centerId,
+      deleted: false,
+      status: 'active',
+      expiresAt: { [Op.gt]: new Date() },
+    },
+    attributes: ['patientId'],
+  });
+  const patientIds = activePatients.map((row) => row.patientId);
+  if (!patientIds.length) return { removedAssignments: 0 };
+
+  const assignments = await ExerciseAssignment.findAll({
+    where: {
+      patientId: { [Op.in]: patientIds },
+      centerId,
+      exerciseConfigId: { [Op.in]: removedConfigIds },
+    },
+  });
+
+  await Promise.all(
+    assignments.map(async (assignment) => {
+      const snapshot = assignment.get({ plain: true });
+      await assignment.destroy();
+      await auditLogService.logEntityAuditEvent({
+        action: 'exerciseAssignment.delete',
+        entityType: 'exerciseAssignment',
+        entityId: snapshot.id,
+        centerId: snapshot.centerId,
+        actorUserId: actorUserId || null,
+        metadata: {
+          patientId: snapshot.patientId,
+          exerciseConfigId: snapshot.exerciseConfigId,
+          reason: 'treatment_package_config_removed',
+          treatmentPackageId,
+        },
+      });
+    })
+  );
+
+  return { removedAssignments: assignments.length };
+};
+
 const createTreatmentPackage = async (body) => {
   const exerciseConfigIds = normalizeConfigIds(body.exerciseConfigIds);
   await validateConfigIdsBelongToCenter(exerciseConfigIds, body.centerId);
@@ -96,6 +161,7 @@ const createTreatmentPackage = async (body) => {
 
   body.createdBy = body.updatedBy;
   body.exerciseConfigIds = exerciseConfigIds;
+  body.packageType = body.packageType === 'system' ? 'system' : 'custom';
 
   const pkg = await TreatmentPackage.create(body);
 
@@ -112,6 +178,17 @@ const createTreatmentPackage = async (body) => {
 };
 
 const queryTreatmentPackages = async (originalFilter, options) => {
+  if (originalFilter.centerId) {
+    try {
+      const { ensureDefaultTreatmentPackages } = require('../system/defaultTreatmentPackages.service');
+      await ensureDefaultTreatmentPackages(originalFilter.centerId, null);
+    } catch (err) {
+      // Non-fatal: list must still work if catalog sync fails (e.g. pending migration)
+      const logger = require('../../config/logger');
+      logger.error('Failed to sync default treatment packages (non-fatal):', err);
+    }
+  }
+
   const filter = { ...originalFilter, deleted: false };
 
   if (filter.name) {
@@ -151,10 +228,17 @@ const updateTreatmentPackageById = async (packageId, updateBody) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy gói điều trị');
   }
 
+  const previousConfigIds = normalizeConfigIds(pkg.exerciseConfigIds);
+
   if (updateBody.code && updateBody.code !== pkg.code) {
     if (await TreatmentPackage.isDuplicateCode(updateBody.code, pkg.centerId, packageId)) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Mã gói điều trị đã tồn tại');
     }
+  }
+
+  if (isSystemPackage(pkg)) {
+    delete updateBody.packageType;
+    delete updateBody.code;
   }
 
   if (updateBody.exerciseConfigIds) {
@@ -165,13 +249,34 @@ const updateTreatmentPackageById = async (packageId, updateBody) => {
   Object.assign(pkg, updateBody);
   await pkg.save();
 
+  const nextConfigIds = normalizeConfigIds(pkg.exerciseConfigIds);
+  const removedConfigIds = previousConfigIds.filter((id) => !nextConfigIds.includes(id));
+  const addedConfigIds = nextConfigIds.filter((id) => !previousConfigIds.includes(id));
+
+  let syncResult = { removedAssignments: 0 };
+  if (removedConfigIds.length) {
+    syncResult = await removePatientAssignmentsForDroppedConfigs({
+      treatmentPackageId: pkg.id,
+      centerId: pkg.centerId,
+      removedConfigIds,
+      actorUserId: updateBody.updatedBy || null,
+    });
+  }
+
   await auditLogService.logEntityAuditEvent({
     action: 'treatmentPackage.update',
     entityType: 'treatmentPackage',
     entityId: pkg.id,
     centerId: pkg.centerId,
     actorUserId: updateBody.updatedBy || null,
-    metadata: { code: pkg.code, name: pkg.name },
+    metadata: {
+      code: pkg.code,
+      name: pkg.name,
+      removedConfigIds,
+      addedConfigIds,
+      removedAssignments: syncResult.removedAssignments,
+      addedConfigsRequireDoctorAssignment: addedConfigIds.length > 0,
+    },
   });
 
   return enrichPackageRow(pkg);
@@ -295,4 +400,6 @@ module.exports = {
   isExerciseConfigAccessibleForPatient,
   filterAssignmentsByTreatmentPackage,
   normalizeConfigIds,
+  canUserMutateTreatmentPackage,
+  isSystemPackage,
 };
