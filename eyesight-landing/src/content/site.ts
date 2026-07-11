@@ -39,7 +39,7 @@ export const heroContent = {
 } as const;
 
 export const trustStats = [
-  { value: '5+', label: 'Loại bài tập lâm sàng' },
+  { value: '15+', label: 'Loại bài tập lâm sàng' },
   { value: '4', label: 'Gói điều trị linh hoạt' },
   { value: '100%', label: 'Hỗ trợ hiệu chuẩn màn hình' },
   { value: '24/7', label: 'Tập tại nhà mọi lúc' },
