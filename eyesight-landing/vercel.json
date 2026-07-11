@@ -1,4 +1,12 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/quan-ly-bac-si",
+      "destination": "/quan-ly/bac-si",
+      "permanent": true
+    }
+  ]
 }
