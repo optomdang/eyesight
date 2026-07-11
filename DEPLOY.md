@@ -226,7 +226,7 @@ NODE_ENV=development node scripts/seed-initial-data.js
 2. **Root Directory:** `eyesight-landing`
 3. Framework: Next.js (tự nhận)
 4. Build Command: `npm run build` (mặc định)
-5. Output: `out` (static export)
+5. **Không** override Output Directory — để Vercel tự xử lý static export (`output: 'export'`)
 
 ### G2. Environment variables
 
