@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useDoctors } from '@/contexts/DoctorsContext';
 import type { DoctorSelection } from '@/types/registration';
-import { Field, SelectInput, TextInput } from '@/components/registration/FormFields';
+import { Field, TextInput } from '@/components/registration/FormFields';
 import type { StepErrors } from '@/lib/validateRegistration';
 
 interface DoctorStepProps {
@@ -13,17 +13,8 @@ interface DoctorStepProps {
 }
 
 export function DoctorStep({ data, errors, onChange }: DoctorStepProps) {
-  const { visibleDoctors, loading, findVisibleByCode } = useDoctors();
+  const { findVisibleByCode } = useDoctors();
   const [unknownCodeWarning, setUnknownCodeWarning] = useState(false);
-
-  const handleSelect = (code: string) => {
-    const doctor = findVisibleByCode(code);
-    setUnknownCodeWarning(false);
-    onChange({
-      doctorCode: code,
-      doctorName: doctor?.fullName ?? '',
-    });
-  };
 
   const handleCodeInput = (code: string) => {
     const doctor = findVisibleByCode(code);
@@ -37,25 +28,10 @@ export function DoctorStep({ data, errors, onChange }: DoctorStepProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Chọn Bác sĩ hoặc Chuyên gia đồng hành, hoặc nhập mã mà Bác sĩ/Chuyên gia đã cung cấp cho bạn.
+        Nhập mã Bác sĩ hoặc Chuyên gia đồng hành mà Bác sĩ/Chuyên gia đã cung cấp cho bạn.
       </p>
 
-      <Field label="Chọn từ danh sách" error={errors.doctorCode}>
-        <SelectInput
-          value={data.doctorCode}
-          onChange={(e) => handleSelect(e.target.value)}
-          disabled={loading}
-        >
-          <option value="">-- Chọn Bác sĩ / Chuyên gia --</option>
-          {visibleDoctors.map((d) => (
-            <option key={d.id} value={d.code}>
-              {d.code} — {d.fullName}
-            </option>
-          ))}
-        </SelectInput>
-      </Field>
-
-      <Field label="Hoặc nhập mã Bác sĩ / Chuyên gia">
+      <Field label="Nhập mã Bác sĩ / Chuyên gia" error={errors.doctorCode}>
         <TextInput
           value={data.doctorCode}
           onChange={(e) => handleCodeInput(e.target.value.toUpperCase())}
