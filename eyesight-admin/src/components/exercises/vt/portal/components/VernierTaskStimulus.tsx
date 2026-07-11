@@ -9,6 +9,7 @@ import React, { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 import { drawVernierSingle, clearVernierCanvas } from '../../stimuli/vernierRenderer';
 import type { VtStimulusColorScheme } from '../../core/vtStimulusColors';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import type { VtVernierTaskMode } from 'src/types/core/vtQuest';
 
 export const VERNIER_CARD_PADDING = 16;
@@ -24,6 +25,7 @@ interface VernierTaskStimulusProps {
   backgroundLum?: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
+  dichopticPresentation?: DichopticPresentation | null;
   visible?: boolean;
   offsetSign?: 1 | -1;
   cardOffsetSigns?: (1 | -1)[];
@@ -40,6 +42,7 @@ const CardCanvas: React.FC<{
   backgroundLum: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent: number;
+  dichopticPresentation?: DichopticPresentation | null;
   visible: boolean;
   offsetSign: 1 | -1;
   selected: boolean;
@@ -53,6 +56,7 @@ const CardCanvas: React.FC<{
   backgroundLum,
   colorScheme,
   stimulusContrastPercent,
+  dichopticPresentation,
   visible,
   offsetSign,
   selected,
@@ -84,6 +88,7 @@ const CardCanvas: React.FC<{
       colorScheme,
       stimulusContrastPercent,
       offsetSign,
+      dichopticPresentation,
     });
   }, [
     offsetPx,
@@ -93,6 +98,7 @@ const CardCanvas: React.FC<{
     backgroundLum,
     colorScheme,
     stimulusContrastPercent,
+    dichopticPresentation,
     visible,
     offsetSign,
     cardW,
@@ -132,6 +138,7 @@ const VernierTaskStimulus: React.FC<VernierTaskStimulusProps> = ({
   backgroundLum = 200,
   colorScheme,
   stimulusContrastPercent = 100,
+  dichopticPresentation,
   visible = true,
   offsetSign = 1,
   cardOffsetSigns = [],
@@ -164,6 +171,7 @@ const VernierTaskStimulus: React.FC<VernierTaskStimulusProps> = ({
       colorScheme,
       stimulusContrastPercent,
       offsetSign,
+      dichopticPresentation,
     });
   }, [
     mode,
@@ -174,6 +182,7 @@ const VernierTaskStimulus: React.FC<VernierTaskStimulusProps> = ({
     backgroundLum,
     colorScheme,
     stimulusContrastPercent,
+    dichopticPresentation,
     visible,
     offsetSign,
     singleSize,
@@ -199,6 +208,7 @@ const VernierTaskStimulus: React.FC<VernierTaskStimulusProps> = ({
             backgroundLum={backgroundLum}
             colorScheme={colorScheme}
             stimulusContrastPercent={stimulusContrastPercent}
+            dichopticPresentation={dichopticPresentation}
             visible={visible}
             offsetSign={sign}
             selected={selectedIndex === idx}

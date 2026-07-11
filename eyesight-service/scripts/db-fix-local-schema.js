@@ -11,6 +11,8 @@ const statements = [
   `ALTER TABLE "ExerciseAssignments" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP WITH TIME ZONE`,
   `ALTER TABLE "ExerciseConfigs" ADD COLUMN IF NOT EXISTS "vtSettings" JSONB`,
   `ALTER TABLE "ExerciseResults" ADD COLUMN IF NOT EXISTS "resultMetrics" JSONB`,
+  `ALTER TABLE "ExerciseConfigs" ADD COLUMN IF NOT EXISTS "dichoptic" JSONB`,
+  `ALTER TABLE "ExerciseSessions" ADD COLUMN IF NOT EXISTS "dichopticSnapshot" JSONB`,
 ];
 
 (async () => {

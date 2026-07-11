@@ -8,6 +8,7 @@ Hệ thống quản lý khám và điều trị thị lực — gồm backend AP
 eyesight/
 ├── eyesight-service/   # Backend — Node.js + Express + PostgreSQL
 ├── eyesight-admin/     # Frontend — React + TypeScript + Vite
+├── eyesight-landing/   # Marketing site — Next.js (nhuocthi.vn)
 ├── package.json        # Script tiện ích chạy cả hai phần
 └── README.md
 ```
@@ -16,6 +17,7 @@ eyesight/
 |------|-----------|-----------|
 | Backend API | http://localhost:4000/api/v1 | Express, Sequelize, Yarn |
 | Frontend | http://localhost:4001 | React 19, MUI, npm |
+| Landing | http://localhost:4002 | Next.js 15, Tailwind, npm |
 
 > **Port 4000/4001** tránh xung đột với VisionD Clinic (thường chạy ở `localhost:3000`).
 
@@ -60,6 +62,7 @@ npm run dev
 # Hoặc chạy riêng từng phần
 npm run dev:service
 npm run dev:admin
+npm run dev:landing
 ```
 
 ## Tài liệu chi tiết

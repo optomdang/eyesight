@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   blendHexAtContrastPercent,
+  blendHexAtLogContrastPercent,
   resolveOpaqueContrastColors,
 } from '../clinicalContrastColor';
 
@@ -15,6 +16,19 @@ describe('blendHexAtContrastPercent', () => {
 
   it('blends mid-grey at 50%', () => {
     expect(blendHexAtContrastPercent('#000000', 50, '#ffffff')).toBe('#808080');
+  });
+});
+
+describe('blendHexAtLogContrastPercent', () => {
+  it('matches linear at 0% and 100%', () => {
+    expect(blendHexAtLogContrastPercent('#ff0000', 0, '#000000')).toBe('#000000');
+    expect(blendHexAtLogContrastPercent('#ff0000', 100, '#000000')).toBe('#ff0000');
+  });
+
+  it('is brighter than linear at mid-low contrast', () => {
+    const linear = blendHexAtContrastPercent('#ff0000', 25, '#000000');
+    const log = blendHexAtLogContrastPercent('#ff0000', 25, '#000000');
+    expect(parseInt(log.slice(1, 3), 16)).toBeGreaterThan(parseInt(linear.slice(1, 3), 16));
   });
 });
 

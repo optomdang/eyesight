@@ -4,11 +4,13 @@
   "version": "1.0.0",
   "description": "Eye-Sight monorepo — backend API + admin/portal frontend",
   "scripts": {
-    "install:all": "npm run install:service && npm run install:admin",
+    "install:all": "npm run install:service && npm run install:admin && npm run install:landing",
     "install:service": "cd eyesight-service && npm install --ignore-scripts",
     "install:admin": "cd eyesight-admin && npm install",
+    "install:landing": "cd eyesight-landing && npm install",
     "dev:service": "cd eyesight-service && npm run dev",
     "dev:admin": "cd eyesight-admin && npm run dev",
+    "dev:landing": "cd eyesight-landing && npm run dev",
     "dev": "concurrently -k -n service,admin -c blue,magenta \"npm run dev:service\" \"npm run dev:admin\"",
     "db:local:up": "docker compose -f docker-compose.db.yml up -d",
     "db:local:down": "docker compose -f docker-compose.db.yml down",
@@ -21,6 +23,7 @@
     "db:local:setup": "npm run db:local:up && node scripts/wait-for-db.js && npm run db:sync && npm run db:fix-schema && npm run db:seed && cd eyesight-service && npm run db:stamp",
     "db:production:setup": "sh scripts/setup-neon-production.sh",
     "build:admin": "cd eyesight-admin && npm run build",
+    "build:landing": "cd eyesight-landing && npm run build",
     "test:service": "cd eyesight-service && yarn test",
     "test:admin": "cd eyesight-admin && npm run test"
   },

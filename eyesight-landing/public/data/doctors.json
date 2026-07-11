@@ -1,0 +1,34 @@
+[
+  {
+    "id": "dt001",
+    "code": "DT001",
+    "fullName": "Nguyễn Văn A",
+    "dateOfBirth": "1980-01-15",
+    "workplace": "Bệnh viện Mắt Trung ương",
+    "title": "doctor"
+  },
+  {
+    "id": "dt002",
+    "code": "DT002",
+    "fullName": "Trần Thị B",
+    "dateOfBirth": "1985-06-20",
+    "workplace": "Phòng khám Nhãn khoa ABC",
+    "title": "doctor"
+  },
+  {
+    "id": "op001",
+    "code": "OP001",
+    "fullName": "Lê Văn C",
+    "dateOfBirth": "1990-03-10",
+    "workplace": "Trung tâm Thị lực XYZ",
+    "title": "optometrist"
+  },
+  {
+    "id": "op002",
+    "code": "OP002",
+    "fullName": "Phạm Thị D",
+    "dateOfBirth": "1992-11-05",
+    "workplace": "Phòng khám Quang học DEF",
+    "title": "optometrist"
+  }
+]

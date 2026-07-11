@@ -16,9 +16,12 @@ import {
   loadGame2048Scripts,
   getGame2048HTML,
   buildGame2048TileColorCss,
+  buildDichopticBalance2048Css,
 } from 'src/utils/game2048Utils';
 import { get2048EffectiveScale } from 'src/utils/visionUtils';
+import { isAnaglyphExerciseColorScheme } from 'src/components/exercises/vt/core/vtStimulusColors';
 import { VisualSettings, GameManager } from 'src/types/core';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 
 // ==================== INTERFACES ====================
 
@@ -28,6 +31,11 @@ export interface UseGame2048EngineOptions {
    * Uses calculateVisualSettings() from visionUtils for consistency
    */
   visualSettings?: VisualSettings;
+
+  /**
+   * Resolved dichoptic presentation — when mode=balance, overrides tile colors.
+   */
+  dichopticPresentation?: DichopticPresentation | null;
 
   /**
    * Callback when game is initialized
@@ -98,6 +106,7 @@ export interface UseGame2048EngineReturn {
 export function useGame2048Engine(options: UseGame2048EngineOptions = {}): UseGame2048EngineReturn {
   const {
     visualSettings,
+    dichopticPresentation = null,
     onGameInit,
     hideUnnecessaryUI = true,
     enabled = true,
@@ -174,18 +183,37 @@ export function useGame2048Engine(options: UseGame2048EngineOptions = {}): UseGa
       css += ` .game-container { transform: scale(${effectiveScale}) !important; transform-origin: center center !important; }`;
       css += ` .game-container .tile, .game-container .tile .tile-inner { font-size: 55px !important; }`;
 
-      // Clinical contrast: blend digit color toward tile background (opaque).
-      // Do NOT use filter:contrast() — that greys the whole board like a fog layer.
-      const numericContrast =
-        typeof contrast === 'number'
-          ? contrast
-          : Number.parseFloat(String(contrast).replace('%', '')) || 100;
-      css += buildGame2048TileColorCss(numericContrast, colorScheme ?? null);
+      if (dichopticPresentation?.enabled && dichopticPresentation.mode === 'balance') {
+        // Balance mode: contrast-adjusted signal vs fellow colors, checkerboard by position.
+        const signalColor =
+          dichopticPresentation.redChannelRole === 'signal'
+            ? dichopticPresentation.redChannelColor
+            : dichopticPresentation.ch2ChannelColor;
+        const fellowColor =
+          dichopticPresentation.redChannelRole === 'fellow'
+            ? dichopticPresentation.redChannelColor
+            : dichopticPresentation.ch2ChannelColor;
+        css += buildDichopticBalance2048Css(signalColor, fellowColor);
+      } else if (isAnaglyphExerciseColorScheme(colorScheme)) {
+        // Plain anaglyph (anti_cue or color-only): raw channel colors, checkerboard by position.
+        // Black tile backgrounds + alternating digit colors force each eye to read
+        // only its own channel without relying on the tile background for separation.
+        const colorA = colorScheme!.textColor || '#ff0000';
+        const colorB = colorScheme!.backgroundColor || '#0000ff';
+        css += buildDichopticBalance2048Css(colorA, colorB);
+      } else {
+        // Non-anaglyph: opaque contrast blend (no filter fog).
+        const numericContrast =
+          typeof contrast === 'number'
+            ? contrast
+            : Number.parseFloat(String(contrast).replace('%', '')) || 100;
+        css += buildGame2048TileColorCss(numericContrast, colorScheme ?? null);
+      }
 
       styleTag.textContent = css;
       document.head.appendChild(styleTag);
     },
-    [hideUnnecessaryUI]
+    [hideUnnecessaryUI, dichopticPresentation]
   );
 
   // ==================== GAME INITIALIZATION ====================
@@ -307,7 +335,7 @@ export function useGame2048Engine(options: UseGame2048EngineOptions = {}): UseGa
     if (isReady && visualSettings) {
       applyVisualSettings(visualSettings);
     }
-  }, [isReady, visualSettings, applyVisualSettings]);
+  }, [isReady, visualSettings, applyVisualSettings, dichopticPresentation]);
 
   // ==================== CLEANUP ====================
 

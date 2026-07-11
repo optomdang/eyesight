@@ -3,7 +3,7 @@
  */
 
 import type { Assignment } from 'src/types';
-import type { ColorScheme } from 'src/types/core/visual-settings';
+import type { ColorScheme, DichopticConfig } from 'src/types/core/visual-settings';
 
 export interface FarAcuitySandboxParams {
   /**
@@ -22,6 +22,7 @@ export interface FarAcuitySandboxParams {
   exerciseName?: string;
   /** Applied to optotype text + background in the sandbox exercise. */
   colorScheme?: ColorScheme | null;
+  dichoptic?: DichopticConfig | null;
 }
 
 export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams = {}): Assignment {
@@ -59,6 +60,7 @@ export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams =
       contrast: 100,
       inactivityThreshold: 30,
       ...(params.colorScheme ? { colorScheme: params.colorScheme } : {}),
+      ...(params.dichoptic ? { dichoptic: params.dichoptic } : {}),
     } as Assignment['exerciseConfig'],
   };
 }

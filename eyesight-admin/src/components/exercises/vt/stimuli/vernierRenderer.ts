@@ -15,10 +15,42 @@
  */
 
 import type { VtResponseSide } from 'src/types/core/vtQuest';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import {
   colorAtContrastPercent,
   type VtStimulusColorScheme,
 } from '../core/vtStimulusColors';
+
+/**
+ * Resolve top/bottom line colors for Vernier dichoptic mode.
+ *
+ * In balance mode each anaglyph channel is assigned to one segment:
+ *   - top line → signal channel (amblyopic eye, higher contrast)
+ *   - bottom line → fellow channel (dominant eye, reduced contrast)
+ *
+ * Colors are already Weber-blended in DichopticPresentation, so no further
+ * blending is needed here.
+ */
+function resolveVernierLineColors(
+  useColors: boolean,
+  colorScheme: VtStimulusColorScheme | null | undefined,
+  stimulusContrastPercent: number,
+  greyColor: string,
+  dichoptic?: DichopticPresentation | null
+): { topColor: string; bottomColor: string } {
+  if (dichoptic?.enabled && dichoptic.mode === 'balance') {
+    const signalColor =
+      dichoptic.redChannelRole === 'signal' ? dichoptic.redChannelColor : dichoptic.ch2ChannelColor;
+    const fellowColor =
+      dichoptic.redChannelRole === 'fellow' ? dichoptic.redChannelColor : dichoptic.ch2ChannelColor;
+    return { topColor: signalColor, bottomColor: fellowColor };
+  }
+  if (!useColors) return { topColor: greyColor, bottomColor: greyColor };
+  return {
+    topColor: colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent),
+    bottomColor: colorAtContrastPercent(colorScheme!.color2, stimulusContrastPercent),
+  };
+}
 
 export interface VernierDrawOptions {
   canvas: HTMLCanvasElement;
@@ -40,6 +72,8 @@ export interface VernierDrawOptions {
   stimulusContrastPercent?: number;
   /** Horizontal offset direction: 1 = right, -1 = left (randomized per trial). */
   offsetSign?: 1 | -1;
+  /** Resolved dichoptic presentation — overrides line colors when mode=balance. */
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 interface LineParams {
@@ -110,6 +144,7 @@ export function drawVernier2AFC(options: VernierDrawOptions): void {
     colorScheme,
     stimulusContrastPercent = 100,
     offsetSign = 1,
+    dichopticPresentation,
   } = options;
 
   const signedOffsetPx = offsetPx * offsetSign;
@@ -124,12 +159,13 @@ export function drawVernier2AFC(options: VernierDrawOptions): void {
   const panelFill = useColors ? '#000000' : `rgb(${backgroundLuminance},${backgroundLuminance},${backgroundLuminance})`;
   const foregroundLum = backgroundLuminance > 128 ? 20 : 230;
   const greyColor = `rgb(${foregroundLum},${foregroundLum},${foregroundLum})`;
-  const topColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent)
-    : greyColor;
-  const bottomColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color2, stimulusContrastPercent)
-    : greyColor;
+  const { topColor, bottomColor } = resolveVernierLineColors(
+    useColors,
+    colorScheme,
+    stimulusContrastPercent,
+    greyColor,
+    dichopticPresentation
+  );
 
   fillRegion(ctx, 0, 0, W, H, panelFill);
 
@@ -168,6 +204,7 @@ export interface VernierSingleDrawOptions {
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
   offsetSign?: 1 | -1;
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 /** Draw a single centred vernier pair (offset_direction / odd_line_out cards). */
@@ -182,6 +219,7 @@ export function drawVernierSingle(options: VernierSingleDrawOptions): void {
     colorScheme,
     stimulusContrastPercent = 100,
     offsetSign = 1,
+    dichopticPresentation,
   } = options;
 
   const ctx = canvas.getContext('2d');
@@ -193,12 +231,13 @@ export function drawVernierSingle(options: VernierSingleDrawOptions): void {
   const panelFill = useColors ? '#000000' : `rgb(${backgroundLuminance},${backgroundLuminance},${backgroundLuminance})`;
   const foregroundLum = backgroundLuminance > 128 ? 20 : 230;
   const greyColor = `rgb(${foregroundLum},${foregroundLum},${foregroundLum})`;
-  const topColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent)
-    : greyColor;
-  const bottomColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color2, stimulusContrastPercent)
-    : greyColor;
+  const { topColor, bottomColor } = resolveVernierLineColors(
+    useColors,
+    colorScheme,
+    stimulusContrastPercent,
+    greyColor,
+    dichopticPresentation
+  );
 
   fillRegion(ctx, 0, 0, W, H, panelFill);
 
@@ -238,6 +277,7 @@ export function drawVernierDualOffset2AFC(options: VernierDualOffsetDrawOptions)
     stimulusContrastPercent = 100,
     offsetSign = 1,
     distractorOffsetRatio = 0.5,
+    dichopticPresentation,
   } = options;
 
   const signedOffsetPx = offsetPx * offsetSign;
@@ -253,12 +293,13 @@ export function drawVernierDualOffset2AFC(options: VernierDualOffsetDrawOptions)
   const panelFill = useColors ? '#000000' : `rgb(${backgroundLuminance},${backgroundLuminance},${backgroundLuminance})`;
   const foregroundLum = backgroundLuminance > 128 ? 20 : 230;
   const greyColor = `rgb(${foregroundLum},${foregroundLum},${foregroundLum})`;
-  const topColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent)
-    : greyColor;
-  const bottomColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color2, stimulusContrastPercent)
-    : greyColor;
+  const { topColor, bottomColor } = resolveVernierLineColors(
+    useColors,
+    colorScheme,
+    stimulusContrastPercent,
+    greyColor,
+    dichopticPresentation
+  );
 
   fillRegion(ctx, 0, 0, W, H, panelFill);
 

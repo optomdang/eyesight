@@ -97,6 +97,10 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
           | null
           | undefined) ?? undefined,
 
+      dichoptic:
+        ((configData as { dichoptic?: import('src/types/core/visual-settings').DichopticConfig | null })
+          ?.dichoptic) ?? null,
+
       inactivityThreshold: configData?.inactivityThreshold ?? 30,
 
       difficultyBaselineSource: (configData as any)?.difficultyBaselineSource ?? 'current_exam',
@@ -404,6 +408,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
               isAdmin={user?.userType === 'admin'}
               exercises={exercises}
               exerciseName={getSelectedExercise()?.name ?? null}
+              exerciseType={getSelectedExercise()?.exerciseType ?? null}
             />
 
             <Grid container spacing={2} sx={{ mt: 1 }} alignItems="flex-start">
@@ -498,6 +503,7 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
           distance={values.distance || 3.0}
           onDistanceChange={(newDistance) => setValue('distance', newDistance)}
           colorScheme={values.colorScheme as any}
+          dichoptic={values.dichoptic ?? null}
           eye={values.eye}
           duration={values.duration}
           vtSettings={

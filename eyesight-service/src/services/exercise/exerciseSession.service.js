@@ -146,6 +146,8 @@ const startExerciseSession = async (assignmentId, userId, deviceInfo = {}) => {
     // Snapshot "số giao" lúc tạo buổi (P2)
     executionCount: assignment.exerciseConfig?.executionCount ?? null,
     executionDuration: assignment.exerciseConfig?.duration ?? null,
+    // Snapshot dichoptic config at session start for reporting
+    dichopticSnapshot: assignment.exerciseConfig?.dichoptic ?? null,
   });
 
   return {

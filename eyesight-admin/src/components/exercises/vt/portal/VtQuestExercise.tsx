@@ -65,6 +65,7 @@ import { getStereopsisTaskModeFromTrial } from '../core/stereopsisTaskModes';
 import { normalizeExerciseType } from 'src/components/exercises/registry';
 import { parseVtPauseSnapshot } from '../core/vtPauseSnapshot';
 import { useVtQuestEngine } from 'src/hooks/exercises/useVtQuestEngine';
+import { useDichopticSessionConfig } from 'src/hooks/exercises/useDichopticSessionConfig';
 import { useAutoInstructionAudioQueue } from 'src/hooks/useInstructionAudioPlayback';
 import {
   getVtStageIntroAudioId,
@@ -281,6 +282,20 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     singleModality: fixedModality ?? undefined,
     staircaseContext: { gaborStartContrast },
   });
+
+  const { dichopticConfig: sessionDichoptic, tryAdvanceOnAccuracy } = useDichopticSessionConfig(
+    exerciseConfig?.dichoptic
+  );
+  const lastAutoBalanceStageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const result = engineState.lastStageResult;
+    if (!result) return;
+    const stageKey = `${result.world}-${result.stageIndex}`;
+    if (lastAutoBalanceStageRef.current === stageKey) return;
+    lastAutoBalanceStageRef.current = stageKey;
+    tryAdvanceOnAccuracy(result.accuracy);
+  }, [engineState.lastStageResult, tryAdvanceOnAccuracy]);
 
   const enableFeedbackSound = vtSettings.gamification?.enableSound !== false;
 
@@ -986,6 +1001,8 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
             distanceM={distanceM}
             visionSizing={vtVisionSizing}
             colorScheme={resolvedColorScheme}
+            dichopticConfig={sessionDichoptic}
+            trainingEye={assignment?.trainingEye ?? exerciseConfig?.eye ?? null}
             feedback={feedback}
             responseBlocked={responseBlocked}
             screenRecommendation={vtScreenCheck?.recommendedLabel ?? null}

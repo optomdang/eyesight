@@ -14,6 +14,7 @@ import {
   clearCrowdingCanvas,
 } from '../../stimuli/crowdingRenderer';
 import type { VtCrowdingTaskMode } from 'src/types/core/vtQuest';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import type { VtStimulusColorScheme } from '../../core/vtStimulusColors';
 
 export const CROWDING_CARD_PADDING = 16;
@@ -29,6 +30,7 @@ interface CrowdingTaskStimulusProps {
   backgroundLum?: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
+  dichopticPresentation?: DichopticPresentation | null;
   visible?: boolean;
   /** odd_letter_out */
   cardTargets?: string[];
@@ -45,6 +47,7 @@ const CardCanvas: React.FC<{
   backgroundLum: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent: number;
+  dichopticPresentation?: DichopticPresentation | null;
   visible: boolean;
   selected: boolean;
   disabled: boolean;
@@ -57,6 +60,7 @@ const CardCanvas: React.FC<{
   backgroundLum,
   colorScheme,
   stimulusContrastPercent,
+  dichopticPresentation,
   visible,
   selected,
   disabled,
@@ -85,6 +89,7 @@ const CardCanvas: React.FC<{
       backgroundLuminance: backgroundLum,
       colorScheme,
       stimulusContrastPercent,
+      dichopticPresentation,
     });
   }, [
     targetLetter,
@@ -94,6 +99,7 @@ const CardCanvas: React.FC<{
     backgroundLum,
     colorScheme,
     stimulusContrastPercent,
+    dichopticPresentation,
     visible,
     cardW,
     cardH,
@@ -132,6 +138,7 @@ const CrowdingTaskStimulus: React.FC<CrowdingTaskStimulusProps> = ({
   backgroundLum = 220,
   colorScheme,
   stimulusContrastPercent = 100,
+  dichopticPresentation,
   visible = true,
   cardTargets = [],
   selectedIndex = -1,
@@ -170,6 +177,7 @@ const CrowdingTaskStimulus: React.FC<CrowdingTaskStimulusProps> = ({
       backgroundLuminance: backgroundLum,
       colorScheme,
       stimulusContrastPercent,
+      dichopticPresentation,
     });
   }, [
     isGridMode,
@@ -181,6 +189,7 @@ const CrowdingTaskStimulus: React.FC<CrowdingTaskStimulusProps> = ({
     backgroundLum,
     colorScheme,
     stimulusContrastPercent,
+    dichopticPresentation,
     visible,
   ]);
 
@@ -206,6 +215,7 @@ const CrowdingTaskStimulus: React.FC<CrowdingTaskStimulusProps> = ({
             backgroundLum={backgroundLum}
             colorScheme={colorScheme}
             stimulusContrastPercent={stimulusContrastPercent}
+            dichopticPresentation={dichopticPresentation}
             visible={visible}
             selected={selectedIndex === idx}
             disabled={cardsDisabled}

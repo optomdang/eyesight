@@ -27,8 +27,43 @@ function toHex(r: number, g: number, b: number): string {
 }
 
 /**
+ * Map clinical contrast percent (0–100) to a perceptual blend weight (log-power curve).
+ * γ < 1 spreads visible steps across the low range — 5% vs 15% easier to distinguish
+ * than with linear mapping. 100% and 0% are unchanged.
+ */
+export function contrastPercentToPerceptualBlend(
+  contrastPercent: number,
+  gamma = DICHOPTIC_PERCEPTUAL_GAMMA
+): number {
+  const p = Math.max(0, Math.min(100, contrastPercent)) / 100;
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  return Math.pow(p, gamma);
+}
+
+/** Default γ for dichoptic anaglyph channel blending (sqrt curve). */
+export const DICHOPTIC_PERCEPTUAL_GAMMA = 0.5;
+
+/**
+ * Opaque blend using perceptual log-power curve instead of linear percent.
+ * Used for dichoptic balance channel colors (blend toward black background).
+ */
+export function blendHexAtLogContrastPercent(
+  foregroundHex: string,
+  contrastPercent: number,
+  backgroundHex: string,
+  gamma = DICHOPTIC_PERCEPTUAL_GAMMA
+): string {
+  const t = contrastPercentToPerceptualBlend(contrastPercent, gamma);
+  const [fr, fg, fb] = parseHex(foregroundHex);
+  const [br, bg, bb] = parseHex(backgroundHex);
+  return toHex(br + (fr - br) * t, bg + (fg - bg) * t, bb + (fb - bb) * t);
+}
+
+/**
  * Blend foreground toward background by clinical contrast percent (0–100).
  * 100 → full foreground; 0 → background. Result is always opaque.
+ * Linear mapping — used for exam / Far Acuity vision contrast (not dichoptic channels).
  */
 export function blendHexAtContrastPercent(
   foregroundHex: string,

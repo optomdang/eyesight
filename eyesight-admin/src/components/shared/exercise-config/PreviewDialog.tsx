@@ -31,7 +31,8 @@ import {
   resolveVtExerciseVision,
 } from 'src/components/exercises/vt/core/vtVisionSizing';
 import type { VtSettings } from 'src/types/core/vtQuest';
-import type { ColorScheme } from 'src/types/core/visual-settings';
+import type { ColorScheme, DichopticConfig } from 'src/types/core/visual-settings';
+import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
 import {
   loadCalibration,
   getPreferredScreenInfo,
@@ -45,6 +46,7 @@ interface PreviewDialogProps {
   distance: number;
   onDistanceChange?: (newDistance: number) => void;
   colorScheme?: ColorScheme | null;
+  dichoptic?: DichopticConfig | null;
   eye?: 'left' | 'right' | 'both';
   vtSettings?: Partial<VtSettings> | null;
   duration?: number;
@@ -65,6 +67,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
   distance,
   onDistanceChange,
   colorScheme,
+  dichoptic,
   eye = 'both',
   vtSettings,
   duration = 30,
@@ -197,6 +200,19 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
     };
   }, [selectedLevel, visionType, previewDistance, screenInfo, colorScheme]);
 
+  const dichopticPresentation = useMemo(
+    () =>
+      resolveDichopticPresentation(
+        {
+          colorScheme: colorScheme ?? null,
+          dichoptic: dichoptic ?? null,
+          eye: eye === 'both' ? null : eye,
+        },
+        { trainingEye: eye === 'both' ? null : eye }
+      ),
+    [colorScheme, dichoptic, eye]
+  );
+
   const sandboxAssignment = useMemo(() => {
     if (!vtQuestMode || !exercise) return null;
     return buildVtQuestSandboxAssignment({
@@ -205,6 +221,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       distance: previewDistance,
       eye,
       colorScheme: colorScheme ?? undefined,
+      dichoptic: dichoptic ?? null,
       vtSettings,
       duration,
       inactivityThreshold,
@@ -219,6 +236,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
     previewDistance,
     eye,
     colorScheme,
+    dichoptic,
     vtSettings,
     duration,
     inactivityThreshold,
@@ -234,6 +252,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       duration,
       exerciseName: exercise.name,
       colorScheme: colorScheme ?? undefined,
+      dichoptic: dichoptic ?? null,
     });
   }, [
     isFarAcuity,
@@ -244,6 +263,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
     eye,
     duration,
     colorScheme,
+    dichoptic,
   ]);
 
   const vtSizingPreview = useMemo(() => {
@@ -285,6 +305,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
         colorScheme?.preset,
         colorScheme?.textColor,
         colorScheme?.backgroundColor,
+        JSON.stringify(dichoptic ?? null),
       ].join('|'),
     [
       isFarAcuity,
@@ -299,6 +320,7 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
       inactivityThreshold,
       duration,
       colorScheme,
+      dichoptic,
     ]
   );
 
@@ -593,7 +615,10 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
               }}
             >
               {registryEntry ? (
-                <registryEntry.PreviewComponent visualSettings={visualSettings} />
+                <registryEntry.PreviewComponent
+                  visualSettings={visualSettings}
+                  dichopticPresentation={dichopticPresentation}
+                />
               ) : (
                 <Typography variant="body2" color="text.secondary" sx={{ minWidth: 320, p: 2 }}>
                   Chưa hỗ trợ xem trước cho loại bài tập &quot;

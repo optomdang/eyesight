@@ -183,3 +183,74 @@ export const getDefaultPassConditions = (): PassConditions => ({
   maxTime: 600,
   minMoves: 10,
 });
+
+// ============ DICHOPTIC TYPES ============
+
+export type DichopticMode = 'off' | 'anti_cue' | 'balance';
+export type FellowContent = 'none' | 'noise' | 'dim_context';
+
+export interface AnaglyphChannelMapping {
+  /** Which eye wears the RED lens */
+  redEye: 'left' | 'right';
+}
+
+export interface DichopticBalanceParams {
+  /** Contrast for the amblyopic (signal) eye, 0–100 */
+  amblyopicContrastPercent: number;
+  /** Contrast for the fellow eye (reduced to suppress dominance), 0–100 */
+  fellowContrastPercent: number;
+  fellowContent: FellowContent;
+  autoBalance?: {
+    enabled: boolean;
+    /** How many contrast-% points to increase fellowContrast per stage on success */
+    stepPercent: number;
+    /** Upper ceiling for fellowContrastPercent auto-progression */
+    maxFellowPercent: number;
+    /** Accuracy (0–1) required to trigger a step-up */
+    accuracyThreshold: number;
+  };
+}
+
+/**
+ * Dichoptic configuration stored on ExerciseConfig.
+ * Requires an anaglyph colorScheme preset (redBlue | redGreen) to take effect.
+ */
+export interface DichopticConfig {
+  mode: DichopticMode;
+  /** Required when mode is 'anti_cue' or 'balance' */
+  mapping?: AnaglyphChannelMapping;
+  /** Required when mode is 'balance' */
+  balance?: DichopticBalanceParams;
+}
+
+/**
+ * Resolved dichoptic presentation — the runtime object consumed by all game renderers.
+ * Produced by resolveDichopticPresentation() in dichopticUtils.ts.
+ */
+export interface DichopticPresentation {
+  enabled: boolean;
+  mode: DichopticMode;
+  amblyopicEye: 'left' | 'right' | null;
+  fellowEye: 'left' | 'right' | null;
+  /** Weber-blended opaque color for the RED-lens channel */
+  redChannelColor: string;
+  redChannelContrast: number;
+  redChannelRole: 'signal' | 'fellow' | 'noise';
+  /** Weber-blended opaque color for the channel-2 lens (blue or green) */
+  ch2ChannelColor: string;
+  ch2ChannelContrast: number;
+  ch2ChannelRole: 'signal' | 'fellow' | 'noise';
+}
+
+export const DICHOPTIC_PRESENTATION_OFF: DichopticPresentation = {
+  enabled: false,
+  mode: 'off',
+  amblyopicEye: null,
+  fellowEye: null,
+  redChannelColor: '#ff0000',
+  redChannelContrast: 100,
+  redChannelRole: 'signal',
+  ch2ChannelColor: '#0000ff',
+  ch2ChannelContrast: 100,
+  ch2ChannelRole: 'signal',
+};

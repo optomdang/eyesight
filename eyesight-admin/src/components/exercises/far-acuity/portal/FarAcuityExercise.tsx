@@ -64,6 +64,10 @@ import { isStreakMilestone } from 'src/components/exercises/vt/gamification/rewa
 import { useExerciseFullscreen } from 'src/hooks/useExerciseFullscreen';
 import { isOriginalGameColorScheme } from 'src/services/colorPreset.service';
 import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
+import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
+import { isAnaglyphExerciseColorScheme } from 'src/components/exercises/vt/core/vtStimulusColors';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
+import { useDichopticSessionConfig } from 'src/hooks/exercises/useDichopticSessionConfig';
 
 interface ExerciseExecution {
   startTime: number;
@@ -114,6 +118,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         examResults: patientExamResults,
       }),
     [assignment, patientExamResults, exerciseConfig?.eye, trainingVisionType]
+  );
+
+  const { dichopticConfig: sessionDichoptic, tryAdvanceOnAccuracy } = useDichopticSessionConfig(
+    exerciseConfig?.dichoptic
   );
 
   // ── charType + setup phase ────────────────────────────────────────────────
@@ -339,6 +347,47 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     });
   }, [exerciseConfig?.colorScheme, state.contrastLevel]);
 
+  const dichopticPresentation = useMemo<DichopticPresentation>(
+    () =>
+      resolveDichopticPresentation(
+        {
+          colorScheme: exerciseConfig?.colorScheme ?? null,
+          dichoptic: sessionDichoptic,
+          eye: exerciseConfig?.eye ?? null,
+        },
+        { trainingEye: assignment?.trainingEye ?? null }
+      ),
+    [exerciseConfig?.colorScheme, sessionDichoptic, exerciseConfig?.eye, assignment?.trainingEye]
+  );
+
+  /**
+   * Per-character dichoptic colors when anaglyph is active.
+   * 5 chars → even indices (0,2,4) = colorA (signal), odd indices (1,3) = colorB (fellow).
+   * Returns null when not anaglyph (caller falls back to single stimulusColors.textColor).
+   */
+  const charDichopticColors = useMemo<{ colorA: string; colorB: string } | null>(() => {
+    const scheme = exerciseConfig?.colorScheme;
+    if (!isAnaglyphExerciseColorScheme(scheme)) return null;
+
+    if (dichopticPresentation.enabled && dichopticPresentation.mode === 'balance') {
+      const colorA =
+        dichopticPresentation.redChannelRole === 'signal'
+          ? dichopticPresentation.redChannelColor
+          : dichopticPresentation.ch2ChannelColor;
+      const colorB =
+        dichopticPresentation.redChannelRole === 'fellow'
+          ? dichopticPresentation.redChannelColor
+          : dichopticPresentation.ch2ChannelColor;
+      return { colorA, colorB };
+    }
+
+    // Plain anaglyph (anti_cue or color-only): use raw channel colors.
+    return {
+      colorA: scheme!.textColor || '#ff0000',
+      colorB: scheme!.backgroundColor || '#0000ff',
+    };
+  }, [exerciseConfig?.colorScheme, dichopticPresentation]);
+
   const displayStrategy = useMemo(
     () =>
       buildExamDisplayStrategy({
@@ -464,6 +513,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     const evaluated = effectiveLetters.map((l) => evaluateAnswer({ ...l }, 'far'));
     const correctCount = evaluated.filter((l) => l.result).length;
     const passed = correctCount / FAR_ACUITY_CHAR_COUNT > 0.5;
+    const roundAccuracy = correctCount / FAR_ACUITY_CHAR_COUNT;
+    tryAdvanceOnAccuracy(roundAccuracy);
 
     await processRound(correctCount, passed);
     submitRound();
@@ -487,6 +538,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     setAnswer,
     state.letters,
     submitRound,
+    tryAdvanceOnAccuracy,
   ]);
 
   // ── Timer ─────────────────────────────────────────────────────────────────
@@ -945,6 +997,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
               screenInfo={screenParams}
               textColor={stimulusColors.textColor}
               backgroundColor={stimulusColors.backgroundColor}
+              charDichopticColors={charDichopticColors}
               snellenLabel={acuityInfo.score}
               logCsLabel={contrastInfo.score}
               eyeLabel={eyeLabel}

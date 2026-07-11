@@ -3,8 +3,10 @@ import { Box } from '@mui/material';
 import LoadingBoundary from 'src/components/shared/LoadingBoundary';
 import { use2048Exercise } from 'src/hooks/use2048Exercise';
 import { Game2048SessionResult, GameManager, VisualSettings } from 'src/types/core';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import { calculateVisualSettings, calculatePPI, VisionCalculationInput, ScreenInfo } from 'src/utils/visionUtils';
-import { loadGame2048Scripts, buildGame2048TileColorCss } from 'src/utils/game2048Utils';
+import { loadGame2048Scripts, buildGame2048TileColorCss, buildDichopticBalance2048Css } from 'src/utils/game2048Utils';
+import { isAnaglyphExerciseColorScheme } from 'src/components/exercises/vt/core/vtStimulusColors';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
 
 interface Game2048BoardProps {
@@ -38,6 +40,11 @@ interface Game2048BoardProps {
     endTime: number | null;
     restartCount: number;
   }) => void;
+  /**
+   * Resolved dichoptic presentation from DichopticUtils.
+   * When mode='balance': tile backgrounds → fellow channel, tile digits → signal channel.
+   */
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 const Game2048Board: React.FC<Game2048BoardProps> = ({
@@ -50,6 +57,7 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
   levelOverride,
   patientVision,
   onGameStateChange,
+  dichopticPresentation,
 }) => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameInstanceRef = useRef<GameManager | null>(null);
@@ -416,11 +424,30 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
         // Generate base CSS for font size (no board-wide contrast filter)
         const baseCss = getBaseCss(fontSize);
 
-        // Original + full contrast: keep native tile colors; otherwise opaque blend
-        const colorModeCss =
-          colorPreset === 'original' && contrastValue >= 99.5
-            ? ''
-            : getColorModeCss(colorPreset, settings.colorScheme, contrastValue);
+        let colorModeCss: string;
+        if (dichopticPresentation?.enabled && dichopticPresentation.mode === 'balance') {
+          // Balance mode: contrast-adjusted signal vs fellow colors, checkerboard by position.
+          const signalColor =
+            dichopticPresentation.redChannelRole === 'signal'
+              ? dichopticPresentation.redChannelColor
+              : dichopticPresentation.ch2ChannelColor;
+          const fellowColor =
+            dichopticPresentation.redChannelRole === 'fellow'
+              ? dichopticPresentation.redChannelColor
+              : dichopticPresentation.ch2ChannelColor;
+          colorModeCss = buildDichopticBalance2048Css(signalColor, fellowColor);
+        } else if (isAnaglyphExerciseColorScheme(settings.colorScheme)) {
+          // Plain anaglyph: black tile backgrounds + checkerboard digit colors.
+          const colorA = settings.colorScheme!.textColor || '#ff0000';
+          const colorB = settings.colorScheme!.backgroundColor || '#0000ff';
+          colorModeCss = buildDichopticBalance2048Css(colorA, colorB);
+        } else {
+          // Non-anaglyph: keep native tile colors or opaque contrast blend.
+          colorModeCss =
+            colorPreset === 'original' && contrastValue >= 99.5
+              ? ''
+              : getColorModeCss(colorPreset, settings.colorScheme, contrastValue);
+        }
 
         // Combine CSS rules
         styleTag.textContent = baseCss + colorModeCss;
@@ -490,6 +517,7 @@ const Game2048Board: React.FC<Game2048BoardProps> = ({
       calculateContrast,
       getBaseCss,
       getColorModeCss,
+      dichopticPresentation,
     ]
   );
 

@@ -112,6 +112,34 @@ const vtSettingsSchema = Joi.object()
   .allow(null)
   .optional();
 
+const dichopticSchema = Joi.object({
+  mode: Joi.string().valid('off', 'anti_cue', 'balance').required(),
+  mapping: Joi.when('mode', {
+    is: Joi.valid('anti_cue', 'balance'),
+    then: Joi.object({
+      redEye: Joi.string().valid('left', 'right').required(),
+    }).required(),
+    otherwise: Joi.forbidden(),
+  }),
+  balance: Joi.when('mode', {
+    is: 'balance',
+    then: Joi.object({
+      amblyopicContrastPercent: Joi.number().min(0).max(100).required(),
+      fellowContrastPercent: Joi.number().min(0).max(100).required(),
+      fellowContent: Joi.string().valid('none', 'noise', 'dim_context').required(),
+      autoBalance: Joi.object({
+        enabled: Joi.boolean().required(),
+        stepPercent: Joi.number().min(1).max(50).required(),
+        maxFellowPercent: Joi.number().min(0).max(100).required(),
+        accuracyThreshold: Joi.number().min(0).max(1).required(),
+      }).optional(),
+    }).required(),
+    otherwise: Joi.forbidden(),
+  }),
+})
+  .allow(null)
+  .optional();
+
 const createExerciseConfig = {
   body: Joi.object().keys({
     exerciseId: Joi.number().integer().required(),
@@ -156,6 +184,7 @@ const createExerciseConfig = {
     difficultyBaselineSource: Joi.string().valid('current_exam', 'latest_achieved').optional(),
     notificationSettings: notificationSchema.optional(),
     vtSettings: vtSettingsSchema,
+    dichoptic: dichopticSchema,
     centerId: Joi.number().integer().optional(),
     createdBy: Joi.number().integer().optional(),
     updatedBy: Joi.number().integer().optional(),
@@ -176,6 +205,31 @@ const updateExerciseConfig = {
     .keys({
       exerciseId: Joi.number().integer().optional(),
       patientId: Joi.number().integer().allow(null).optional(),
+      name: Joi.string().optional(),
+      eye: Joi.string().valid('right', 'left', 'both').optional(),
+      distance: Joi.number().precision(2).min(0.1).max(10).optional(),
+      duration: Joi.number().min(0.5).max(180).optional(),
+      frequency: Joi.string().valid('daily', 'weekly', 'monthly', 'quarterly', 'yearly').optional(),
+      executionCount: Joi.number().integer().min(1).max(10).optional(),
+      fontSize: Joi.number().integer().min(8).max(110).optional(),
+      contrast: Joi.number().integer().min(0).max(100).optional(),
+      colorScheme: Joi.alternatives()
+        .try(
+          Joi.string().valid('standard', 'high-contrast', 'redgreen', 'bluewhite'),
+          Joi.object().keys({
+            preset: Joi.string().optional(),
+            textColor: Joi.string()
+              .pattern(/^#[0-9A-Fa-f]{6}$/)
+              .optional(),
+            backgroundColor: Joi.string()
+              .pattern(/^#[0-9A-Fa-f]{6}$/)
+              .optional(),
+          })
+        )
+        .optional(),
+      visionType: Joi.string().valid('far', 'near', 'contrast', 'stereopsis').optional(),
+      levelOverride: Joi.boolean().optional(),
+      visionLevel: Joi.number().integer().min(1).max(20).allow(null).optional(),
       levels: Joi.object().optional(),
       passConditions: Joi.object().optional(),
       autoAdjustmentRules: Joi.object().allow(null).optional(),
@@ -184,6 +238,7 @@ const updateExerciseConfig = {
       difficultyBaselineSource: Joi.string().valid('current_exam', 'latest_achieved').optional(),
       notificationSettings: notificationSchema.optional(),
       vtSettings: vtSettingsSchema,
+      dichoptic: dichopticSchema,
       centerId: Joi.number().integer().optional(),
       updatedBy: Joi.number().integer().optional(),
     })
@@ -258,6 +313,7 @@ const updateExerciseConfigById = {
       difficultyBaselineSource: Joi.string().valid('current_exam', 'latest_achieved').optional(),
       notificationSettings: notificationSchema.optional(),
       vtSettings: vtSettingsSchema,
+      dichoptic: dichopticSchema,
       centerId: Joi.number().integer().optional(),
       updatedBy: Joi.number().integer().optional(),
     })

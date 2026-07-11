@@ -2,6 +2,7 @@ import * as Yup from 'yup';
 import * as common from './common';
 import type {
   ColorScheme,
+  DichopticConfig,
   NotificationSettings,
   PassConditions,
   AutoAdjustmentRules,
@@ -102,6 +103,7 @@ export const exerciseConfigSchema = Yup.object({
     .optional(),
   // 2048 / non-VT configs store null in DB — treat as optional empty
   vtSettings: Yup.object().nullable().optional(),
+  dichoptic: Yup.object().nullable().optional(),
 });
 
 export const exerciseAssignmentSchema = Yup.object({
@@ -141,6 +143,7 @@ export interface ExerciseConfigFormData {
   /** How starting difficulty is determined: 'current_exam' (default) | 'latest_achieved'. */
   difficultyBaselineSource?: 'current_exam' | 'latest_achieved' | null;
   vtSettings?: import('src/types/core/vtQuest').VtSettings;
+  dichoptic?: DichopticConfig | null;
 }
 
 export interface ExerciseAssignmentFormData {

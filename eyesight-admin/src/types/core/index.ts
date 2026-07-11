@@ -17,6 +17,12 @@ export type {
   PassConditions,
   AutoAdjustmentRules,
   ExerciseLevelConfig,
+  DichopticMode,
+  FellowContent,
+  AnaglyphChannelMapping,
+  DichopticBalanceParams,
+  DichopticConfig,
+  DichopticPresentation,
 } from './visual-settings';
 
 export {
@@ -28,6 +34,7 @@ export {
   DEFAULT_VISUAL_SETTINGS,
   DEFAULT_PASS_CONDITIONS,
   DEFAULT_AUTO_ADJUSTMENT_RULES,
+  DICHOPTIC_PRESENTATION_OFF,
 } from './visual-settings';
 
 // Game2048 Specific Types

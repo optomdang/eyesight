@@ -11,12 +11,14 @@ Hướng dẫn đưa **EyeSight** (monorepo backend + frontend) lên cloud với
 | Thành phần | Hosting | Domain |
 |------------|---------|--------|
 | Frontend (admin + portal) | **Vercel** | `https://app.nhuocthi.vn` |
+| Landing (marketing) | **Vercel** (project riêng) | `https://nhuocthi.vn` |
 | Backend API | **Render** (free) hoặc VPS Azdigi | `https://api.nhuocthi.vn` |
 | PostgreSQL | **Neon** | (nội bộ, không public) |
 
-Web marketing `nhuocthi.vn` (landing) làm sau — repo riêng; giai đoạn 1 chỉ cần **app**.
+Web marketing `nhuocthi.vn` nằm trong `eyesight-landing/` — deploy Vercel với Root Directory = `eyesight-landing`.
 
 ```
+Browser → nhuocthi.vn (Vercel, Next.js static)
 Browser → app.nhuocthi.vn (Vercel, Vite SPA)
               ↓ API calls
          api.nhuocthi.vn (Render, Express)
@@ -212,7 +214,40 @@ NODE_ENV=development node scripts/seed-initial-data.js
 1. **Không commit** `.env`, `.env.remote` — file `.env.remote` có credential cũ Supabase, nên xoá hoặc rotate nếu từng lộ.
 2. **Render free tier** sleep sau 15 phút không dùng — request đầu có thể chậm ~30s. Nâng paid hoặc dùng VPS Azdigi nếu cần 24/7.
 3. **VisionD** (`qlpk.visiondsoft.com`) không bị ảnh hưởng — DB và project deploy tách hẳn.
-4. **Web marketing** `nhuocthi.vn` (root domain): làm repo `nhuocthi-web` sau; hiện có thể redirect root → `app.nhuocthi.vn` tạm.
+4. **Web marketing** `nhuocthi.vn`: deploy từ `eyesight-landing/` — xem Phần G bên dưới.
+
+---
+
+## Phần G — Deploy landing page (nhuocthi.vn)
+
+### G1. Tạo Vercel project mới
+
+1. Vercel Dashboard → **Add New Project** → import cùng repo GitHub `eyesight`
+2. **Root Directory:** `eyesight-landing`
+3. Framework: Next.js (tự nhận)
+4. Build Command: `npm run build` (mặc định)
+5. Output: `out` (static export)
+
+### G2. Environment variables
+
+| Biến | Ví dụ |
+|------|-------|
+| `NEXT_PUBLIC_SITE_URL` | `https://nhuocthi.vn` |
+| `NEXT_PUBLIC_APP_URL` | `https://app.nhuocthi.vn` |
+| `NEXT_PUBLIC_ZALO_PHONE` | `09xxxxxxxx` |
+
+### G3. Domain
+
+1. Vercel project landing → Settings → Domains → thêm `nhuocthi.vn` và `www.nhuocthi.vn`
+2. DNS (tại registrar): A record hoặc CNAME theo hướng dẫn Vercel cho root domain
+
+### G4. Chạy local
+
+```bash
+npm run install:landing
+cp eyesight-landing/.env.example eyesight-landing/.env.local
+npm run dev:landing   # http://localhost:4002
+```
 
 ---
 

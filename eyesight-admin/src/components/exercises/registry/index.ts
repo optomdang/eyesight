@@ -15,12 +15,15 @@
 
 import React from 'react';
 import { VisualSettings } from 'src/types/core';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import type { PortalExerciseProps } from 'src/components/exercises/portal/types';
 
 // ==================== INTERFACES ====================
 
 export interface ExercisePreviewProps {
   visualSettings: VisualSettings;
+  /** Resolved dichoptic presentation for anaglyph balance preview (2048, etc.). */
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 export interface ExerciseRegistryEntry {

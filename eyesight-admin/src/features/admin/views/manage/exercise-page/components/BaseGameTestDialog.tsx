@@ -17,6 +17,11 @@ import { useTranslation } from 'src/hooks/useTranslation';
 import type { Exercise, VisualSettings } from 'src/types/core';
 import { getExerciseEntry, normalizeExerciseType } from 'src/components/exercises/registry';
 import { isVtQuestFamily } from 'src/components/exercises/vt/core/vtExerciseTypes';
+import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
+import {
+  buildBaseGameTestVisualOptions,
+  type BaseGameTestVisualOptions,
+} from 'src/utils/dichopticCapabilities';
 import {
   ALL_GABOR_TASK_MODES,
   GABOR_TASK_MODE_LABELS,
@@ -51,6 +56,11 @@ interface BaseGameTestDialogProps {
   open: boolean;
   exercise: Exercise | null;
   onClose: () => void;
+  /**
+   * Optional visual/dichoptic overrides (e.g. from an ExerciseConfig).
+   * When omitted, sensible anaglyph defaults are used for supported game types.
+   */
+  testVisualOptions?: BaseGameTestVisualOptions | null;
 }
 
 /** Cài đặt mặc định để chơi thử game gốc (không cần chế độ tập). */
@@ -190,7 +200,12 @@ const VT_TEST_SELECT_SX = {
   '.MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
 } as const;
 
-const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise, onClose }) => {
+const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({
+  open,
+  exercise,
+  onClose,
+  testVisualOptions: testVisualOptionsProp = null,
+}) => {
   const { t } = useTranslation();
   const [gaborTestPreset, setGaborTestPreset] = useState<GaborTestPreset>('orientation_id');
   const [vernierTestPreset, setVernierTestPreset] =
@@ -240,16 +255,57 @@ const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise,
   const isFarAcuity =
     exercise != null && normalizeExerciseType(exercise.exerciseType ?? exercise.code ?? '') === 'far-acuity';
 
+  const testVisualOptions = useMemo(
+    () =>
+      buildBaseGameTestVisualOptions(
+        exercise?.exerciseType ?? exercise?.code ?? null,
+        testVisualOptionsProp
+      ),
+    [exercise, testVisualOptionsProp]
+  );
+
+  const dichopticPresentation = useMemo(
+    () =>
+      resolveDichopticPresentation(
+        {
+          colorScheme: testVisualOptions.colorScheme ?? null,
+          dichoptic: testVisualOptions.dichoptic ?? null,
+          eye: testVisualOptions.eye === 'both' ? null : testVisualOptions.eye,
+        },
+        {
+          trainingEye: testVisualOptions.eye === 'both' ? null : testVisualOptions.eye,
+        }
+      ),
+    [testVisualOptions]
+  );
+
+  const registryVisualSettings = useMemo<VisualSettings>(() => {
+    const base: VisualSettings = {
+      ...DEFAULT_TEST_VISUAL_SETTINGS,
+      visionType: testVisualOptions.visionType ?? 'far',
+    };
+    if (testVisualOptions.colorScheme) {
+      base.colorScheme = {
+        preset: testVisualOptions.colorScheme.preset,
+        textColor: testVisualOptions.colorScheme.textColor,
+        backgroundColor: testVisualOptions.colorScheme.backgroundColor,
+      };
+    }
+    return base;
+  }, [testVisualOptions]);
+
   const sandboxAssignment = useMemo(
     () =>
       isVtQuest && exercise
         ? buildVtQuestSandboxAssignment({
-            visionType: 'far',
+            visionType: testVisualOptions.visionType ?? 'far',
             visionLevel: 10,
-            distance: 3,
-            eye: 'both',
+            distance: testVisualOptions.distance ?? 3,
+            eye: testVisualOptions.eye ?? 'left',
             exerciseName: exercise.name,
             exerciseType: exercise.exerciseType,
+            colorScheme: testVisualOptions.colorScheme ?? undefined,
+            dichoptic: testVisualOptions.dichoptic ?? null,
             vtSettings: buildTestVtSettings(
               isGaborCapable,
               gaborTestPreset,
@@ -265,6 +321,7 @@ const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise,
     [
       isVtQuest,
       exercise,
+      testVisualOptions,
       isGaborCapable,
       gaborTestPreset,
       isVernierCapable,
@@ -281,12 +338,15 @@ const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise,
       isFarAcuity && exercise
         ? buildFarAcuitySandboxAssignment({
             visionLevel: 10,
-            distance: 3,
-            eye: 'both',
+            visionType: testVisualOptions.visionType ?? 'far',
+            distance: testVisualOptions.distance ?? 3,
+            eye: testVisualOptions.eye ?? 'left',
             exerciseName: exercise.name,
+            colorScheme: testVisualOptions.colorScheme ?? undefined,
+            dichoptic: testVisualOptions.dichoptic ?? null,
           })
         : null,
-    [isFarAcuity, exercise]
+    [isFarAcuity, exercise, testVisualOptions]
   );
 
   const screenParams = useMemo(
@@ -456,6 +516,12 @@ const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise,
           minHeight: 0,
         }}
       >
+        {!testVisualOptionsProp?.dichoptic && testVisualOptions.colorScheme && (
+          <Alert severity="info" sx={{ mx: 2, mt: 1, flexShrink: 0 }}>
+            Chơi thử dùng màu anaglyph mặc định (đỏ–xanh). Để kiểm tra cấu hình cân bằng dichoptic đã
+            lưu, dùng <strong>Xem trước</strong> trong form cấu hình bài tập.
+          </Alert>
+        )}
         {isVtQuest && sandboxAssignment ? (
           <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <VtQuestExercise
@@ -492,7 +558,10 @@ const BaseGameTestDialog: React.FC<BaseGameTestDialogProps> = ({ open, exercise,
             ref={previewFullscreenRef}
             sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2 }}
           >
-            <PreviewComponent visualSettings={DEFAULT_TEST_VISUAL_SETTINGS} />
+            <PreviewComponent
+              visualSettings={registryVisualSettings}
+              dichopticPresentation={dichopticPresentation}
+            />
           </Box>
         )}
       </DialogContent>

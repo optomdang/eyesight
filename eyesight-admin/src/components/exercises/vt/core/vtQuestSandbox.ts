@@ -3,7 +3,7 @@
  */
 
 import type { Assignment } from 'src/types';
-import type { ColorScheme } from 'src/types/core/visual-settings';
+import type { ColorScheme, DichopticConfig } from 'src/types/core/visual-settings';
 import { DEFAULT_VT_SETTINGS, type VtSettings } from 'src/types/core/vtQuest';
 import {
   getVtExerciseDisplayName,
@@ -17,6 +17,7 @@ export interface VtQuestSandboxParams {
   distance: number;
   eye?: 'left' | 'right' | 'both';
   colorScheme?: ColorScheme | null;
+  dichoptic?: DichopticConfig | null;
   vtSettings?: Partial<VtSettings> | null;
   duration?: number;
   inactivityThreshold?: number | null;
@@ -48,6 +49,9 @@ export function mergeVtSettings(partial?: Partial<VtSettings> | null): VtSetting
 export function buildVtQuestSandboxAssignment(params: VtQuestSandboxParams): Assignment {
   const exerciseType = params.exerciseType ?? 'vt-quest';
   const displayName = params.exerciseName ?? getVtExerciseDisplayName(exerciseType);
+  const eye = params.eye ?? 'both';
+  // Dichoptic balance needs a single training eye — prefer left/right over both
+  const trainingEye = eye === 'left' || eye === 'right' ? eye : 'left';
 
   return {
     id: 0,
@@ -57,6 +61,7 @@ export function buildVtQuestSandboxAssignment(params: VtQuestSandboxParams): Ass
     sessionsCompleted: 0,
     levelOverride: true,
     visionLevel: params.visionLevel,
+    trainingEye,
     createdAt: '',
     updatedAt: '',
     exercise: {
@@ -70,18 +75,19 @@ export function buildVtQuestSandboxAssignment(params: VtQuestSandboxParams): Ass
       exerciseId: 0,
       configType: 'admin',
       name: 'VT Quest — Chơi thử',
-      eye: params.eye ?? 'both',
+      eye,
       distance: params.distance,
       duration: params.duration ?? 30,
       visionType: params.visionType,
       fontSize: 55,
       contrast: 100,
       colorScheme: params.colorScheme ?? undefined,
+      dichoptic: params.dichoptic ?? null,
       vtSettings: resolveVtSettingsForExerciseType(
         exerciseType,
         mergeVtSettings(params.vtSettings)
       ),
       inactivityThreshold: params.inactivityThreshold ?? 30,
-    } as Assignment['exerciseConfig'],
+    } as unknown as Assignment['exerciseConfig'],
   };
 }

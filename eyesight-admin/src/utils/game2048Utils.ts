@@ -212,7 +212,7 @@ import { blendHexAtContrastPercent } from 'src/utils/clinicalContrastColor';
 /** Re-export shared clinical blend for 2048 callers / tests. */
 export { blendHexAtContrastPercent };
 
-const GAME2048_TILE_INNER_SELECTORS = [
+export const GAME2048_TILE_INNER_SELECTORS = [
   '.game-container .tile.tile-2 .tile-inner',
   '.game-container .tile.tile-4 .tile-inner',
   '.game-container .tile.tile-8 .tile-inner',
@@ -266,6 +266,54 @@ export function buildGame2048TileColorCss(
     .join(',');
 
   return ` ${selectors} { background: ${backgroundColor} !important; color: ${digitColor} !important; }`;
+}
+
+/**
+ * Build CSS for dichoptic anaglyph mode on the 2048 game (balance or plain color).
+ *
+ * Layout:
+ *   - ALL tile backgrounds → #000000 (black, neutral to both anaglyph channels)
+ *   - Tile digit color alternates in a checkerboard pattern by grid position:
+ *       (col + row) % 2 === 0  →  colorA  (signal / amblyopic eye)
+ *       (col + row) % 2 === 1  →  colorB  (fellow / dominant eye)
+ *
+ * For balance mode: pass contrast-blended signal/fellow colors.
+ * For plain anaglyph (anti_cue / no dichoptic config): pass raw colorScheme.textColor /
+ * colorScheme.backgroundColor.
+ *
+ * @param colorA - Digit color for even-sum positions (signal channel)
+ * @param colorB - Digit color for odd-sum positions (fellow channel)
+ * @param containerPrefix - Optional CSS selector prefix (for scoped previews)
+ */
+export function buildDichopticBalance2048Css(
+  colorA: string,
+  colorB: string,
+  containerPrefix = ''
+): string {
+  const p = containerPrefix;
+
+  const aSelectors: string[] = [];
+  const bSelectors: string[] = [];
+
+  // 4×4 grid; positions are 1-indexed (col=x, row=y)
+  for (let col = 1; col <= 4; col++) {
+    for (let row = 1; row <= 4; row++) {
+      const sel = `${p}.game-container .tile.tile-position-${col}-${row} .tile-inner`;
+      if ((col + row) % 2 === 0) {
+        aSelectors.push(sel);
+      } else {
+        bSelectors.push(sel);
+      }
+    }
+  }
+
+  const allTileInner = `${p}.game-container .tile .tile-inner`;
+
+  return [
+    ` ${allTileInner} { background: #000000 !important; }`,
+    ` ${aSelectors.join(', ')} { color: ${colorA} !important; }`,
+    ` ${bSelectors.join(', ')} { color: ${colorB} !important; }`,
+  ].join('');
 }
 
 /**

@@ -185,6 +185,11 @@ export interface ExerciseConfig {
   /** VT Quest game configuration (modalities, staircase, stimulus, gamification) */
   vtSettings?: Record<string, unknown> | null;
   /**
+   * Dichoptic balance config (requires anaglyph colorScheme preset redBlue/redGreen).
+   * Resolved at runtime via resolveDichopticPresentation().
+   */
+  dichoptic?: import('./visual-settings').DichopticConfig | null;
+  /**
    * How the starting difficulty is determined each session.
    * - 'current_exam': use the patient's latest exam result for the configured visionType + eye.
    * - 'latest_achieved': on the first execution use the exam result; on subsequent executions

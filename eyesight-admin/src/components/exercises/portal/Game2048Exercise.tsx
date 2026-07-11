@@ -32,6 +32,12 @@ import { useExerciseFullscreen } from 'src/hooks/useExerciseFullscreen';
 import ExerciseVisionRequiredAlert from 'src/features/portal/views/exerciseResult/components/ExerciseVisionRequiredAlert';
 import { VisualSettings, GameManager } from 'src/types/core';
 import type { PortalExerciseProps } from './types';
+import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
+import { useDichopticSessionConfig } from 'src/hooks/exercises/useDichopticSessionConfig';
+import { resolveExerciseColorScheme } from 'src/services/colorPreset.service';
+
+/** Score delta between auto-balance fellow-contrast steps in 2048 (no per-stage accuracy). */
+const DICHOPTIC_2048_SCORE_MILESTONE = 200;
 
 declare global {
   interface Window {
@@ -80,6 +86,12 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const exerciseConfig = useMemo(() => assignment?.exerciseConfig, [assignment]);
+  const { dichopticConfig: sessionDichoptic, tryAdvanceOnAccuracy } = useDichopticSessionConfig(
+    exerciseConfig?.dichoptic
+  );
+  const tryAdvanceOnAccuracyRef = useRef(tryAdvanceOnAccuracy);
+  const lastDichopticScoreMilestoneRef = useRef(0);
+  tryAdvanceOnAccuracyRef.current = tryAdvanceOnAccuracy;
   const patientExamResults = freshExamResults ?? (patient as any)?.examResults;
 
   useEffect(() => {
@@ -568,6 +580,19 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
               maxScore: Math.max(maxScore, metadata.score),
               scoringMoves: scoreIncreased ? scoringMoves + 1 : scoringMoves,
             };
+
+            if (scoreIncreased) {
+              const moves = gameExecutionRef.current.movesCount ?? 0;
+              const scoring = gameExecutionRef.current.scoringMoves ?? 0;
+              const mergeAccuracy = moves > 0 ? scoring / moves : 0;
+              const score = metadata.score as number;
+              if (
+                score - lastDichopticScoreMilestoneRef.current >= DICHOPTIC_2048_SCORE_MILESTONE
+              ) {
+                lastDichopticScoreMilestoneRef.current = score;
+                tryAdvanceOnAccuracyRef.current(mergeAccuracy);
+              }
+            }
           }
 
           // Check game over - will be handled by endExerciseResult defined below
@@ -617,6 +642,24 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 
   const currentVisualSettings = useMemo(() => getVisualSettings(), [getVisualSettings]);
 
+  const dichopticPresentation = useMemo(
+    () =>
+      resolveDichopticPresentation(
+        {
+          colorScheme: resolveExerciseColorScheme(exerciseConfig?.colorScheme ?? null),
+          dichoptic: sessionDichoptic,
+          eye: exerciseConfig?.eye ?? null,
+        },
+        { trainingEye: assignment?.trainingEye ?? null }
+      ),
+    [
+      exerciseConfig?.colorScheme,
+      sessionDichoptic,
+      exerciseConfig?.eye,
+      assignment?.trainingEye,
+    ]
+  );
+
   // ==================== GAME ENGINE HOOK ====================
 
   const {
@@ -625,6 +668,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     isReady: isGameReady,
   } = useGame2048Engine({
     visualSettings: currentVisualSettings,
+    dichopticPresentation,
     enableTracking: true,
     hideUnnecessaryUI: true,
     onGameInit: attachGameTracking,

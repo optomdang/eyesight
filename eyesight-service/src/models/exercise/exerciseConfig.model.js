@@ -132,6 +132,13 @@ ExerciseConfig.init(
         'VT Quest configuration: modalities, staircase params, stimulus params, gamification theme',
     },
 
+    // Dichoptic balance configuration (requires anaglyph colorScheme preset)
+    dichoptic: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      comment: 'Dichoptic config: { mode: off|anti_cue|balance, mapping: { redEye }, balance: { amblyopicContrastPercent, fellowContrastPercent, fellowContent, autoBalance? } }',
+    },
+
     // Notification Settings - configurable reminder behavior
     notificationSettings: {
       type: DataTypes.JSONB,

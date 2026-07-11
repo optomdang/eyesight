@@ -83,7 +83,8 @@ import type {
 } from 'src/types/core/vtQuest';
 import type { IntroShapeType } from 'src/utils/stereopsis/stereopsisEngine';
 import type { GeoShapeType } from 'src/utils/stereopsis/stereopsisEngine';
-import type { ColorScheme } from 'src/types/core/visual-settings';
+import type { ColorScheme, DichopticConfig, DichopticPresentation } from 'src/types/core/visual-settings';
+import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
 
 const BG_LUMINANCE: Record<VtWorld, number> = {
   gabor: 128,
@@ -99,6 +100,10 @@ interface TrialScreenProps {
   distanceM: number;
   visionSizing: VtVisionSizing | null;
   colorScheme?: ColorScheme | null;
+  /** Dichoptic config from ExerciseConfig — resolver computes DichopticPresentation internally. */
+  dichopticConfig?: DichopticConfig | null;
+  /** trainingEye from the assignment (used by dichoptic resolver). */
+  trainingEye?: string | null;
   onResponse: (response: VtTrialResponseInput) => void;
   feedback?: TrialFeedbackState | null;
   responseBlocked?: boolean;
@@ -202,6 +207,8 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
   distanceM,
   visionSizing,
   colorScheme,
+  dichopticConfig,
+  trainingEye,
   onResponse,
   feedback = null,
   responseBlocked = false,
@@ -287,6 +294,16 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
     () => isAnaglyphExerciseColorScheme(colorScheme),
     [colorScheme]
   );
+
+  const dichopticPresentation = useMemo<DichopticPresentation>(
+    () =>
+      resolveDichopticPresentation(
+        { colorScheme, dichoptic: dichopticConfig ?? null },
+        { trainingEye: trainingEye ?? null }
+      ),
+    [colorScheme, dichopticConfig, trainingEye]
+  );
+
   const stimulusContrastPercent = visionSizing?.stimulusContrastPercent ?? 100;
   const panelBackground =
     world === 'stereopsis'
@@ -620,6 +637,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
           stimulusContrastPercent,
           offsetSign,
           distractorOffsetRatio: ratio,
+          dichopticPresentation,
         });
         return;
       }
@@ -634,6 +652,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
         colorScheme: stimulusColorScheme,
         stimulusContrastPercent,
         offsetSign,
+        dichopticPresentation,
       });
       return;
     }
@@ -669,6 +688,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
           colorScheme: stimulusColorScheme,
           stimulusContrastPercent,
           anaglyphAntiCue: crowdingAnaglyphAntiCue,
+          dichopticPresentation,
         });
         return;
       }
@@ -684,6 +704,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
         colorScheme: stimulusColorScheme,
         stimulusContrastPercent,
         anaglyphAntiCue: crowdingAnaglyphAntiCue,
+        dichopticPresentation,
       });
     }
   }, [
@@ -705,6 +726,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
     stimulusColorScheme,
     stimulusContrastPercent,
     crowdingAnaglyphAntiCue,
+    dichopticPresentation,
   ]);
 
   const disabled = !engineState.isPendingResponse || !layout?.fits || responseBlocked;
@@ -1002,6 +1024,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
               backgroundLum={bgLum}
               colorScheme={stimulusColorScheme}
               stimulusContrastPercent={stimulusContrastPercent}
+              dichopticPresentation={dichopticPresentation}
               visible={customStimulusVisible}
               offsetSign={vernierOffsetSign}
               cardOffsetSigns={vernierCardOffsetSigns}
@@ -1022,6 +1045,7 @@ const TrialScreen: React.FC<TrialScreenProps> = ({
               backgroundLum={bgLum}
               colorScheme={stimulusColorScheme}
               stimulusContrastPercent={stimulusContrastPercent}
+              dichopticPresentation={dichopticPresentation}
               visible={customStimulusVisible}
               cardTargets={cardTargets}
               onCardSelect={(idx) => onResponse({ index: idx })}

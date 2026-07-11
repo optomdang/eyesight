@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import { VisualSettings } from 'src/types/core';
+import type { ExercisePreviewProps } from 'src/components/exercises/registry';
 import { useGame2048Engine } from 'src/hooks/exercises/useGame2048Engine';
-
-interface Game2048PreviewProps {
-  visualSettings?: VisualSettings;
-}
 
 /**
  * Game2048Preview Component
@@ -16,13 +12,14 @@ interface Game2048PreviewProps {
  * game (real GameManager + KeyboardInputManager), exactly like the patient
  * experience. The clinician can play with the arrow keys to verify tile
  * sizing/contrast/colors per vision level, screen and distance.
- *
- * Previously this component rendered a static board (two fixed "2" tiles), which
- * is why arrow keys did nothing in the preview dialog.
  */
-const Game2048Preview: React.FC<Game2048PreviewProps> = ({ visualSettings }) => {
+const Game2048Preview: React.FC<ExercisePreviewProps> = ({
+  visualSettings,
+  dichopticPresentation = null,
+}) => {
   const { gameContainerRef, isReady, error } = useGame2048Engine({
     visualSettings,
+    dichopticPresentation,
     // Preview is for clinician trial only — no result tracking, clean board.
     enableTracking: false,
     hideUnnecessaryUI: true,

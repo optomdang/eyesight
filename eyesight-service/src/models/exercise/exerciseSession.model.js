@@ -114,6 +114,11 @@ ExerciseSession.init(
     deviceInfo: {
       type: DataTypes.JSONB,
     },
+    dichopticSnapshot: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      comment: 'Snapshot of DichopticConfig from ExerciseConfig at session start',
+    },
     centerId: {
       type: DataTypes.INTEGER,
       allowNull: false,

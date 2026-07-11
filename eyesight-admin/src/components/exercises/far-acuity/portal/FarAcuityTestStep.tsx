@@ -29,6 +29,13 @@ interface FarAcuityTestStepProps {
   textColor?: string;
   /** Display area background from exercise colorScheme */
   backgroundColor?: string;
+  /**
+   * When set (anaglyph mode), overrides textColor per character:
+   *   even index (0, 2, 4) → colorA  (signal / amblyopic eye)
+   *   odd  index (1, 3)    → colorB  (fellow / dominant eye)
+   * Gives 3 signal + 2 fellow for the standard 5-character row.
+   */
+  charDichopticColors?: { colorA: string; colorB: string } | null;
   snellenLabel: string;
   logCsLabel: string;
   eyeLabel: string;
@@ -57,6 +64,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
   screenInfo,
   textColor = '#000000',
   backgroundColor = '#FFFFFF',
+  charDichopticColors,
   snellenLabel,
   logCsLabel,
   eyeLabel,
@@ -217,17 +225,25 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                 boxSizing: 'border-box',
               }}
             >
-              {currentBatchItems.map((item, index) => (
-                <OptotypeChar
-                  key={batchStart + index}
-                  char={item.char}
-                  display={item.display}
-                  sizeMm={fontSizeMm}
-                  screenInfo={screenInfo}
-                  textColor={textColor}
-                  spacing={0}
-                />
-              ))}
+              {currentBatchItems.map((item, index) => {
+                const absoluteIndex = batchStart + index;
+                const charColor = charDichopticColors
+                  ? absoluteIndex % 2 === 0
+                    ? charDichopticColors.colorA
+                    : charDichopticColors.colorB
+                  : textColor;
+                return (
+                  <OptotypeChar
+                    key={absoluteIndex}
+                    char={item.char}
+                    display={item.display}
+                    sizeMm={fontSizeMm}
+                    screenInfo={screenInfo}
+                    textColor={charColor}
+                    spacing={0}
+                  />
+                );
+              })}
             </Box>
           </Box>
         )}

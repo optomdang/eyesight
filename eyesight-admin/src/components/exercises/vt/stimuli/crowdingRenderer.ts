@@ -13,6 +13,7 @@
  */
 
 import type { VtResponseSide } from 'src/types/core/vtQuest';
+import type { DichopticPresentation } from 'src/types/core/visual-settings';
 import { CHAR_POOL_MAP } from 'src/utils/constant';
 import { crowdingLetterFont } from '../core/vtOptotypeFont';
 import {
@@ -48,6 +49,8 @@ export interface CrowdingDrawOptions {
   stimulusContrastPercent?: number;
   /** When true (anaglyph config): random colours + matched outer letter span. */
   anaglyphAntiCue?: boolean;
+  /** Resolved dichoptic presentation — overrides anaglyphAntiCue color logic when mode=balance. */
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 function fillRegion(
@@ -98,13 +101,44 @@ export function drawCrowdingTriplet(params: CrowdingTripletDrawParams): void {
   drawLetter(ctx, flankers[1], cx + spacingPx, cy, letterHeightPx, letterColors[2]);
 }
 
+/**
+ * Derive the signal and fellow colors from a DichopticPresentation.
+ * signalColor = the channel that carries the target (amblyopic eye).
+ * fellowColor = the other channel (dominant eye, reduced contrast).
+ */
+function dichopticChannelColors(dp: DichopticPresentation): {
+  signalColor: string;
+  fellowColor: string;
+} {
+  const signalColor =
+    dp.redChannelRole === 'signal' ? dp.redChannelColor : dp.ch2ChannelColor;
+  const fellowColor =
+    dp.redChannelRole === 'fellow' ? dp.redChannelColor : dp.ch2ChannelColor;
+  return { signalColor, fellowColor };
+}
+
+/**
+ * Resolve letter colors for a crowding triplet [flanker, target, flanker].
+ *
+ * In balance mode:
+ *   - target (centre letter)  → signal channel (amblyopic eye, full contrast)
+ *   - flankers               → fellow channel (dominant eye, reduced contrast)
+ *
+ * In anti-cue mode: random anaglyph colours (existing behaviour).
+ * Otherwise: alternating colour scheme or grey.
+ */
 function resolveTripletColors(
   useColors: boolean,
   anaglyphMode: boolean,
   colorScheme: VtStimulusColorScheme | null | undefined,
   stimulusContrastPercent: number,
-  greyColor: string
+  greyColor: string,
+  dichoptic?: DichopticPresentation | null
 ): [string, string, string] {
+  if (dichoptic?.enabled && dichoptic.mode === 'balance') {
+    const { signalColor, fellowColor } = dichopticChannelColors(dichoptic);
+    return [fellowColor, signalColor, fellowColor];
+  }
   if (!useColors) return [greyColor, greyColor, greyColor];
   if (anaglyphMode) {
     return randomAnaglyphLetterColors(
@@ -123,6 +157,40 @@ function resolveTripletColors(
   ) as [string, string, string];
 }
 
+/**
+ * Resolve colors for the reference pair (2 flankers, no target).
+ * In balance mode both flankers use the fellow channel (dominant eye).
+ */
+function resolveReferencePairColors(
+  useColors: boolean,
+  anaglyphMode: boolean,
+  colorScheme: VtStimulusColorScheme | null | undefined,
+  stimulusContrastPercent: number,
+  greyColor: string,
+  dichoptic?: DichopticPresentation | null
+): [string, string] {
+  if (dichoptic?.enabled && dichoptic.mode === 'balance') {
+    const { fellowColor } = dichopticChannelColors(dichoptic);
+    return [fellowColor, fellowColor];
+  }
+  if (!useColors) return [greyColor, greyColor];
+  if (anaglyphMode) {
+    return randomAnaglyphLetterColors(
+      2,
+      colorScheme!.color1,
+      colorScheme!.color2,
+      stimulusContrastPercent
+    ) as [string, string];
+  }
+  return alternatingLetterColors(
+    2,
+    colorScheme!.color1,
+    colorScheme!.color2,
+    stimulusContrastPercent,
+    true
+  ) as [string, string];
+}
+
 export interface CrowdingSingleDrawOptions {
   canvas: HTMLCanvasElement;
   spacingRatio: number;
@@ -132,6 +200,7 @@ export interface CrowdingSingleDrawOptions {
   backgroundLuminance?: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 /** Draw one centered crowding triplet (central_letter_id, delayed_letter, flanker_same_different). */
@@ -145,6 +214,7 @@ export function drawCrowdingSingle(options: CrowdingSingleDrawOptions): void {
     backgroundLuminance = 200,
     colorScheme,
     stimulusContrastPercent = 100,
+    dichopticPresentation,
   } = options;
 
   const ctx = canvas.getContext('2d');
@@ -165,7 +235,8 @@ export function drawCrowdingSingle(options: CrowdingSingleDrawOptions): void {
     false,
     colorScheme,
     stimulusContrastPercent,
-    greyColor
+    greyColor,
+    dichopticPresentation
   );
 
   drawCrowdingTriplet({
@@ -193,6 +264,7 @@ export interface CrowdingLetterMatchDrawOptions {
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
   anaglyphAntiCue?: boolean;
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 /** Reference letter on top + 2AFC crowding triplets below. */
@@ -210,6 +282,7 @@ export function drawCrowdingLetterMatch(options: CrowdingLetterMatchDrawOptions)
     colorScheme,
     stimulusContrastPercent = 100,
     anaglyphAntiCue = false,
+    dichopticPresentation,
   } = options;
 
   const ctx = canvas.getContext('2d');
@@ -219,7 +292,9 @@ export function drawCrowdingLetterMatch(options: CrowdingLetterMatchDrawOptions)
   const H = canvas.height;
   const halfW = Math.floor(W / 2);
   const useColors = colorScheme?.useColoredPanels === true;
-  const anaglyphMode = anaglyphAntiCue && useColors;
+  // Anti-cue: active only when NOT in balance mode
+  const anaglyphMode =
+    anaglyphAntiCue && useColors && !(dichopticPresentation?.mode === 'balance');
   const panelFill = useColors ? '#000000' : `rgb(${backgroundLuminance},${backgroundLuminance},${backgroundLuminance})`;
   const textLum = backgroundLuminance > 128 ? 20 : 230;
   const greyColor = `rgb(${textLum},${textLum},${textLum})`;
@@ -234,9 +309,13 @@ export function drawCrowdingLetterMatch(options: CrowdingLetterMatchDrawOptions)
   const refCy = padding + refFontPx / 2;
   const tripletY = refCy + refFontPx / 2 + rowGapPx + letterHeightPx / 2;
 
-  const refColor = useColors
-    ? colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent)
-    : greyColor;
+  // Reference letter: use signal channel in balance mode
+  const refColor =
+    dichopticPresentation?.enabled && dichopticPresentation.mode === 'balance'
+      ? dichopticChannelColors(dichopticPresentation).signalColor
+      : useColors
+        ? colorAtContrastPercent(colorScheme!.color1, stimulusContrastPercent)
+        : greyColor;
   drawLetter(ctx, referenceLetter, W / 2, refCy, refFontPx, refColor);
 
   const dividerTop = refCy + refFontPx / 2 + rowGapPx * 0.35;
@@ -251,14 +330,16 @@ export function drawCrowdingLetterMatch(options: CrowdingLetterMatchDrawOptions)
     anaglyphMode,
     colorScheme,
     stimulusContrastPercent,
-    greyColor
+    greyColor,
+    dichopticPresentation
   );
   const rightColors = resolveTripletColors(
     useColors,
     anaglyphMode,
     colorScheme,
     stimulusContrastPercent,
-    greyColor
+    greyColor,
+    dichopticPresentation
   );
 
   drawCrowdingTriplet({
@@ -294,6 +375,7 @@ export interface CrowdingGridDrawOptions {
   backgroundLuminance?: number;
   colorScheme?: VtStimulusColorScheme | null;
   stimulusContrastPercent?: number;
+  dichopticPresentation?: DichopticPresentation | null;
 }
 
 /** Draw a 2×2 grid of crowding triplets (odd_letter_out). */
@@ -307,6 +389,7 @@ export function drawCrowdingGrid(options: CrowdingGridDrawOptions): void {
     backgroundLuminance = 200,
     colorScheme,
     stimulusContrastPercent = 100,
+    dichopticPresentation,
   } = options;
 
   const ctx = canvas.getContext('2d');
@@ -337,7 +420,8 @@ export function drawCrowdingGrid(options: CrowdingGridDrawOptions): void {
       false,
       colorScheme,
       stimulusContrastPercent,
-      greyColor
+      greyColor,
+      dichopticPresentation
     );
     drawCrowdingTriplet({
       ctx,
@@ -412,6 +496,7 @@ export function drawCrowding2AFC(options: CrowdingDrawOptions): void {
     colorScheme,
     stimulusContrastPercent = 100,
     anaglyphAntiCue = false,
+    dichopticPresentation,
   } = options;
 
   const ctx = canvas.getContext('2d');
@@ -421,7 +506,9 @@ export function drawCrowding2AFC(options: CrowdingDrawOptions): void {
   const H = canvas.height;
   const halfW = Math.floor(W / 2);
   const useColors = colorScheme?.useColoredPanels === true;
-  const anaglyphMode = anaglyphAntiCue && useColors;
+  // Anti-cue is disabled when balance mode is active (balance handles its own color logic)
+  const anaglyphMode =
+    anaglyphAntiCue && useColors && !(dichopticPresentation?.mode === 'balance');
   const panelFill = useColors ? '#000000' : `rgb(${backgroundLuminance},${backgroundLuminance},${backgroundLuminance})`;
   const textLum = backgroundLuminance > 128 ? 20 : 230;
   const greyColor = `rgb(${textLum},${textLum},${textLum})`;
@@ -436,39 +523,23 @@ export function drawCrowding2AFC(options: CrowdingDrawOptions): void {
   const rightCx = halfW + halfW / 2;
   const midY = H / 2;
 
-  const signalColors = useColors
-    ? anaglyphMode
-      ? (randomAnaglyphLetterColors(
-          3,
-          colorScheme!.color1,
-          colorScheme!.color2,
-          stimulusContrastPercent
-        ) as [string, string, string])
-      : (alternatingLetterColors(
-          3,
-          colorScheme!.color1,
-          colorScheme!.color2,
-          stimulusContrastPercent,
-          true
-        ) as [string, string, string])
-    : ([greyColor, greyColor, greyColor] as [string, string, string]);
+  const signalColors = resolveTripletColors(
+    useColors,
+    anaglyphMode,
+    colorScheme,
+    stimulusContrastPercent,
+    greyColor,
+    dichopticPresentation
+  );
 
-  const referenceColors = useColors
-    ? anaglyphMode
-      ? (randomAnaglyphLetterColors(
-          2,
-          colorScheme!.color1,
-          colorScheme!.color2,
-          stimulusContrastPercent
-        ) as [string, string])
-      : (alternatingLetterColors(
-          2,
-          colorScheme!.color1,
-          colorScheme!.color2,
-          stimulusContrastPercent,
-          true
-        ) as [string, string])
-    : ([greyColor, greyColor] as [string, string]);
+  const referenceColors = resolveReferencePairColors(
+    useColors,
+    anaglyphMode,
+    colorScheme,
+    stimulusContrastPercent,
+    greyColor,
+    dichopticPresentation
+  );
 
   if (signalSide === 'left') {
     drawSignalSide(
