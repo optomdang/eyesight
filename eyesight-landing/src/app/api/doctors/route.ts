@@ -9,8 +9,18 @@ const doctorTitles: DoctorTitle[] = ['doctor', 'optometrist', 'optician', 'nurse
 
 function getKvConfig() {
   return {
-    url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '',
-    token: process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '',
+    url:
+      process.env.KV_REST_API_URL ||
+      process.env.UPSTASH_REDIS_REST_URL ||
+      process.env.UPSTASH_REDIS_REST_KV_REST_API_URL ||
+      process.env.STORAGE_URL ||
+      '',
+    token:
+      process.env.KV_REST_API_TOKEN ||
+      process.env.UPSTASH_REDIS_REST_TOKEN ||
+      process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN ||
+      process.env.STORAGE_TOKEN ||
+      '',
   };
 }
 
