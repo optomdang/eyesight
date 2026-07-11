@@ -4,7 +4,7 @@ Marketing site for **Nhuoc Thi / D-VisUp** — deploy at `https://nhuocthi.vn`.
 
 ## Stack
 
-- Next.js 15 (App Router, static export)
+- Next.js 15 (App Router + API route)
 - TypeScript + Tailwind CSS
 - Port local: **4002**
 
@@ -33,6 +33,9 @@ Copy `.env.example` to `.env.local` and set:
 - `NEXT_PUBLIC_PAYMENT_ACCOUNT` — số tài khoản nhận thanh toán
 - `NEXT_PUBLIC_PAYMENT_ACCOUNT_NAME` — tên chủ tài khoản
 - `NEXT_PUBLIC_GOOGLE_SHEETS_WEBHOOK_URL` — URL Google Apps Script lưu đăng ký
+- `NEXT_PUBLIC_ADMIN_EMAIL`, `NEXT_PUBLIC_ADMIN_PASSWORD` — tài khoản quản lý Bác sĩ
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` — tài khoản API server để ghi danh sách Bác sĩ
+- `KV_REST_API_URL`, `KV_REST_API_TOKEN` — Vercel KV / Upstash Redis để lưu danh sách Bác sĩ trên server
 
 ## Đăng ký → Google Sheets
 
@@ -65,7 +68,7 @@ function doPost(e) {
 3. **Deploy → New deployment → Web app** — Execute as: Me, Who has access: **Anyone**
 4. Copy URL vào `NEXT_PUBLIC_GOOGLE_SHEETS_WEBHOOK_URL`
 
-Cập nhật danh sách Bác sĩ/Chuyên gia tại `/quan-ly/bac-si` (cần đăng nhập admin). Cấu hình `NEXT_PUBLIC_ADMIN_EMAIL` và `NEXT_PUBLIC_ADMIN_PASSWORD` trong `.env.local`.
+Cập nhật danh sách Bác sĩ/Chuyên gia tại `/quan-ly/bac-si` (cần đăng nhập admin). Danh sách được lưu qua API `/api/doctors`; khi deploy production cần cấu hình Vercel KV / Upstash Redis.
 
 ## Deploy (Vercel)
 

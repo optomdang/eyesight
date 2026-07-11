@@ -10,25 +10,26 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  clearDoctorsStorage,
   createDoctorId,
-  fetchDefaultDoctors,
   findDoctorByCode,
   generateDoctorCode,
-  loadDoctorsFromStorage,
-  saveDoctorsToStorage,
+  getVisibleDoctors,
   validateDoctorForm,
 } from '@/lib/doctors';
+import { getAdminCredentials } from '@/lib/adminAuth';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import type { DoctorFormData, DoctorRecord } from '@/types/doctor';
 
 interface DoctorsContextValue {
   doctors: DoctorRecord[];
+  visibleDoctors: DoctorRecord[];
   loading: boolean;
-  addDoctor: (data: DoctorFormData) => string | null;
-  updateDoctor: (id: string, data: DoctorFormData) => string | null;
-  removeDoctor: (id: string) => void;
+  addDoctor: (data: DoctorFormData) => Promise<string | null>;
+  updateDoctor: (id: string, data: DoctorFormData) => Promise<string | null>;
+  removeDoctor: (id: string) => Promise<string | null>;
+  setDoctorHidden: (id: string, hidden: boolean) => Promise<string | null>;
   findByCode: (code: string) => DoctorRecord | undefined;
-  resetToDefault: () => Promise<void>;
+  findVisibleByCode: (code: string) => DoctorRecord | undefined;
   exportJson: () => void;
   importJson: (file: File) => Promise<string | null>;
 }
@@ -36,27 +37,36 @@ interface DoctorsContextValue {
 const DoctorsContext = createContext<DoctorsContextValue | null>(null);
 
 export function DoctorsProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAdminAuth();
   const [doctors, setDoctors] = useState<DoctorRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const visibleDoctors = useMemo(() => getVisibleDoctors(doctors), [doctors]);
+
+  const adminHeaders = useCallback((): HeadersInit => {
+    const { email, password } = getAdminCredentials();
+    if (!email || !password) return {};
+
+    return {
+      Authorization: `Basic ${btoa(`${email}:${password}`)}`,
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const stored = loadDoctorsFromStorage();
-      if (stored) {
-        if (!cancelled) {
-          setDoctors(stored);
-          setLoading(false);
-        }
-        return;
-      }
-
+      setLoading(true);
       try {
-        const defaults = await fetchDefaultDoctors();
+        const res = await fetch(`/api/doctors${isAuthenticated ? '?scope=all' : ''}`, {
+          headers: isAuthenticated ? adminHeaders() : undefined,
+          cache: 'no-store',
+        });
+        if (!res.ok) throw new Error('Không tải được danh sách bác sĩ.');
+
+        const data = (await res.json()) as DoctorRecord[];
         if (!cancelled) {
-          setDoctors(defaults);
-          saveDoctorsToStorage(defaults);
+          setDoctors(data);
         }
       } catch {
         if (!cancelled) setDoctors([]);
@@ -69,15 +79,39 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [adminHeaders, isAuthenticated]);
 
-  const persist = useCallback((next: DoctorRecord[]) => {
-    setDoctors(next);
-    saveDoctorsToStorage(next);
-  }, []);
+  const persist = useCallback(
+    async (next: DoctorRecord[]): Promise<string | null> => {
+      const previous = doctors;
+      setDoctors(next);
+
+      try {
+        const res = await fetch('/api/doctors', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...adminHeaders(),
+          },
+          body: JSON.stringify({ doctors: next }),
+        });
+
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(data?.error || 'Không lưu được danh sách bác sĩ.');
+        }
+
+        return null;
+      } catch (error) {
+        setDoctors(previous);
+        return error instanceof Error ? error.message : 'Không lưu được danh sách bác sĩ.';
+      }
+    },
+    [adminHeaders, doctors],
+  );
 
   const addDoctor = useCallback(
-    (data: DoctorFormData): string | null => {
+    async (data: DoctorFormData): Promise<string | null> => {
       const error = validateDoctorForm(data);
       if (error) return error;
 
@@ -90,16 +124,16 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
         workplace: data.workplace.trim(),
         title: data.title,
         description: data.description?.trim() || undefined,
+        hidden: false,
       };
 
-      persist([...doctors, record]);
-      return null;
+      return persist([...doctors, record]);
     },
     [doctors, persist],
   );
 
   const updateDoctor = useCallback(
-    (id: string, data: DoctorFormData): string | null => {
+    async (id: string, data: DoctorFormData): Promise<string | null> => {
       const error = validateDoctorForm(data);
       if (error) return error;
 
@@ -118,15 +152,22 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
 
       const next = [...doctors];
       next[index] = updated;
-      persist(next);
-      return null;
+      return persist(next);
     },
     [doctors, persist],
   );
 
   const removeDoctor = useCallback(
-    (id: string) => {
-      persist(doctors.filter((d) => d.id !== id));
+    async (id: string): Promise<string | null> => {
+      return persist(doctors.filter((d) => d.id !== id));
+    },
+    [doctors, persist],
+  );
+
+  const setDoctorHidden = useCallback(
+    async (id: string, hidden: boolean): Promise<string | null> => {
+      const next = doctors.map((d) => (d.id === id ? { ...d, hidden } : d));
+      return persist(next);
     },
     [doctors, persist],
   );
@@ -136,11 +177,10 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
     [doctors],
   );
 
-  const resetToDefault = useCallback(async () => {
-    clearDoctorsStorage();
-    const defaults = await fetchDefaultDoctors();
-    persist(defaults);
-  }, [persist]);
+  const findVisibleByCode = useCallback(
+    (code: string) => findDoctorByCode(visibleDoctors, code),
+    [visibleDoctors],
+  );
 
   const exportJson = useCallback(() => {
     const blob = new Blob([JSON.stringify(doctors, null, 2)], { type: 'application/json' });
@@ -167,8 +207,7 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        persist(parsed);
-        return null;
+        return persist(parsed);
       } catch {
         return 'Không đọc được file JSON.';
       }
@@ -179,23 +218,27 @@ export function DoctorsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       doctors,
+      visibleDoctors,
       loading,
       addDoctor,
       updateDoctor,
       removeDoctor,
+      setDoctorHidden,
       findByCode,
-      resetToDefault,
+      findVisibleByCode,
       exportJson,
       importJson,
     }),
     [
       doctors,
+      visibleDoctors,
       loading,
       addDoctor,
       updateDoctor,
       removeDoctor,
+      setDoctorHidden,
       findByCode,
-      resetToDefault,
+      findVisibleByCode,
       exportJson,
       importJson,
     ],

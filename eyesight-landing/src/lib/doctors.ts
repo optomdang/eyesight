@@ -1,8 +1,5 @@
 import type { DoctorFormData, DoctorRecord, DoctorTitle } from '@/types/doctor';
 
-export const DOCTORS_STORAGE_KEY = 'd-visup-doctors-v1';
-export const DOCTORS_DATA_URL = '/data/doctors.json';
-
 export const doctorTitleOptions: { value: DoctorTitle; label: string }[] = [
   { value: 'doctor', label: 'Bác sĩ (Doctor)' },
   { value: 'optometrist', label: 'Chuyên gia (Optometrist)' },
@@ -19,6 +16,10 @@ const titlePrefixes: Record<DoctorTitle, string> = {
 
 export function getDoctorTitleLabel(title: DoctorTitle): string {
   return doctorTitleOptions.find((o) => o.value === title)?.label ?? title;
+}
+
+export function getVisibleDoctors(doctors: DoctorRecord[]): DoctorRecord[] {
+  return doctors.filter((d) => !d.hidden);
 }
 
 export function findDoctorByCode(doctors: DoctorRecord[], code: string): DoctorRecord | undefined {
@@ -57,30 +58,4 @@ export function validateDoctorForm(data: DoctorFormData): string | null {
   if (!data.workplace.trim()) return 'Vui lòng nhập đơn vị công tác.';
   if (!data.title) return 'Vui lòng chọn chức danh.';
   return null;
-}
-
-export async function fetchDefaultDoctors(): Promise<DoctorRecord[]> {
-  const res = await fetch(DOCTORS_DATA_URL);
-  if (!res.ok) throw new Error('Không tải được danh sách bác sĩ mặc định.');
-  const data = (await res.json()) as DoctorRecord[];
-  return data;
-}
-
-export function loadDoctorsFromStorage(): DoctorRecord[] | null {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(DOCTORS_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as DoctorRecord[];
-  } catch {
-    return null;
-  }
-}
-
-export function saveDoctorsToStorage(doctors: DoctorRecord[]): void {
-  localStorage.setItem(DOCTORS_STORAGE_KEY, JSON.stringify(doctors));
-}
-
-export function clearDoctorsStorage(): void {
-  localStorage.removeItem(DOCTORS_STORAGE_KEY);
 }

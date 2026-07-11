@@ -4,4 +4,5 @@ export {
   findDoctorByCode,
   getDoctorTitleLabel,
   formatDoctorBirthDate,
+  getVisibleDoctors,
 } from '@/lib/doctors';

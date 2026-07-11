@@ -18,7 +18,7 @@ Hướng dẫn đưa **EyeSight** (monorepo backend + frontend) lên cloud với
 Web marketing `nhuocthi.vn` nằm trong `eyesight-landing/` — deploy Vercel với Root Directory = `eyesight-landing`.
 
 ```
-Browser → nhuocthi.vn (Vercel, Next.js static)
+Browser → nhuocthi.vn (Vercel, Next.js + API route)
 Browser → app.nhuocthi.vn (Vercel, Vite SPA)
               ↓ API calls
          api.nhuocthi.vn (Render, Express)
@@ -226,7 +226,7 @@ NODE_ENV=development node scripts/seed-initial-data.js
 2. **Root Directory:** `eyesight-landing`
 3. Framework: Next.js (tự nhận)
 4. Build Command: `npm run build` (mặc định)
-5. **Không** override Output Directory — để Vercel tự xử lý static export (`output: 'export'`)
+5. **Không** override Output Directory — để Vercel tự xử lý Next.js build
 
 ### G2. Environment variables
 
@@ -235,6 +235,14 @@ NODE_ENV=development node scripts/seed-initial-data.js
 | `NEXT_PUBLIC_SITE_URL` | `https://nhuocthi.vn` |
 | `NEXT_PUBLIC_APP_URL` | `https://app.nhuocthi.vn` |
 | `NEXT_PUBLIC_ZALO_PHONE` | `09xxxxxxxx` |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | `admin@nhuocthi.vn` |
+| `NEXT_PUBLIC_ADMIN_PASSWORD` | `Admin@123` |
+| `ADMIN_EMAIL` | `admin@nhuocthi.vn` |
+| `ADMIN_PASSWORD` | `Admin@123` |
+| `KV_REST_API_URL` | Vercel KV / Upstash REST URL |
+| `KV_REST_API_TOKEN` | Vercel KV / Upstash REST token |
+
+> Trang quản lý Bác sĩ dùng `/api/doctors` để lưu danh sách trên server. Cần tạo Vercel KV (hoặc Upstash Redis) cho project landing và thêm `KV_REST_API_URL`, `KV_REST_API_TOKEN`; nếu thiếu 2 biến này, API vẫn đọc danh sách mặc định nhưng không lưu được thay đổi.
 
 ### G3. Domain
 

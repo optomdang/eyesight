@@ -23,7 +23,7 @@ const emptyForm: DoctorFormData = {
 
 export function DoctorAdminPage() {
   const { isAuthenticated, loading: authLoading, login } = useAdminAuth();
-  const { doctors, loading, addDoctor, updateDoctor, removeDoctor, resetToDefault, exportJson, importJson } =
+  const { doctors, loading, addDoctor, updateDoctor, removeDoctor, setDoctorHidden, exportJson, importJson } =
     useDoctors();
   const [form, setForm] = useState<DoctorFormData>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,8 +50,8 @@ export function DoctorAdminPage() {
     setFormError('');
   };
 
-  const handleSubmit = () => {
-    const error = editingId ? updateDoctor(editingId, form) : addDoctor(form);
+  const handleSubmit = async () => {
+    const error = editingId ? await updateDoctor(editingId, form) : await addDoctor(form);
     if (error) {
       setFormError(error);
       return;
@@ -60,9 +60,13 @@ export function DoctorAdminPage() {
     resetForm();
   };
 
-  const handleDelete = (doctor: DoctorRecord) => {
+  const handleDelete = async (doctor: DoctorRecord) => {
     if (!window.confirm(`Xóa ${doctor.fullName} (${doctor.code})?`)) return;
-    removeDoctor(doctor.id);
+    const error = await removeDoctor(doctor.id);
+    if (error) {
+      setStatusMessage(error);
+      return;
+    }
     if (editingId === doctor.id) resetForm();
     setStatusMessage('Đã xóa bác sĩ.');
   };
@@ -74,7 +78,7 @@ export function DoctorAdminPage() {
       setStatusMessage(error);
       return;
     }
-    setStatusMessage('Đã nhập danh sách từ file JSON.');
+    setStatusMessage('Đã khôi phục danh sách từ file.');
     resetForm();
   };
 
@@ -106,11 +110,23 @@ export function DoctorAdminPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={exportJson}>
-            Xuất JSON
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={exportJson}
+            title="Tải file sao lưu danh sách bác sĩ"
+          >
+            Sao lưu danh sách
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-            Nhập JSON
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            title="Khôi phục danh sách từ file đã sao lưu"
+          >
+            Khôi phục từ file
           </Button>
           <input
             ref={fileInputRef}
@@ -122,18 +138,6 @@ export function DoctorAdminPage() {
               e.target.value = '';
             }}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (window.confirm('Khôi phục danh sách mặc định từ file gốc?')) {
-                resetToDefault().then(() => setStatusMessage('Đã khôi phục danh sách mặc định.'));
-              }
-            }}
-          >
-            Khôi phục mặc định
-          </Button>
         </div>
       </div>
 
@@ -224,11 +228,19 @@ export function DoctorAdminPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {doctors.map((doctor) => (
-                <div key={doctor.id} className="px-6 py-4">
+                <div
+                  key={doctor.id}
+                  className={`px-6 py-4 ${doctor.hidden ? 'bg-gray-50' : ''}`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900">
                         <span className="font-mono text-brand-teal">{doctor.code}</span> — {doctor.fullName}
+                        {doctor.hidden && (
+                          <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                            Đã ẩn
+                          </span>
+                        )}
                       </p>
                       <p className="mt-1 text-sm text-gray-600">
                         {getDoctorTitleLabel(doctor.title)} · Sinh {formatDoctorBirthDate(doctor.dateOfBirth)}
@@ -238,7 +250,23 @@ export function DoctorAdminPage() {
                         <p className="mt-2 text-sm text-gray-500">{doctor.description}</p>
                       )}
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nextHidden = !doctor.hidden;
+                          const error = await setDoctorHidden(doctor.id, nextHidden);
+                          setStatusMessage(
+                            error ||
+                              (nextHidden
+                                ? `Đã ẩn ${doctor.fullName} khỏi danh sách lựa chọn.`
+                                : `Đã hiện ${doctor.fullName} trên danh sách lựa chọn.`),
+                          );
+                        }}
+                        className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50"
+                      >
+                        {doctor.hidden ? 'Hiện lại' : 'Ẩn'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => startEdit(doctor)}
@@ -262,9 +290,11 @@ export function DoctorAdminPage() {
         </section>
       </div>
 
-      <p className="mt-8 text-xs text-gray-500">
-        Dữ liệu lưu trên trình duyệt (localStorage). Dùng <strong>Xuất JSON</strong> để sao lưu hoặc
-        cập nhật file <code className="rounded bg-gray-100 px-1">public/data/doctors.json</code> khi deploy.
+      <p className="mt-8 text-sm text-gray-500">
+        <strong>Sao lưu danh sách</strong> — tải file JSON về máy để giữ bản backup.
+        <strong> Khôi phục từ file</strong> — nạp lại danh sách từ file đã sao lưu (thay thế toàn bộ).
+        Nút <strong>Ẩn</strong> chỉ ẩn khỏi dropdown đăng ký và trang công khai; bác sĩ vẫn hiện ở đây.
+        Dữ liệu được lưu trên server.
       </p>
     </div>
   );

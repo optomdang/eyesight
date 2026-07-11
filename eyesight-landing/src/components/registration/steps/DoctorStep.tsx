@@ -13,11 +13,11 @@ interface DoctorStepProps {
 }
 
 export function DoctorStep({ data, errors, onChange }: DoctorStepProps) {
-  const { doctors, loading, findByCode } = useDoctors();
+  const { visibleDoctors, loading, findVisibleByCode } = useDoctors();
   const [unknownCodeWarning, setUnknownCodeWarning] = useState(false);
 
   const handleSelect = (code: string) => {
-    const doctor = findByCode(code);
+    const doctor = findVisibleByCode(code);
     setUnknownCodeWarning(false);
     onChange({
       doctorCode: code,
@@ -26,7 +26,7 @@ export function DoctorStep({ data, errors, onChange }: DoctorStepProps) {
   };
 
   const handleCodeInput = (code: string) => {
-    const doctor = findByCode(code);
+    const doctor = findVisibleByCode(code);
     setUnknownCodeWarning(Boolean(code.trim()) && !doctor);
     onChange({
       doctorCode: code,
@@ -47,7 +47,7 @@ export function DoctorStep({ data, errors, onChange }: DoctorStepProps) {
           disabled={loading}
         >
           <option value="">-- Chọn Bác sĩ / Chuyên gia --</option>
-          {doctors.map((d) => (
+          {visibleDoctors.map((d) => (
             <option key={d.id} value={d.code}>
               {d.code} — {d.fullName}
             </option>

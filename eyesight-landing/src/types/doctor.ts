@@ -8,6 +8,7 @@ export interface DoctorRecord {
   workplace: string;
   title: DoctorTitle;
   description?: string;
+  hidden?: boolean;
 }
 
 export type DoctorFormData = Omit<DoctorRecord, 'id' | 'code'> & {
