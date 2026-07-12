@@ -17,10 +17,10 @@ export function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <a href="/" className="flex items-center">
           <Image
-            src="/images/logo-wordmark.png"
+            src="/images/logo.svg"
             alt={site.productName}
-            width={168}
-            height={40}
+            width={174}
+            height={36}
             priority
             className="h-10 w-auto"
           />

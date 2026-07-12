@@ -98,42 +98,81 @@ const SignaturePad = React.forwardRef<SignaturePadHandle, SignaturePadProps>(fun
     return () => observer.disconnect();
   }, [resizeCanvas]);
 
-  const startDraw = (x: number, y: number) => {
-    if (disabled) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    drawingRef.current = true;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
 
-  const draw = (x: number, y: number) => {
-    if (!drawingRef.current || disabled) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    if (!hasStrokeRef.current) {
-      hasStrokeRef.current = true;
-      setHasStroke(true);
-      onChange?.(false);
-    }
-  };
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
 
-  const endDraw = () => {
-    drawingRef.current = false;
-  };
+    const startDraw = (x: number, y: number) => {
+      if (disabledRef.current) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      drawingRef.current = true;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const { x, y } = getPoint(e.currentTarget, e.clientX, e.clientY);
-    startDraw(x, y);
-  };
+    const draw = (x: number, y: number) => {
+      if (!drawingRef.current || disabledRef.current) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      if (!hasStrokeRef.current) {
+        hasStrokeRef.current = true;
+        setHasStroke(true);
+        onChange?.(false);
+      }
+    };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { x, y } = getPoint(e.currentTarget, e.clientX, e.clientY);
-    draw(x, y);
-  };
+    const endDraw = () => {
+      drawingRef.current = false;
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (disabledRef.current) return;
+      e.preventDefault();
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // Some browsers throw if the pointer is no longer active; safe to ignore.
+      }
+      const { x, y } = getPoint(canvas, e.clientX, e.clientY);
+      startDraw(x, y);
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!drawingRef.current) return;
+      e.preventDefault();
+      const { x, y } = getPoint(canvas, e.clientX, e.clientY);
+      draw(x, y);
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      e.preventDefault();
+      endDraw();
+    };
+
+    // Native listeners with passive:false so preventDefault() stops the page
+    // from scrolling/zooming while signing on touch devices.
+    canvas.addEventListener('pointerdown', handlePointerDown, { passive: false });
+    canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
+    canvas.addEventListener('pointerup', handlePointerUp, { passive: false });
+    canvas.addEventListener('pointerleave', endDraw);
+    canvas.addEventListener('pointercancel', handlePointerUp, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('pointerdown', handlePointerDown);
+      canvas.removeEventListener('pointermove', handlePointerMove);
+      canvas.removeEventListener('pointerup', handlePointerUp);
+      canvas.removeEventListener('pointerleave', endDraw);
+      canvas.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [onChange]);
 
   return (
     <Box>
@@ -153,14 +192,12 @@ const SignaturePad = React.forwardRef<SignaturePadHandle, SignaturePadProps>(fun
           ref={canvasRef}
           aria-label="Vùng ký tên"
           role="img"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={endDraw}
-          onPointerLeave={endDraw}
-          onPointerCancel={endDraw}
           style={{
             display: 'block',
             touchAction: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            WebkitTouchCallout: 'none',
             cursor: disabled ? 'not-allowed' : 'crosshair',
           }}
         />
