@@ -8,8 +8,13 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     const transaction = await queryInterface.sequelize.transaction();
     try {
-      await queryInterface.dropTable('WarrantyAgreementPhases', { transaction });
-      await queryInterface.dropTable('WarrantyAgreements', { transaction });
+      // IF EXISTS: safe when 100000 already created tables or this migration is re-run manually
+      await queryInterface.sequelize.query('DROP TABLE IF EXISTS "WarrantyAgreementPhases" CASCADE;', {
+        transaction,
+      });
+      await queryInterface.sequelize.query('DROP TABLE IF EXISTS "WarrantyAgreements" CASCADE;', {
+        transaction,
+      });
 
       await queryInterface.createTable(
         'WarrantyAgreements',

@@ -13,6 +13,7 @@ services:
     plan: free
     rootDir: eyesight-service
     buildCommand: npm install --ignore-scripts
+    preDeployCommand: npm run db:migrate
     startCommand: npm run start:node
     healthCheckPath: /api/v1/version
     envVars:

@@ -9,7 +9,7 @@ export const WARRANTY_POLICY_TAGLINE =
 
 export const WARRANTY_REFUND_CRITERIA = [
   'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên.',
-  'Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức => Hoàn tiền.',
+  'Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức → Hoàn tiền.',
   'Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền',
   'Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả',
 ];

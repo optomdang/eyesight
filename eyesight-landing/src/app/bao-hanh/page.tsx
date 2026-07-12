@@ -40,7 +40,7 @@ const guaranteeConditions = [
   {
     title: 'Không ghi nhận cải thiện',
     description:
-      'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên. Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức => Hoàn tiền. Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền; Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả. Bác sĩ/Chuyên gia xác nhận dựa trên kết quả trước và sau điều trị, thống nhất giữa hệ thống và khám thực tế.',
+      'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên. Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức → Hoàn tiền. Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền; Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả. Bác sĩ/Chuyên gia xác nhận dựa trên kết quả trước và sau điều trị, thống nhất giữa hệ thống và khám thực tế.',
   },
 ];
 
@@ -151,7 +151,7 @@ export default function WarrantyPage() {
               </p>
               <p className="mt-2">
                 Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1
-                dòng/mức =&gt; Hoàn tiền.
+                dòng/mức → Hoàn tiền.
               </p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-gray-700">
                 <li>Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền</li>

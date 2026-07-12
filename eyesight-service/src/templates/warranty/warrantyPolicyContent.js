@@ -47,7 +47,7 @@ const ARTICLES = [
       'Chỉ áp dụng cho gói Amblyopia Ultra và Amblyopia Ultimate có gắn cờ cam kết hoàn tiền trên hệ thống.',
       'D-VisUp hoàn 100% số tiền thực tế đã thanh toán cho gói phần mềm nếu người tập đáp ứng đầy đủ điều kiện tại Điều 5 nhưng không ghi nhận cải thiện có ý nghĩa sau khi hoàn thành liệu trình.',
       'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên.',
-      'Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức => Hoàn tiền.',
+      'Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức → Hoàn tiền.',
       'Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền.',
       'Ví dụ: Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả.',
       'Khoản hoàn không bao gồm chi phí khám, tái khám, kính, thiết bị, dịch vụ phòng khám hoặc chi phí bên thứ ba khác.',
