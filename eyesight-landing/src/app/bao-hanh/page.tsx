@@ -25,7 +25,7 @@ const guaranteeConditions = [
   {
     title: 'Tuân thủ tối thiểu 90%',
     description:
-      'Hoàn thành ít nhất 90% tổng số buổi tập được Bác sĩ/Chuyên gia giao trên hệ thống trong 365 ngày. Điều kiện tuân thủ không khó khăn / ngặt nghèo đến mức yêu cầu cao 95% hay 100%, nhưng bạn cần đạt mức tuân thủ 90% để đảm bảo hiệu quả. Ai cũng có việc, có lúc ốm đau, đi du lịch, đi cưới hỏi và vô vàn lý do khác nên hãy cố gắng hoàn thành đủ yêu cầu những lúc có thể để lúc cần có thể nghỉ nhé!',
+      'Hoàn thành ít nhất 90% tổng khối lượng/buổi tập được Bác sĩ/Chuyên gia giao trên hệ thống trong 365 ngày. Điều kiện tuân thủ không khó khăn / ngặt nghèo đến mức yêu cầu cao 95% hay 100%, nhưng bạn cần đạt mức tuân thủ 90% để đảm bảo hiệu quả. Ai cũng có việc, có lúc ốm đau, đi du lịch, đi cưới hỏi và vô vàn lý do khác nên hãy cố gắng hoàn thành đủ yêu cầu những lúc có thể để lúc cần có thể nghỉ nhé!',
   },
   {
     title: 'Có Bác sĩ/Chuyên gia theo dõi và xác nhận',
@@ -40,7 +40,7 @@ const guaranteeConditions = [
   {
     title: 'Không ghi nhận cải thiện',
     description:
-      'Bác sĩ/Chuyên gia xác nhận không có cải thiện có ý nghĩa ở các chỉ số thị giác được theo dõi, dựa trên kết quả trước và sau điều trị. Kết quả cần thống nhất giữa kết quả theo dõi của hệ thống và xác nhận của Bác sĩ.',
+      'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên. Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức => Hoàn tiền. Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền; Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả. Bác sĩ/Chuyên gia xác nhận dựa trên kết quả trước và sau điều trị, thống nhất giữa hệ thống và khám thực tế.',
   },
 ];
 
@@ -141,6 +141,23 @@ export default function WarrantyPage() {
               tập đáp ứng đầy đủ tất cả điều kiện dưới đây nhưng không ghi nhận cải thiện
               sau khi hoàn thành liệu trình.
             </p>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-white/80 p-4 text-sm leading-7 text-gray-800 md:text-base">
+              <p className="font-semibold text-gray-900">
+                KHÔNG HIỆU QUẢ KHÔNG MẤT TIỀN — áp dụng có điều kiện cho gói Ultra và Ultimate.
+              </p>
+              <p className="mt-2">
+                D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn
+                gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên.
+              </p>
+              <p className="mt-2">
+                Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1
+                dòng/mức =&gt; Hoàn tiền.
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-gray-700">
+                <li>Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền</li>
+                <li>Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả</li>
+              </ul>
+            </div>
             <div className="mt-5 space-y-4 border-t border-amber-200/80 pt-5 text-sm leading-7 text-gray-700 md:text-base">
               <p>
                 Bạn có nhớ những lần bạn thử điều trị cho con 3–4 khoá tập nhưng không hiệu

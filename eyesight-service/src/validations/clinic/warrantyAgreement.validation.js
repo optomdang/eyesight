@@ -1,11 +1,13 @@
 const Joi = require('joi');
-const { standardId } = require('../../utils/validation');
+const { standardId, standardTenantFields } = require('../../utils/validation');
 const { SIGNATURE_DATA_URL_PATTERN } = require('../../utils/signatureValidation');
 
 const eyeResultSchema = Joi.object().keys({
   leftEye: Joi.number().allow(null).optional(),
   rightEye: Joi.number().allow(null).optional(),
   bothEye: Joi.number().allow(null).optional(),
+  // Patient examResults snapshots embed lastExamDate inside each result object
+  lastExamDate: Joi.alternatives().try(Joi.date().iso(), Joi.string().allow(null, '')).optional(),
 });
 
 const examTypeClinicalSchema = Joi.object().keys({
@@ -63,6 +65,8 @@ const createPatientAgreement = {
   }),
   body: Joi.object().keys({
     clinicalData: clinicalDataSchema.optional(),
+    centerId: standardTenantFields.centerId,
+    updatedBy: standardTenantFields.updatedBy,
   }),
 };
 
@@ -74,6 +78,8 @@ const createAgreementPhase = {
     phaseType: Joi.string().valid('reexam', 'final').required(),
     clinicalData: clinicalDataSchema.required(),
     reexamEarlyOverrideReason: Joi.string().trim().max(2000).allow(null, '').optional(),
+    centerId: standardTenantFields.centerId,
+    updatedBy: standardTenantFields.updatedBy,
   }),
 };
 
@@ -84,6 +90,8 @@ const updateAgreementPhaseClinicalData = {
   }),
   body: Joi.object().keys({
     clinicalData: clinicalDataSchema.required(),
+    centerId: standardTenantFields.centerId,
+    updatedBy: standardTenantFields.updatedBy,
   }),
 };
 
@@ -116,6 +124,34 @@ const downloadAgreementAggregatePdf = {
   }),
 };
 
+const generateSignToken = {
+  params: Joi.object().keys({
+    agreementId: standardId,
+    phaseId: standardId,
+  }),
+};
+
+const getSignData = {
+  params: Joi.object().keys({
+    token: Joi.string().required(),
+  }),
+};
+
+const signByToken = {
+  params: Joi.object().keys({
+    token: Joi.string().required(),
+  }),
+  body: Joi.object().keys({
+    signatureDataUrl: Joi.string()
+      .pattern(SIGNATURE_DATA_URL_PATTERN)
+      .required()
+      .messages({ 'string.pattern.base': 'Chữ ký phải là ảnh PNG/JPEG/WebP dạng data URL hợp lệ' }),
+    signerName: Joi.string().trim().min(2).max(255).required(),
+    signerRelation: Joi.string().trim().max(100).allow(null, '').optional(),
+    consentAccepted: Joi.boolean().valid(true).required(),
+  }),
+};
+
 module.exports = {
   getMyAgreement,
   getPatientAgreement,
@@ -125,4 +161,7 @@ module.exports = {
   signAgreementPhase,
   downloadAgreementPhasePdf,
   downloadAgreementAggregatePdf,
+  generateSignToken,
+  getSignData,
+  signByToken,
 };

@@ -66,4 +66,31 @@ router.get(
   warrantyAgreementController.downloadAgreementAggregatePdf
 );
 
+// Generate a short-lived public sign link token (requires staff auth)
+router.post(
+  '/:agreementId/phases/:phaseId/sign-token',
+  auth(allRights.managePatients.code),
+  validate(warrantyAgreementValidation.generateSignToken),
+  warrantyAgreementController.generateSignToken
+);
+
+// Public endpoints — no auth required (validated by JWT token in URL)
+router.get(
+  '/sign/:token',
+  validate(warrantyAgreementValidation.getSignData),
+  warrantyAgreementController.getSignData
+);
+
+router.post(
+  '/sign/:token',
+  validate(warrantyAgreementValidation.signByToken),
+  warrantyAgreementController.submitSignature
+);
+
+router.get(
+  '/sign/:token/pdf',
+  validate(warrantyAgreementValidation.getSignData),
+  warrantyAgreementController.downloadPdfByToken
+);
+
 module.exports = router;

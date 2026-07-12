@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Alert, Typography } from '@mui/material';
 import { getMyWarrantyAgreement } from 'src/services/warranty.service';
 
 /**
@@ -36,18 +35,10 @@ const WarrantyPendingBanner: React.FC = () => {
   if (!checked || !pending) return null;
 
   return (
-    <Alert
-      severity="warning"
-      sx={{ mb: 3 }}
-      action={
-        <Button color="inherit" size="small" component={RouterLink} to="/portal/warranty">
-          Ký ngay
-        </Button>
-      }
-    >
+    <Alert severity="warning" sx={{ mb: 3 }}>
       <Typography variant="body2">
-        <strong>Cam kết bảo hành:</strong> Có giai đoạn đang chờ phụ huynh/người giám hộ ký xác
-        nhận. Vui lòng hoàn tất để tiếp tục quy trình điều trị.
+        <strong>Cam kết bảo hành:</strong> Có giai đoạn đang chờ phụ huynh/người giám hộ ký.
+        Vui lòng mở link ký mà bác sĩ gửi qua Zalo hoặc tin nhắn trên điện thoại.
       </Typography>
     </Alert>
   );

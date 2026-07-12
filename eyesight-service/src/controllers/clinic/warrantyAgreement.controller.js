@@ -98,6 +98,39 @@ const downloadAgreementAggregatePdf = catchAsync(async (req, res) => {
   sendPdf(res, pdf);
 });
 
+const generateSignToken = catchAsync(async (req, res) => {
+  const result = await warrantyAgreementService.generateSignToken(
+    Number(req.params.agreementId),
+    Number(req.params.phaseId),
+    req.user
+  );
+  res.send(result);
+});
+
+const getSignData = catchAsync(async (req, res) => {
+  const data = await warrantyAgreementService.getPhaseBySignToken(req.params.token);
+  res.send(data);
+});
+
+const submitSignature = catchAsync(async (req, res) => {
+  const requestContext = auditLogService.buildRequestContext(req);
+  const agreement = await warrantyAgreementService.signPhaseByToken(
+    req.params.token,
+    req.body,
+    requestContext
+  );
+  res.send(agreement);
+});
+
+const downloadPdfByToken = catchAsync(async (req, res) => {
+  const requestContext = auditLogService.buildRequestContext(req);
+  const pdf = await warrantyAgreementService.downloadPhasePdfBySignToken(
+    req.params.token,
+    requestContext
+  );
+  sendPdf(res, pdf);
+});
+
 module.exports = {
   getMyAgreement,
   getPatientAgreement,
@@ -107,4 +140,8 @@ module.exports = {
   signAgreementPhase,
   downloadAgreementPhasePdf,
   downloadAgreementAggregatePdf,
+  generateSignToken,
+  getSignData,
+  submitSignature,
+  downloadPdfByToken,
 };

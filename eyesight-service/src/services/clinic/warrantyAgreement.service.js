@@ -1,10 +1,14 @@
+const jwt = require('jsonwebtoken');
 const httpStatus = require('http-status');
 const { Op } = require('sequelize');
 const ApiError = require('../../utils/ApiError');
 const warrantyConfig = require('../../config/warranty');
+const config = require('../../config/config');
 const { validateSignaturePayload, buildSignatureRecord } = require('../../utils/signatureValidation');
 const auditLogService = require('../system/auditLog.service');
 const treatmentPackageService = require('../exercise/treatmentPackage.service');
+
+const WARRANTY_SIGN_TOKEN_TYPE = 'warranty_sign';
 const {
   WarrantyAgreement,
   WarrantyAgreementPhase,
@@ -508,6 +512,207 @@ const downloadAggregatePdf = async (agreementId, user, requestContext) => {
   };
 };
 
+const generateSignToken = async (agreementId, phaseId, user) => {
+  const { agreement, phases } = await loadAgreementWithPhases(agreementId);
+  const patient = await loadPatientOrThrow(agreement.patientId);
+  assertStaffPatientAccess(user, patient);
+
+  const phase = phases.find((p) => p.id === Number(phaseId));
+  if (!phase) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Giai đoạn không tồn tại');
+  }
+  const ALLOWED_FOR_TOKEN = [
+    PHASE_STATUSES.AWAITING_GUARDIAN,
+    PHASE_STATUSES.AWAITING_DOCTOR,
+    PHASE_STATUSES.COMPLETED,
+  ];
+  if (!ALLOWED_FOR_TOKEN.includes(phase.status)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Không thể tạo link cho giai đoạn ở trạng thái này');
+  }
+
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(Date.now() + SEVEN_DAYS_MS).toISOString();
+
+  const token = jwt.sign(
+    { phaseId: phase.id, agreementId: agreement.id, type: WARRANTY_SIGN_TOKEN_TYPE },
+    config.jwt.secret,
+    { expiresIn: '7d' }
+  );
+
+  return { token, expiresAt };
+};
+
+const verifySignToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret);
+    if (decoded.type !== WARRANTY_SIGN_TOKEN_TYPE) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'Link ký không hợp lệ');
+    }
+    return decoded;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error.name === 'TokenExpiredError') {
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'Link ký đã hết hạn (7 ngày)');
+    }
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Link ký không hợp lệ');
+  }
+};
+
+const getPhaseBySignToken = async (token) => {
+  const decoded = verifySignToken(token);
+  const { agreement, phases } = await loadAgreementWithPhases(decoded.agreementId);
+  const phase = phases.find((p) => p.id === decoded.phaseId);
+  if (!phase) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Giai đoạn không tồn tại');
+  }
+
+  let signRole = null;
+  if (phase.status === PHASE_STATUSES.AWAITING_GUARDIAN) {
+    signRole = 'guardian';
+  } else if (phase.status === PHASE_STATUSES.AWAITING_DOCTOR) {
+    signRole = 'doctor';
+  }
+
+  return {
+    signRole,
+    patientName: agreement.patientSnapshot?.name || '',
+    packageName: agreement.packageSnapshot?.name || '',
+    policyVersion: agreement.policyVersion,
+    phase: sanitizePhaseForResponse(phase),
+    createdAt: agreement.createdAt,
+  };
+};
+
+const signPhaseByToken = async (token, payload, requestContext = {}) => {
+  const decoded = verifySignToken(token);
+  const { agreement, phases } = await loadAgreementWithPhases(decoded.agreementId);
+  const phase = phases.find((p) => p.id === decoded.phaseId);
+  if (!phase) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Giai đoạn không tồn tại');
+  }
+  if (
+    phase.status !== PHASE_STATUSES.AWAITING_GUARDIAN &&
+    phase.status !== PHASE_STATUSES.AWAITING_DOCTOR
+  ) {
+    throw new ApiError(httpStatus.CONFLICT, 'Giai đoạn này đã được ký hoặc không còn chờ ký nữa');
+  }
+
+  let validated;
+  try {
+    validated = validateSignaturePayload(payload);
+  } catch (error) {
+    throw new ApiError(httpStatus.BAD_REQUEST, error.message);
+  }
+
+  if (phase.status === PHASE_STATUSES.AWAITING_GUARDIAN) {
+    await phase.update({
+      guardianSignature: buildSignatureRecord(validated, null, requestContext),
+      status: PHASE_STATUSES.AWAITING_DOCTOR,
+    });
+
+    await logWarrantyAudit({
+      user: null,
+      action: 'warrantyAgreement.phase.sign',
+      entityId: agreement.id,
+      centerId: agreement.centerId,
+      metadata: {
+        patientId: agreement.patientId,
+        phaseId: phase.id,
+        signerRole: 'guardian',
+        source: 'public_link',
+      },
+      requestContext,
+    });
+  } else if (phase.status === PHASE_STATUSES.AWAITING_DOCTOR) {
+    const doctorSignature = buildSignatureRecord(validated, null, requestContext);
+    const completedAt = new Date();
+    const phaseJson = {
+      ...phase.toJSON(),
+      doctorSignature,
+      completedAt: completedAt.toISOString(),
+    };
+    const documentHash = computeDocumentHash(buildDocumentSnapshot(phaseJson, agreement));
+
+    await phase.update({
+      doctorSignature,
+      documentHash,
+      status: PHASE_STATUSES.COMPLETED,
+      completedAt,
+    });
+
+    await logWarrantyAudit({
+      user: null,
+      action: 'warrantyAgreement.phase.sign',
+      entityId: agreement.id,
+      centerId: agreement.centerId,
+      metadata: {
+        patientId: agreement.patientId,
+        phaseId: phase.id,
+        signerRole: 'doctor',
+        source: 'public_link',
+      },
+      requestContext,
+    });
+
+    await logWarrantyAudit({
+      user: null,
+      action: 'warrantyAgreement.phase.complete',
+      entityId: agreement.id,
+      centerId: agreement.centerId,
+      metadata: {
+        patientId: agreement.patientId,
+        phaseId: phase.id,
+        phaseType: phase.phaseType,
+        documentHash,
+        source: 'public_link',
+      },
+      requestContext,
+    });
+  } else {
+    throw new ApiError(httpStatus.CONFLICT, 'Giai đoạn này đã được ký hoặc không còn chờ ký nữa');
+  }
+
+  const refreshedPhases = await WarrantyAgreementPhase.findAll({
+    where: { agreementId: agreement.id },
+    order: [['phaseNumber', 'ASC'], ['id', 'ASC']],
+  });
+  await syncAgreementStatus(agreement, refreshedPhases);
+  const refreshedAgreement = await WarrantyAgreement.findByPk(agreement.id);
+
+  return sanitizeAgreementForResponse(refreshedAgreement, refreshedPhases);
+};
+
+const downloadPhasePdfBySignToken = async (token, requestContext = {}) => {
+  const decoded = verifySignToken(token);
+  const { agreement, phases } = await loadAgreementWithPhases(decoded.agreementId);
+  const phase = phases.find((p) => p.id === decoded.phaseId);
+  if (!phase) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Giai đoạn không tồn tại');
+  }
+
+  const buffer = await renderPdfBuffer({ agreement, phases, singlePhase: phase });
+
+  await logWarrantyAudit({
+    user: null,
+    action: 'warrantyAgreement.download',
+    entityId: agreement.id,
+    centerId: agreement.centerId,
+    metadata: {
+      patientId: agreement.patientId,
+      phaseId: phase.id,
+      scope: 'phase',
+      source: 'public_link',
+    },
+    requestContext,
+  });
+
+  const patientCode = agreement.patientSnapshot?.code || agreement.patientId;
+  return {
+    buffer,
+    filename: `warranty-${patientCode}-phase-${phase.phaseNumber}.pdf`,
+  };
+};
+
 module.exports = {
   sanitizePhaseForResponse,
   sanitizeAgreementForResponse,
@@ -518,4 +723,8 @@ module.exports = {
   signPhase,
   downloadPhasePdf,
   downloadAggregatePdf,
+  generateSignToken,
+  getPhaseBySignToken,
+  signPhaseByToken,
+  downloadPhasePdfBySignToken,
 };

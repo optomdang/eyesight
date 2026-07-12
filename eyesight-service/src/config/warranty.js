@@ -26,6 +26,8 @@ module.exports = {
     'Tầng 5, Tòa nhà ABC, Quận 1, TP. Hồ Chí Minh, Việt Nam',
   taxCode: process.env.WARRANTY_TAX_CODE || '',
   representativeName: process.env.WARRANTY_REPRESENTATIVE_NAME || 'Đại diện pháp luật D-VisUp',
+  representativeHonorific: process.env.WARRANTY_REPRESENTATIVE_HONORIFIC || '',
+  representativeCCCD: process.env.WARRANTY_REPRESENTATIVE_CCCD || '',
   representativeTitle: process.env.WARRANTY_REPRESENTATIVE_TITLE || 'Giám đốc',
   supportEmail: process.env.WARRANTY_SUPPORT_EMAIL || 'support@d-visup.com',
   supportZalo: process.env.WARRANTY_SUPPORT_ZALO || '',

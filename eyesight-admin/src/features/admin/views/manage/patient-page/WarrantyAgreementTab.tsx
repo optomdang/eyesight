@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Grid,
+  IconButton,
+  InputAdornment,
+  OutlinedInput,
   Typography,
   Alert,
   Chip,
@@ -10,9 +16,14 @@ import {
   Divider,
   Paper,
   TextField,
+  Tooltip,
 } from '@mui/material';
 import { LabelWithHelp } from 'src/components/shared/HelpTooltip';
 import AddIcon from '@mui/icons-material/Add';
+import LinkIcon from '@mui/icons-material/Link';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CloseIcon from '@mui/icons-material/Close';
+import { QRCodeSVG } from 'qrcode.react';
 import useSnackbar from 'src/contexts/UseSnackbar';
 import { SNACKBAR_SEVERITY } from 'src/utils/constant';
 import { useConfirm } from 'src/hooks/useConfirm';
@@ -24,6 +35,7 @@ import {
   createWarrantyPhase,
   updateWarrantyPhaseClinicalData,
   signWarrantyPhase,
+  generateWarrantySignToken,
 } from 'src/services/warranty.service';
 import {
   buildClinicalDataFromPatient,
@@ -37,6 +49,7 @@ import PdfDownloadButton from 'src/components/warranty/PdfDownloadButton';
 import ClinicalDataForm from 'src/components/warranty/ClinicalDataForm';
 import DoctorSignForm from 'src/components/warranty/DoctorSignForm';
 import useAuth from 'src/contexts/authGuard/useAuth';
+import { getErrorMessage } from 'src/utils/errorHandler';
 
 export interface WarrantyAgreementTabProps {
   patient: PatientWithCompliance;
@@ -54,6 +67,9 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
   const [clinicalDraft, setClinicalDraft] = useState<WarrantyClinicalData | null>(null);
   const [clinicalDirty, setClinicalDirty] = useState(false);
   const [reexamOverrideDraft, setReexamOverrideDraft] = useState('');
+  const [signLinkDialogOpen, setSignLinkDialogOpen] = useState(false);
+  const [signLink, setSignLink] = useState('');
+  const [signLinkRole, setSignLinkRole] = useState<'guardian' | 'doctor'>('guardian');
 
   const patientId = patient.id ?? 0;
 
@@ -65,11 +81,12 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
       setAgreement(data);
       if (data?.phases?.length) {
         const pending =
+          data.phases.find((p) => p.status === 'awaiting_guardian' || p.status === 'draft') ||
           data.phases.find((p) => p.status === 'awaiting_doctor') ||
           data.phases.find((p) => p.status !== 'completed') ||
           data.phases[data.phases.length - 1];
         setSelectedPhase(pending);
-        setClinicalDraft(pending.clinicalData);
+        setClinicalDraft(pending.clinicalData ?? {});
       } else {
         setSelectedPhase(null);
         setClinicalDraft(null);
@@ -89,18 +106,21 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
 
   useEffect(() => {
     if (selectedPhase) {
-      setClinicalDraft(selectedPhase.clinicalData);
+      setClinicalDraft(selectedPhase.clinicalData ?? {});
       setClinicalDirty(false);
     }
   }, [selectedPhase]);
 
   const isPhaseImmutable = selectedPhase?.status === 'completed';
   const canDoctorSign = selectedPhase?.status === 'awaiting_doctor';
-  const canEditClinical =
-    selectedPhase && !isPhaseImmutable && selectedPhase.status !== 'awaiting_guardian';
+  // Doctor enters clinical data BEFORE sending link to guardian (awaiting_guardian / draft)
+  // After guardian signs (awaiting_doctor), data is locked — backend also enforces this
+  const canEditClinical = Boolean(
+    selectedPhase && !['completed', 'awaiting_doctor'].includes(selectedPhase.status)
+  );
 
   const reexamEarly = useMemo(
-    () => (agreement ? isReexamWithinSixMonths(agreement.phases) : false),
+    () => (agreement ? isReexamWithinSixMonths(agreement.phases ?? []) : false),
     [agreement]
   );
 
@@ -123,17 +143,52 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
       showSnackbar('Đã tạo cam kết bảo hành.', SNACKBAR_SEVERITY.SUCCESS);
     } catch (error) {
       console.error('Create agreement failed:', error);
-      showSnackbar('Không tạo được cam kết bảo hành.', SNACKBAR_SEVERITY.ERROR);
+      showSnackbar(getErrorMessage(error, 'Không tạo được cam kết bảo hành.'), SNACKBAR_SEVERITY.ERROR);
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handlePullFromPatientTests = () => {
+    const fromPatient = buildClinicalDataFromPatient(patient);
+    setClinicalDraft((prev) => ({
+      ...(prev || {}),
+      examResults: fromPatient.examResults,
+      compliance: fromPatient.compliance,
+    }));
+    setClinicalDirty(true);
+    showSnackbar('Đã lấy kết quả test từ hồ sơ bệnh nhân.', SNACKBAR_SEVERITY.SUCCESS);
+  };
+
+  const handleGenerateSignLink = async (role: 'guardian' | 'doctor' = 'guardian') => {
+    if (!agreement || !selectedPhase) return;
+    setActionLoading(true);
+    try {
+      const { token } = await generateWarrantySignToken(agreement.id, selectedPhase.id);
+      const appBase = window.location.origin;
+      const link = `${appBase}/sign/warranty/${token}`;
+      setSignLink(link);
+      setSignLinkRole(role);
+      setSignLinkDialogOpen(true);
+    } catch (error) {
+      console.error('Generate sign token failed:', error);
+      showSnackbar('Không tạo được link ký. Vui lòng thử lại.', SNACKBAR_SEVERITY.ERROR);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(signLink).then(() => {
+      showSnackbar('Đã sao chép link ký!', SNACKBAR_SEVERITY.SUCCESS);
+    });
   };
 
   const handleCreatePhase = async (phaseType: WarrantyPhaseType) => {
     if (!agreement) return;
 
     const clinicalData = buildClinicalDataFromPatient(patient);
-    const needsOverride = phaseType === 'reexam' && isReexamWithinSixMonths(agreement.phases);
+    const needsOverride = phaseType === 'reexam' && isReexamWithinSixMonths(agreement.phases ?? []);
 
     if (needsOverride) {
       const reason = reexamOverrideDraft.trim();
@@ -229,8 +284,9 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
     }
   };
 
-  const hasInitial = agreement?.phases.some((p) => p.phaseType === 'initial');
-  const hasFinal = agreement?.phases.some((p) => p.phaseType === 'final');
+  const phases = agreement?.phases ?? [];
+  const hasInitial = phases.some((p) => p.phaseType === 'initial');
+  const hasFinal = phases.some((p) => p.phaseType === 'final');
 
   if (!patient.id) {
     return (
@@ -288,7 +344,7 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
               agreementId={agreement.id}
               filename={`warranty-${patient.code}-full.pdf`}
               label="Tải PDF đầy đủ"
-              disabled={agreement.phases.every((p) => p.status !== 'completed')}
+              disabled={phases.every((p) => p.status !== 'completed')}
             />
           )}
         </Stack>
@@ -309,7 +365,7 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                 Tiến trình các giai đoạn
               </Typography>
               <PhaseTimeline
-                phases={agreement.phases}
+                phases={phases}
                 selectedPhaseId={selectedPhase?.id}
                 onSelectPhase={setSelectedPhase}
               />
@@ -380,9 +436,32 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                   )}
                 </Box>
 
-                {selectedPhase.status === 'awaiting_guardian' && (
+                {canEditClinical && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Đang chờ phụ huynh/người giám hộ ký trên cổng bệnh nhân.
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      Bước 1: Nhập kết quả khám (cột Ban đầu) và nhận xét bác sĩ bên dưới → Lưu
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      Bước 2: Tạo link ký → Gửi cho phụ huynh (phụ huynh sẽ thấy nhận xét của bác
+                      sĩ trên link)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Nếu bệnh nhân đã test trên cổng: dùng &quot;Lấy từ kết quả test&quot; để điền
+                      nhanh, rồi chỉnh lại theo khám thực tế nếu cần. Xem thêm tab Phác đồ điều
+                      trị.
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="info"
+                        startIcon={<LinkIcon />}
+                        onClick={() => handleGenerateSignLink('guardian')}
+                        disabled={actionLoading}
+                      >
+                        Tạo link ký cho phụ huynh
+                      </Button>
+                    </Box>
                   </Alert>
                 )}
 
@@ -393,21 +472,48 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                       setClinicalDraft(data);
                       setClinicalDirty(true);
                     }}
-                    readOnly={!canEditClinical}
+                    readOnlyExamResults={!canEditClinical}
+                    readOnlyDoctorRemarks={!canEditClinical}
                     showReexamOverride={selectedPhase.phaseType === 'reexam' && reexamEarly}
                   />
                 )}
 
-                {canEditClinical && clinicalDirty && (
-                  <Box sx={{ mt: 2 }}>
+                {canEditClinical && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
                     <Button
                       variant="outlined"
-                      onClick={handleSaveClinical}
+                      onClick={handlePullFromPatientTests}
                       disabled={actionLoading}
+                    >
+                      Lấy từ kết quả test
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveClinical}
+                      disabled={actionLoading || !clinicalDirty}
                     >
                       Lưu dữ liệu lâm sàng
                     </Button>
-                  </Box>
+                  </Stack>
+                )}
+
+                {selectedPhase.status === 'awaiting_doctor' && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    Phụ huynh đã ký — dữ liệu lâm sàng đã được khóa. Vui lòng kiểm tra và ký xác
+                    nhận bên dưới, hoặc mở link ký trên điện thoại để ký cảm ứng.
+                    <Box sx={{ mt: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<LinkIcon />}
+                        onClick={() => handleGenerateSignLink('doctor')}
+                        disabled={actionLoading}
+                      >
+                        Mở link ký trên điện thoại
+                      </Button>
+                    </Box>
+                  </Alert>
                 )}
 
                 {isPhaseImmutable && (
@@ -449,6 +555,72 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
           <PolicyViewer compact />
         </Box>
       )}
+
+      {/* Sign Link Dialog */}
+      <Dialog
+        open={signLinkDialogOpen}
+        onClose={() => setSignLinkDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {signLinkRole === 'doctor' ? 'Link ký bác sĩ (điện thoại)' : 'Link ký cho phụ huynh'}
+          <IconButton size="small" onClick={() => setSignLinkDialogOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {signLinkRole === 'doctor' ? (
+              <>
+                Mở link trên điện thoại hoặc quét QR để bác sĩ ký xác nhận bằng cảm ứng. Link có
+                hiệu lực trong <strong>7 ngày</strong>.
+              </>
+            ) : (
+              <>
+                Gửi link hoặc cho bệnh nhân quét QR code bằng điện thoại để ký cam kết. Link có hiệu
+                lực trong <strong>7 ngày</strong>. Sau khi phụ huynh ký, cùng link vẫn dùng được
+                để bác sĩ ký tiếp.
+              </>
+            )}
+          </Typography>
+
+          {signLink && (
+            <>
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <QRCodeSVG value={signLink} size={200} />
+              </Box>
+
+              <OutlinedInput
+                fullWidth
+                size="small"
+                value={signLink}
+                readOnly
+                sx={{ mb: 1, fontSize: '0.75rem', fontFamily: 'monospace' }}
+                endAdornment={
+                  <InputAdornment position="end">
+                    <Tooltip title="Sao chép link">
+                      <IconButton size="small" onClick={handleCopyLink}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                }
+              />
+
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<ContentCopyIcon />}
+                onClick={handleCopyLink}
+                sx={{ mt: 1 }}
+              >
+                Sao chép link ký
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

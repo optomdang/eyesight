@@ -4,6 +4,16 @@
 
 export const WARRANTY_POLICY_VERSION = '2026-07-11';
 
+export const WARRANTY_POLICY_TAGLINE =
+  'KHÔNG HIỆU QUẢ KHÔNG MẤT TIỀN — áp dụng có điều kiện cho gói Ultra và Ultimate.';
+
+export const WARRANTY_REFUND_CRITERIA = [
+  'D-VisUp sẽ hoàn tiền 100% nếu không có bất kỳ bài kiểm tra nào (nhìn xa, nhìn gần, tương phản, thị giác lập thể) cải thiện từ 2 dòng/mức thị lực trở lên.',
+  'Nghĩa là nếu đồng thời cả 4 tiêu chí không cải thiện mức nào hay chỉ cải thiện 1 dòng/mức => Hoàn tiền.',
+  'Ví dụ: Ban đầu (20/100) → Kết thúc (20/80): Không hiệu quả → Hoàn tiền',
+  'Ban đầu (20/100) → Kết thúc (20/63): Hiệu quả',
+];
+
 export const WARRANTY_POLICY_SECTIONS = [
   {
     title: 'Bảo hành kỹ thuật',
@@ -18,10 +28,10 @@ export const WARRANTY_POLICY_SECTIONS = [
     title: 'Cam kết hoàn tiền (Ultra / Ultimate)',
     items: [
       'Hoàn thành đủ thời gian 365 ngày kể từ ngày kích hoạt tài khoản.',
-      'Tuân thủ tối thiểu 90% tổng số buổi tập được Bác sĩ/Chuyên gia giao trên hệ thống.',
+      'Tuân thủ tối thiểu 90% tổng khối lượng/buổi tập được Bác sĩ/Chuyên gia giao trên hệ thống.',
       'Có Bác sĩ/Chuyên gia theo dõi và xác nhận phác đồ, tuân thủ và kết quả.',
       'Tái khám tối thiểu 6 tháng/lần; có đánh giá ban đầu, tái khám khoảng tháng thứ 6 và khi kết thúc gói.',
-      'Bác sĩ/Chuyên gia xác nhận không có cải thiện có ý nghĩa ở các chỉ số thị giác được theo dõi.',
+      'Bác sĩ/Chuyên gia xác nhận không có bài kiểm tra nào trong 4 tiêu chí (nhìn xa, nhìn gần, tương phản, lập thể) cải thiện từ 2 dòng/mức trở lên (ví dụ: 20/100 → 20/80: hoàn tiền; 20/100 → 20/63: có hiệu quả).',
     ],
   },
   {

@@ -12,7 +12,9 @@ import {
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import {
   WARRANTY_POLICY_SECTIONS,
+  WARRANTY_POLICY_TAGLINE,
   WARRANTY_POLICY_VERSION,
+  WARRANTY_REFUND_CRITERIA,
   E_SIGN_DISCLAIMER,
 } from 'src/content/warrantyPolicy';
 
@@ -33,9 +35,15 @@ const PolicyViewer: React.FC<PolicyViewerProps> = ({
       <Chip label={`Phiên bản ${policyVersion}`} size="small" variant="outlined" />
     </Box>
 
-    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-      KHÔNG HIỆU QUẢ KHÔNG MẤT TIỀN — áp dụng có điều kiện cho gói Ultra và Ultimate.
+    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+      {WARRANTY_POLICY_TAGLINE}
     </Typography>
+    {WARRANTY_REFUND_CRITERIA.map((line) => (
+      <Typography key={line} variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+        {line}
+      </Typography>
+    ))}
+    <Box sx={{ mb: 2 }} />
 
     {WARRANTY_POLICY_SECTIONS.map((section) => (
       <Box key={section.title} sx={{ mb: 2 }}>
