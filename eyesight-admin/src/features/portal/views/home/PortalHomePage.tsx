@@ -23,6 +23,7 @@ import ScoreTrendChart from './components/ScoreTrendChart';
 import TodaySessionsList from './components/TodaySessionsList';
 import StreakAndAchievements from './components/StreakAndAchievements';
 import TreatmentProgressCharts from './components/TreatmentProgressCharts';
+import WarrantyPendingBanner from './components/WarrantyPendingBanner';
 // Reuse the admin leaderboard component as-is (BU: dùng lại y hệt)
 import TopPerformersLeaderboard from 'src/features/admin/dashboard/exercise/TopPerformersLeaderboard';
 import type { AssignmentStats, ExerciseResult, PatientInfo, ScoreTrendData } from 'src/types/core';
@@ -228,6 +229,8 @@ const PortalHomePage: React.FC = () => {
             {getMotivationalMessage(streak, stats?.summary.averageScore || 0)}
           </Typography>
         </Box>
+
+        <WarrantyPendingBanner />
 
         {/* Stats Overview */}
         <LoadingBoundary loading={loading} height="400px">

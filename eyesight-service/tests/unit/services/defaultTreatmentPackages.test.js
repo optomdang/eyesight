@@ -13,6 +13,14 @@ describe('defaultTreatmentPackages', () => {
     expect(DEFAULT_TREATMENT_PACKAGES[3].exerciseModeNames).toHaveLength(15);
   });
 
+  test('Ultra and Ultimate include refund guarantee flag', () => {
+    const { DEFAULT_TREATMENT_PACKAGES } = require('../../../src/config/defaultTreatmentPackages');
+    expect(DEFAULT_TREATMENT_PACKAGES[0].includesRefundGuarantee).toBe(false);
+    expect(DEFAULT_TREATMENT_PACKAGES[1].includesRefundGuarantee).toBe(false);
+    expect(DEFAULT_TREATMENT_PACKAGES[2].includesRefundGuarantee).toBe(true);
+    expect(DEFAULT_TREATMENT_PACKAGES[3].includesRefundGuarantee).toBe(true);
+  });
+
   test('exports backfill helpers', () => {
     expect(typeof ensureDefaultTreatmentPackages).toBe('function');
     expect(typeof backfillDefaultTreatmentPackagesForAllCenters).toBe('function');

@@ -1,4 +1,12 @@
-import { IconEye, IconActivity, IconUser, IconHome, IconAdjustments, IconVolume } from '@tabler/icons-react';
+import {
+  IconEye,
+  IconActivity,
+  IconUser,
+  IconHome,
+  IconAdjustments,
+  IconVolume,
+  IconFileCertificate,
+} from '@tabler/icons-react';
 
 // Simple ID generator to replace lodash uniqueId
 let idCounter = 0;
@@ -50,6 +58,12 @@ const PortalMenuItems: LegacyMenuitemsType[] = [
     title: 'Lịch sử',
     icon: IconUser,
     href: '/portal/history',
+  },
+  {
+    id: uniqueId(),
+    title: 'Cam kết bảo hành',
+    icon: IconFileCertificate,
+    href: '/portal/warranty',
   },
   {
     navlabel: true,

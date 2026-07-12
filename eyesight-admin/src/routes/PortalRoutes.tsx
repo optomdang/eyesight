@@ -41,6 +41,9 @@ const PatientProfilePage = Loadable(
   lazy(() => import('src/features/portal/views/profile/PatientProfilePage'))
 );
 const InactivePage = Loadable(lazy(() => import('src/features/portal/views/InactivePage')));
+const PortalWarrantyPage = Loadable(
+  lazy(() => import('src/features/portal/views/warranty/WarrantyPage'))
+);
 const ScreenCalibrationPage = Loadable(
   lazy(() => import('src/features/portal/views/settings/ScreenCalibrationPage'))
 );
@@ -95,6 +98,23 @@ const PortalRoutes = {
           <InactivePage />
         </PatientGuard>
       ),
+    },
+    // Warranty e-sign (PatientGuard only — active + completed patients can sign)
+    {
+      path: 'warranty',
+      element: (
+        <PatientGuard>
+          <CenterProvider>
+            <FullLayout />
+          </CenterProvider>
+        </PatientGuard>
+      ),
+      children: [
+        {
+          path: '',
+          element: <PortalWarrantyPage />,
+        },
+      ],
     },
     // Routes with full layout (sidebar, header) - Protected by PortalGuard
     {

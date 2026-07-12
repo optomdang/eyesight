@@ -212,6 +212,22 @@ export type {
 } from './vtQuest';
 export { DEFAULT_VT_SETTINGS } from './vtQuest';
 
+// Warranty E-Sign Types
+export type {
+  WarrantyAgreementStatus,
+  WarrantyPhaseType,
+  WarrantyPhaseStatus,
+  WarrantySignatureRecord,
+  WarrantyExamTypeClinical,
+  WarrantyComplianceClinical,
+  WarrantyClinicalData,
+  WarrantyPhase,
+  WarrantyAgreement,
+  CreateWarrantyPhasePayload,
+  UpdateWarrantyClinicalDataPayload,
+  SignWarrantyPhasePayload,
+} from './warranty';
+
 // Common/Utility Types
 export type {
   Severity,

@@ -5,6 +5,7 @@ module.exports.roleValidation = require('./authentication/role.validation');
 
 // Clinic validations
 module.exports.patientValidation = require('./clinic/patient.validation');
+module.exports.warrantyAgreementValidation = require('./clinic/warrantyAgreement.validation');
 module.exports.doctorValidation = require('./clinic/doctor.validation');
 module.exports.examAssignmentValidation = require('./clinic/examAssignment.validation');
 

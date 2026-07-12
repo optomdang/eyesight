@@ -17,6 +17,8 @@ const ExerciseAssignment = require('./exercise/exerciseAssignment.model');
 const ExerciseSession = require('./exercise/exerciseSession.model');
 const TreatmentPackage = require('./exercise/treatmentPackage.model');
 const PatientTreatmentPackage = require('./exercise/patientTreatmentPackage.model');
+const WarrantyAgreement = require('./clinic/warrantyAgreement.model');
+const WarrantyAgreementPhase = require('./clinic/warrantyAgreementPhase.model');
 const Notification = require('./common/notification.model');
 const NotificationTemplate = require('./system/notificationTemplate.model');
 const AuditLog = require('./system/auditLog.model');
@@ -62,6 +64,7 @@ Patient.hasMany(ExamResult, { foreignKey: 'patientId', constraints: false });
 Patient.hasMany(ExamAssignment, { foreignKey: 'patientId', constraints: false });
 Patient.hasMany(ExerciseAssignment, { foreignKey: 'patientId', as: 'exerciseAssignments', constraints: false });
 Patient.hasMany(PatientTreatmentPackage, { foreignKey: 'patientId', as: 'treatmentPackageAssignments', constraints: false });
+Patient.hasMany(WarrantyAgreement, { foreignKey: 'patientId', as: 'warrantyAgreements', constraints: false });
 
 TreatmentPackage.belongsTo(Center, { foreignKey: 'centerId', as: 'center', constraints: false });
 TreatmentPackage.hasMany(PatientTreatmentPackage, { foreignKey: 'treatmentPackageId', as: 'patientAssignments', constraints: false });
@@ -75,6 +78,15 @@ Doctor.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: false })
 Doctor.belongsTo(Center, { foreignKey: 'centerId', as: 'center', constraints: false });
 Doctor.belongsTo(Clinic, { foreignKey: 'clinicId', as: 'clinic', constraints: false });
 Doctor.hasMany(Patient, { foreignKey: 'doctorId', as: 'patients', constraints: false });
+Doctor.hasMany(WarrantyAgreement, { foreignKey: 'doctorId', as: 'warrantyAgreements', constraints: false });
+
+// Warranty agreement associations
+WarrantyAgreement.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient', constraints: false });
+WarrantyAgreement.belongsTo(Doctor, { foreignKey: 'doctorId', as: 'doctor', constraints: false });
+WarrantyAgreement.belongsTo(Center, { foreignKey: 'centerId', as: 'center', constraints: false });
+WarrantyAgreement.hasMany(WarrantyAgreementPhase, { foreignKey: 'agreementId', as: 'phases', constraints: false });
+
+WarrantyAgreementPhase.belongsTo(WarrantyAgreement, { foreignKey: 'agreementId', as: 'agreement', constraints: false });
 
 // ExamSession associations - MATCHING Exercise pattern
 ExamSession.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient', constraints: false });
@@ -195,6 +207,8 @@ module.exports = {
   ExerciseSession,
   TreatmentPackage,
   PatientTreatmentPackage,
+  WarrantyAgreement,
+  WarrantyAgreementPhase,
   Notification,
   NotificationTemplate,
   AuditLog,

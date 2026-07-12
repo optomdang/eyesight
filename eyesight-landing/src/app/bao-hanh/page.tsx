@@ -210,6 +210,24 @@ export default function WarrantyPage() {
           </ol>
         </section>
 
+        <section className="rounded-2xl border border-brand-purple/20 bg-brand-purple/5 p-6 md:p-8">
+          <h2 className="text-xl font-bold text-gray-900">Hồ sơ cam kết và ký điện tử</h2>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            Người bệnh hoặc người đại diện và Bác sĩ/Chuyên gia xác nhận thỏa thuận ban đầu,
+            từng biên bản tái khám và biên bản kết thúc điều trị trên ứng dụng D-VisUp. Hệ
+            thống lưu nội dung đã ký, thời điểm ký và nhật ký xác thực để bảo đảm khả năng
+            đối chiếu. Chữ ký vẽ trên hệ thống là chữ ký điện tử thông thường, không phải chữ
+            ký số hoặc chữ ký điện tử chuyên dùng bảo đảm an toàn.
+          </p>
+          <LinkButton
+            href={`${site.appUrl}/portal/warranty`}
+            variant="secondary"
+            className="mt-5"
+          >
+            Mở hồ sơ cam kết của tôi
+          </LinkButton>
+        </section>
+
         <section className="rounded-2xl bg-gray-50 p-6 md:p-8">
           <h2 className="text-xl font-bold text-gray-900">Lưu ý chuyên môn</h2>
           <p className="mt-3 text-sm leading-6 text-gray-600">

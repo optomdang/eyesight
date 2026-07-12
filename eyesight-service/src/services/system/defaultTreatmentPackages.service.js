@@ -99,6 +99,7 @@ const ensureDefaultTreatmentPackages = async (centerId, actorUserId = null, tran
         durationDays: def.durationDays,
         exerciseConfigIds,
         packageType: 'system',
+        includesRefundGuarantee: Boolean(def.includesRefundGuarantee),
         createdBy: actorUserId,
         updatedBy: actorUserId,
       },

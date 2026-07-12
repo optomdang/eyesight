@@ -155,4 +155,31 @@ async function deleteData<TResponse, TBody = unknown>(
   });
 }
 
-export { getData, getDataTable, postData, putData, patchData, deleteData };
+/** GET binary response (e.g. PDF download) */
+async function getBlob(url: string): Promise<Blob> {
+  const accessToken = localStorage.getItem('accessToken');
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+
+  try {
+    const response = await axiosClient({
+      url,
+      method: 'GET',
+      responseType: 'blob',
+      headers,
+    });
+    return response.data as Blob;
+  } catch (error) {
+    if (!axios.isAxiosError(error)) {
+      throw new Error('An unexpected error occurred');
+    }
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = `${BASE_NAME}/auth/login`;
+      throw new Error('Authentication required');
+    }
+    throw error;
+  }
+}
+
+export { getData, getDataTable, postData, putData, patchData, deleteData, getBlob };

@@ -20,6 +20,7 @@ const auditLogRoute = require('./system/auditLog.route');
 const doctorRoute = require('./clinic/doctor.route');
 const patientRoute = require('./clinic/patient.route');
 const examAssignmentRoute = require('./clinic/examAssignment.route');
+const warrantyAgreementRoute = require('./clinic/warrantyAgreement.route');
 
 // Exam routes
 const examSessionRoute = require('./exam/examSession.route');
@@ -77,6 +78,7 @@ const clinicRoutes = [
   { path: '/doctors', route: doctorRoute },
   { path: '/patients', route: patientRoute },
   { path: '/exam-assignments', route: examAssignmentRoute },
+  { path: '/warranty-agreements', route: warrantyAgreementRoute },
 ];
 
 // Exam domain routes

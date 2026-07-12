@@ -10,6 +10,7 @@ module.exports.levelAdjustmentController = require('./exercise/levelAdjustment.c
 // Clinic controllers
 module.exports.examAssignmentController = require('./clinic/examAssignment.controller');
 module.exports.patientController = require('./clinic/patient.controller');
+module.exports.warrantyAgreementController = require('./clinic/warrantyAgreement.controller');
 module.exports.doctorController = require('./clinic/doctor.controller');
 
 // Exam controllers

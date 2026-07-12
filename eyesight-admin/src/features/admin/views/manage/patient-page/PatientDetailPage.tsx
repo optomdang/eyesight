@@ -16,6 +16,7 @@ import ExamAssignmentForm from './forms/ExamConfigForm.tsx';
 import TreatmentPlanTab from './TreatmentPlanTab';
 import PatientExerciseDetail from './PatientExerciseDetail.tsx';
 import MedicalRecordTab from './MedicalRecordTab';
+import WarrantyAgreementTab from './WarrantyAgreementTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -168,6 +169,7 @@ const PatientDetailPage: React.FC = () => {
               <Tab label={t('admin.tabs.treatmentPlan', 'THEO DÕI ĐIỀU TRỊ')} />
               <Tab label={t('admin.tabs.exerciseConfig', 'CẤU HÌNH BÀI TẬP')} />
               <Tab label={t('admin.tabs.examConfig', 'CẤU HÌNH BÀI KIỂM TRA')} />
+              <Tab label={t('admin.tabs.warranty', 'CAM KẾT BẢO HÀNH')} />
             </Tabs>
           </Box>
 
@@ -212,6 +214,11 @@ const PatientDetailPage: React.FC = () => {
           {/* Tab 4: CẤU HÌNH BÀI KIỂM TRA */}
           <TabPanel value={tabValue} index={4}>
             {patient && <ExamAssignmentForm patient={patient} onSuccess={handleConfigSuccess} />}
+          </TabPanel>
+
+          {/* Tab 5: CAM KẾT BẢO HÀNH */}
+          <TabPanel value={tabValue} index={5}>
+            {patient && <WarrantyAgreementTab patient={patient} />}
           </TabPanel>
         </>
       </LoadingBoundary>

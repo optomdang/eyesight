@@ -32,6 +32,11 @@ TreatmentPackage.init(
       allowNull: false,
       defaultValue: 'custom',
     },
+    includesRefundGuarantee: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     deleted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     createdBy: { type: DataTypes.INTEGER, allowNull: true },
     updatedBy: { type: DataTypes.INTEGER, allowNull: true },
