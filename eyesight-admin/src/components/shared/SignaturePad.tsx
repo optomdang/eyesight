@@ -19,17 +19,21 @@ export interface SignaturePadProps {
   onChange?: (isEmpty: boolean) => void;
 }
 
-function getPoint(
-  canvas: HTMLCanvasElement,
-  clientX: number,
-  clientY: number
-): { x: number; y: number } {
+// Returns coordinates in the canvas context's CSS-pixel space.
+// resizeCanvas applies ctx.setTransform(dpr, 0, 0, dpr, 0, 0) so the context
+// already maps 1 CSS px → dpr backing-store pixels.
+// We must NOT multiply by (canvas.width / rect.width) here because that would
+// double-apply the DPR and shift strokes by a factor of dpr² on retina/mobile.
+// Returns coordinates in the canvas context's CSS-pixel space.
+// resizeCanvas applies ctx.setTransform(dpr, 0, 0, dpr, 0, 0) so the context
+// already maps 1 CSS px → dpr backing-store pixels.
+// We must NOT multiply by (canvas.width / rect.width) here because that would
+// double-apply the DPR and shift strokes by a factor of dpr² on retina/mobile.
+function getPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
   return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY,
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   };
 }
 
