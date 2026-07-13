@@ -55,13 +55,15 @@ const ActiveSessionsPage: React.FC = () => {
   const columns: MUIDataTableColumnDef[] = [
     createNestedColumn('exerciseConfig.exercise.name', 'Bài tập'),
     {
-      name: 'exerciseConfig.eye',
+      name: 'trainingEye',
       label: 'Mắt',
       options: {
         filter: true,
         sort: false,
-        customBodyRender: (value: string) => {
-          switch (value) {
+        customBodyRender: (_: any, tableMeta: any) => {
+          const assignment = dataRes?.rows?.[tableMeta.rowIndex] as PortalExerciseAssignment;
+          const eye = assignment?.trainingEye || assignment?.exerciseConfig?.eye;
+          switch (eye) {
             case 'left':
               return 'Trái';
             case 'right':
@@ -69,7 +71,7 @@ const ActiveSessionsPage: React.FC = () => {
             case 'both':
               return 'Cả hai';
             default:
-              return value || 'Cả hai';
+              return eye || 'Cả hai';
           }
         },
       },

@@ -346,7 +346,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
           const exercise = availableExercises.find((ex) => ex.id === data.exerciseId);
           const configPayload = normalizeExerciseConfigPayload({
             name: `${exercise?.name ?? template.name} — ${patient.code}`,
-            eye: template.eye,
+            eye: data.eye ?? template.eye,
             distance: template.distance,
             duration: data.duration,
             frequency: template.frequency,

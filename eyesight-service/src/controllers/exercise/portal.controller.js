@@ -35,11 +35,17 @@ const getMyAssignments = catchAsync(async (req, res) => {
   }
 
   // Apply treatment package filter at query level so pagination count is accurate.
+  // Expand allowed IDs to include doctor/patient clones (configReferentId → template),
+  // otherwise customized configs would silently disappear from the patient's list.
   const activePackage = await treatmentPackageService.getActivePatientPackage(patient.id);
-  const packageFilter =
-    activePackage && activePackage.allowedConfigIds?.length
-      ? { exerciseConfigId: activePackage.allowedConfigIds.map(Number) }
-      : {};
+  let packageFilter = {};
+  if (activePackage && activePackage.allowedConfigIds?.length) {
+    const allowedConfigIds = await treatmentPackageService.expandAllowedConfigIds(
+      activePackage.allowedConfigIds,
+      { centerId: patient.centerId }
+    );
+    packageFilter = { exerciseConfigId: allowedConfigIds };
+  }
 
   const filter = {
     patientId: patient.id,

@@ -7,13 +7,17 @@ interface ExerciseInfoProps {
   exerciseConfig: any;
   gameStarted: boolean;
   onStartGame: () => void;
+  /** Per-patient eye override from the assignment; falls back to config eye. */
+  trainingEye?: string | null;
 }
 
 const ExerciseInfo: React.FC<ExerciseInfoProps> = ({
   exerciseConfig,
   gameStarted,
   onStartGame,
+  trainingEye = null,
 }) => {
+  const eye = trainingEye || exerciseConfig?.eye;
   return (
     <Box>
       {/* Chế độ luyện tập hiện tại - Simple Layout */}
@@ -52,11 +56,11 @@ const ExerciseInfo: React.FC<ExerciseInfoProps> = ({
                 Mắt luyện tập
               </Typography>
               <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                {exerciseConfig.eye === 'right'
+                {eye === 'right'
                   ? 'Mắt phải'
-                  : exerciseConfig.eye === 'left'
+                  : eye === 'left'
                     ? 'Mắt trái'
-                    : exerciseConfig.eye === 'both'
+                    : eye === 'both'
                       ? 'Cả hai mắt'
                       : 'Không xác định'}
               </Typography>

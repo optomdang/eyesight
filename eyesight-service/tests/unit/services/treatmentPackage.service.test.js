@@ -7,6 +7,7 @@ jest.mock('../../../src/models', () => ({
   ExerciseAssignment: {},
   ExerciseConfig: {
     findByPk: jest.fn(),
+    findAll: jest.fn(),
   },
 }));
 
@@ -19,6 +20,7 @@ const {
   isExerciseConfigAccessibleForPatient,
   isConfigAllowedByPackage,
   resolveConfigReferentChain,
+  expandAllowedConfigIds,
 } = require('../../../src/services/exercise/treatmentPackage.service');
 const { PatientTreatmentPackage, ExerciseConfig } = require('../../../src/models');
 
@@ -59,6 +61,39 @@ describe('treatmentPackage.service — config referent chain', () => {
         .mockResolvedValueOnce({ id: 100, configReferentId: null });
 
       await expect(isConfigAllowedByPackage(200, [101, 102])).resolves.toBe(false);
+    });
+  });
+
+  describe('expandAllowedConfigIds', () => {
+    test('includes doctor clones that reference an allowed template', async () => {
+      // Templates 100, 101 → clone 200 references 100; deeper clone 300 references 200.
+      ExerciseConfig.findAll
+        .mockResolvedValueOnce([{ id: 200 }]) // children of [100, 101]
+        .mockResolvedValueOnce([{ id: 300 }]) // children of [200]
+        .mockResolvedValueOnce([]); // children of [300]
+
+      const result = await expandAllowedConfigIds([100, 101], { centerId: 7 });
+
+      expect(result.sort((a, b) => a - b)).toEqual([100, 101, 200, 300]);
+      expect(ExerciseConfig.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            configReferentId: { [Op.in]: [100, 101] },
+            centerId: 7,
+          }),
+        })
+      );
+    });
+
+    test('returns empty when no allowed ids', async () => {
+      await expect(expandAllowedConfigIds([])).resolves.toEqual([]);
+      expect(ExerciseConfig.findAll).not.toHaveBeenCalled();
+    });
+
+    test('returns only templates when there are no clones', async () => {
+      ExerciseConfig.findAll.mockResolvedValueOnce([]);
+
+      await expect(expandAllowedConfigIds([100, 101])).resolves.toEqual([100, 101]);
     });
   });
 

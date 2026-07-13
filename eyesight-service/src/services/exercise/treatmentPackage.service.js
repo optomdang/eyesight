@@ -158,7 +158,7 @@ const removeOutOfPackageAssignmentsForPatient = async ({
   actorUserId,
   transaction = null,
 }) => {
-  const allowed = new Set(normalizeConfigIds(allowedConfigIds));
+  const allowed = new Set(await expandAllowedConfigIds(allowedConfigIds, { centerId }, transaction));
   if (!allowed.size) return 0;
 
   const assignments = await ExerciseAssignment.findAll({
@@ -460,6 +460,43 @@ const isConfigAllowedByPackage = async (exerciseConfigId, allowedConfigIds, tran
   return chain.some((id) => allowed.has(id));
 };
 
+/**
+ * Expand a package's allowed config IDs to include every derived config (doctor/
+ * patient clone) whose configReferentId chain resolves back to an allowed template.
+ *
+ * Portal listing and package cleanup must both use this so a doctor-customized config
+ * (new id, not in the catalog list) stays visible/assignable exactly like the template
+ * it was cloned from — matching isConfigAllowedByPackage's referent-chain semantics.
+ */
+const expandAllowedConfigIds = async (allowedConfigIds, { centerId } = {}, transaction = null) => {
+  const allowed = new Set(normalizeConfigIds(allowedConfigIds));
+  if (!allowed.size) return [];
+
+  const result = new Set(allowed);
+  let frontier = [...allowed];
+
+  for (let depth = 0; depth < 10 && frontier.length; depth += 1) {
+    const where = { configReferentId: { [Op.in]: frontier } };
+    if (centerId) where.centerId = centerId;
+    // eslint-disable-next-line no-await-in-loop
+    const children = await ExerciseConfig.findAll({
+      where,
+      attributes: ['id'],
+      transaction,
+    });
+    frontier = [];
+    children.forEach((row) => {
+      const id = Number(row.id);
+      if (!result.has(id)) {
+        result.add(id);
+        frontier.push(id);
+      }
+    });
+  }
+
+  return [...result];
+};
+
 const isExerciseConfigAccessibleForPatient = async (patientId, exerciseConfigId) => {
   await expireStaleAssignments(patientId);
   const active = await getActivePatientPackage(patientId);
@@ -494,6 +531,7 @@ module.exports = {
   getActivePatientPackage,
   isExerciseConfigAccessibleForPatient,
   isConfigAllowedByPackage,
+  expandAllowedConfigIds,
   resolveConfigReferentChain,
   filterAssignmentsByTreatmentPackage,
   normalizeConfigIds,
