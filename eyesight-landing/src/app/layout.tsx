@@ -17,7 +17,7 @@ const beVietnam = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: `${site.name} — ${site.tagline}`,
+    default: site.pageTitle,
     template: `%s | ${site.name}`,
   },
   description: site.description,
@@ -34,13 +34,13 @@ export const metadata: Metadata = {
     locale: 'vi_VN',
     url: site.url,
     siteName: site.name,
-    title: `${site.name} — ${site.tagline}`,
+    title: site.pageTitle,
     description: site.description,
-    images: [{ url: '/images/og-image.svg', width: 1200, height: 630, alt: site.name }],
+    images: [{ url: '/images/og-image.svg', width: 1200, height: 630, alt: site.pageTitle }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${site.name} — ${site.tagline}`,
+    title: site.pageTitle,
     description: site.description,
     images: ['/images/og-image.svg'],
   },

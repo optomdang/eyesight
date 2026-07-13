@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { usePermission } from 'src/hooks/usePermission';
+import useAuth from 'src/contexts/authGuard/useAuth';
 import {
   DEFAULT_ADMIN_SETTINGS_TAB,
   isAdminSettingsTab,
@@ -13,6 +14,7 @@ export interface AdminSettingsTabDef {
 
 export function useAdminSettingsVisibleTabs(): AdminSettingsTabDef[] {
   const { hasPermission } = usePermission();
+  const { user } = useAuth();
 
   return useMemo<AdminSettingsTabDef[]>(() => {
     const tabs: AdminSettingsTabDef[] = [
@@ -26,7 +28,7 @@ export function useAdminSettingsVisibleTabs(): AdminSettingsTabDef[] {
       tabs.push({ id: 'treatment-packages', label: 'Gói điều trị' });
     }
     return tabs;
-  }, [hasPermission]);
+  }, [user?.id, user?.userType, user?.roleId]);
 }
 
 export function resolveAdminSettingsTab(

@@ -75,6 +75,50 @@ const filterConfigsByPackage = (configs: ExerciseConfig[], allowedIds: number[] 
   return configs.filter((config) => config.id != null && allowedIds.includes(config.id));
 };
 
+const TEMPLATE_OVERRIDE_FIELDS = new Set([
+  'duration',
+  'distance',
+  'frequency',
+  'executionCount',
+  'inactivityThreshold',
+  'visionType',
+  'colorScheme',
+  'notificationSettings',
+  'vtSettings',
+]);
+
+const templateConfigDiffersFromForm = (
+  data: PatientAssignmentFormData,
+  template: ExerciseConfig | null
+): boolean => {
+  if (!template) return false;
+
+  if (Number(data.duration) !== Number(template.duration)) return true;
+  if (Number(data.distance) !== Number(template.distance)) return true;
+  if (data.frequency !== template.frequency) return true;
+  if (Number(data.executionCount) !== Number(template.executionCount)) return true;
+  if (Number(data.inactivityThreshold ?? 30) !== Number(template.inactivityThreshold ?? 30)) return true;
+  if ((data.visionType || 'far') !== (template.visionType || 'far')) return true;
+
+  if (JSON.stringify(data.colorScheme ?? null) !== JSON.stringify(template.colorScheme ?? null)) {
+    return true;
+  }
+  if (
+    JSON.stringify(data.notificationSettings ?? null) !==
+    JSON.stringify(template.notificationSettings ?? null)
+  ) {
+    return true;
+  }
+
+  const formVt = (data as { vtSettings?: Partial<VtSettings> }).vtSettings;
+  const templateVt = (template as { vtSettings?: Partial<VtSettings> }).vtSettings;
+  if (JSON.stringify(formVt ?? null) !== JSON.stringify(templateVt ?? null)) {
+    return true;
+  }
+
+  return false;
+};
+
 interface PatientAssignmentModalProps {
   open: boolean;
   onClose: () => void;
@@ -163,6 +207,36 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
     });
   };
 
+  const ensureCustomConfigName = () => {
+    if (values.name?.trim()) return;
+    const exercise = availableExercises.find((ex) => ex.id === values.exerciseId);
+    setFormValue('name', exercise ? `${exercise.name} — ${patient.code}` : patient.code);
+  };
+
+  const enableCustomConfigFromTemplate = () => {
+    if (values.createCustomConfig) return;
+    setFormValue('createCustomConfig', true);
+    const referentId =
+      values.configReferentId ?? values.exerciseConfigId ?? selectedConfig?.id ?? null;
+    if (referentId) {
+      setFormValue('configReferentId', referentId);
+    }
+    ensureCustomConfigName();
+  };
+
+  const handleConfigFieldChange = (field: string, value: unknown) => {
+    setFormValue(field, value);
+
+    if (isDoctor || !TEMPLATE_OVERRIDE_FIELDS.has(field) || !selectedConfig) {
+      return;
+    }
+
+    const nextValues = { ...values, [field]: value } as PatientAssignmentFormData;
+    if (templateConfigDiffersFromForm(nextValues, selectedConfig)) {
+      enableCustomConfigFromTemplate();
+    }
+  };
+
   // Get vision level options based on visionType
   const getVisionOptions = () => {
     if (!values.visionType) return [];
@@ -204,21 +278,34 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
       setLoading(true);
       const levelOverrideEnabled = data.levelOverride === true;
       const effectiveVisionLevel = levelOverrideEnabled ? (data.visionLevel ?? null) : null;
+      const needsCustomConfig =
+        data.createCustomConfig ||
+        (selectedConfig != null && templateConfigDiffersFromForm(data, selectedConfig));
 
-      if (data.createCustomConfig) {
-        if (isDoctor) {
-          showSnackbar(
-            t('admin.adminOnlyAction', 'Chỉ quản trị viên mới có quyền thực hiện'),
-            SNACKBAR_SEVERITY.WARNING
-          );
-          return;
-        }
+      if (needsCustomConfig && isDoctor) {
+        showSnackbar(
+          t(
+            'assignment.customConfigRequired',
+            'Thay đổi thời lượng/cấu hình cần tạo cấu hình tùy chỉnh — chỉ quản trị viên có quyền này'
+          ),
+          SNACKBAR_SEVERITY.WARNING
+        );
+        return;
+      }
+
+      if (needsCustomConfig) {
         const referentId =
-          data.configReferentId ?? data.exerciseConfigId ?? availableConfigs[0]?.id ?? null;
+          data.configReferentId ?? data.exerciseConfigId ?? selectedConfig?.id ?? availableConfigs[0]?.id ?? null;
         const exerciseType =
           availableExercises.find((ex) => ex.id === data.exerciseId)?.exerciseType ?? null;
+        const configName =
+          data.name?.trim() ||
+          (() => {
+            const exercise = availableExercises.find((ex) => ex.id === data.exerciseId);
+            return exercise ? `${exercise.name} — ${patient.code}` : patient.code;
+          })();
         const configPayload = normalizeExerciseConfigPayload({
-          name: data.name,
+          name: configName,
           eye: data.eye,
           distance: data.distance,
           duration: data.duration,
@@ -602,6 +689,11 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                     }
                     label={t('config.createCustomConfig', 'Tạo cấu hình tùy chỉnh')}
                   />
+                  {!values.createCustomConfig && values.exerciseConfigId ? (
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                      Đổi thời lượng hoặc cấu hình khác so với mẫu sẽ tự bật tùy chỉnh khi bạn sửa.
+                    </Typography>
+                  ) : null}
                 </Box>
               </Box>
             )}
@@ -643,7 +735,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   errors={errors}
                   touched={touched}
                   isSubmitted={isSubmitted}
-                  onFieldChange={setFormValue}
+                  onFieldChange={handleConfigFieldChange}
                   exercises={availableExercises}
                   exerciseName={
                     availableExercises.find((ex) => ex.id === values.exerciseId)?.name ?? null
@@ -708,7 +800,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                     <NotificationSettingsFields
                       isReadOnly={false}
                       config={values}
-                      onFieldChange={setFormValue}
+                      onFieldChange={handleConfigFieldChange}
                     />
                   </Box>
                 )}
@@ -720,7 +812,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                       : (selectedConfig as { vtSettings?: Partial<VtSettings> } | null)?.vtSettings ??
                         (values as { vtSettings?: Partial<VtSettings> }).vtSettings
                   }
-                  onChange={(vt) => setFormValue('vtSettings', vt)}
+                  onChange={(vt) => handleConfigFieldChange('vtSettings', vt)}
                   readOnly={!values.createCustomConfig}
                 />
                 {/* Preview Button */}

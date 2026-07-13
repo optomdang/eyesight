@@ -3,6 +3,8 @@ export type Audience = 'clinic' | 'patient';
 export const site = {
   name: 'Nhuoc Thi',
   productName: 'D-VisUp',
+  /** Browser tab + link preview title (OG/Twitter) */
+  pageTitle: 'Phần mềm hỗ trợ cải thiện thị lực nhược thị',
   tagline: 'Nền tảng khám và điều trị thị lực thông minh',
   description:
     'Hệ thống hỗ trợ phòng khám nhãn khoa và bệnh nhân tập thị lực tại nhà — khám chính xác, bài tập lâm sàng, theo dõi tiến độ.',

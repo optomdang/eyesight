@@ -20,7 +20,13 @@ const LoadingFallback = () => (
 );
 
 // Error fallback for lazy components
-const LazyErrorFallback = ({ retry, error }: { retry: () => void; error?: Error }) => (
+const LazyErrorFallback = ({
+  retry,
+  error,
+}: {
+  retry: () => void;
+  error?: Error;
+}) => (
   <Box
     display="flex"
     flexDirection="column"
@@ -31,16 +37,51 @@ const LazyErrorFallback = ({ retry, error }: { retry: () => void; error?: Error 
     px={2}
   >
     <Typography variant="h6" color="error">
-      Failed to load component
+      Không tải được trang
     </Typography>
     <Typography variant="body2" color="text.secondary" textAlign="center">
-      There was an error loading this page. Please try again.
+      Có lỗi khi tải trang. Thử tải lại (Cmd+Shift+R) hoặc đăng nhập lại sau vài giây.
     </Typography>
-    {import.meta.env.DEV && error?.message && (
+    {error?.message && (
       <Typography variant="caption" color="error" textAlign="center" sx={{ maxWidth: 480 }}>
         {error.message}
       </Typography>
     )}
+    <Box display="flex" gap={1}>
+      <Typography
+        component="button"
+        variant="body2"
+        onClick={retry}
+        sx={{
+          cursor: 'pointer',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          px: 2,
+          py: 0.75,
+          bgcolor: 'background.paper',
+        }}
+      >
+        Thử lại
+      </Typography>
+      <Typography
+        component="button"
+        variant="body2"
+        onClick={() => window.location.reload()}
+        sx={{
+          cursor: 'pointer',
+          border: '1px solid',
+          borderColor: 'primary.main',
+          borderRadius: 1,
+          px: 2,
+          py: 0.75,
+          color: 'primary.main',
+          bgcolor: 'background.paper',
+        }}
+      >
+        Tải lại trang
+      </Typography>
+    </Box>
   </Box>
 );
 
