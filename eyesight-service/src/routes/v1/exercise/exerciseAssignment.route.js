@@ -8,6 +8,14 @@ const exerciseAssignmentController = require('../../../controllers/exercise/exer
 
 const router = express.Router();
 
+// Maintenance (admin/doctor) — sync session snapshots after config changes
+router.post(
+  '/maintenance/sync-sessions',
+  auth(allRights.manageExercises.code),
+  validate(exerciseAssignmentValidation.syncAssignmentSessions),
+  exerciseAssignmentController.syncAssignmentSessions
+);
+
 // Nested resource: Exercise config assignments
 router
   .route('/exercise-configs/:configId/assignments')

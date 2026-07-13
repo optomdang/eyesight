@@ -567,6 +567,32 @@ const getAssignmentById = async (assignmentId) => {
   return assignment;
 };
 
+/**
+ * Sync incomplete session snapshots for active assignments (maintenance).
+ */
+const syncAllActiveAssignmentSessions = async (filter = {}) => {
+  const where = { status: 'active' };
+  if (filter.centerId) where.centerId = filter.centerId;
+  if (filter.patientId) where.patientId = filter.patientId;
+  if (filter.assignmentId) where.id = filter.assignmentId;
+
+  const assignments = await ExerciseAssignment.findAll({
+    where,
+    attributes: ['id', 'patientId'],
+    order: [['id', 'ASC']],
+  });
+
+  let sessionsUpdated = 0;
+  // eslint-disable-next-line no-restricted-syntax
+  for (const assignment of assignments) {
+    // eslint-disable-next-line no-await-in-loop
+    const { updated } = await syncAssignmentSessionSnapshots(assignment.id);
+    sessionsUpdated += updated;
+  }
+
+  return { assignments: assignments.length, sessionsUpdated };
+};
+
 module.exports = {
   assignConfigToPatients,
   getConfigAssignments,
@@ -578,4 +604,5 @@ module.exports = {
   getAssignmentStats,
   getAssignmentById,
   calculateCompliancePercentage,
+  syncAllActiveAssignmentSessions,
 };

@@ -226,6 +226,13 @@ const getSessionProgress = {
   }),
 };
 
+const syncAssignmentSessions = {
+  query: Joi.object().keys({
+    patientId: Joi.number().integer().positive().optional(),
+    assignmentId: Joi.number().integer().positive().optional(),
+  }),
+};
+
 module.exports = {
   assignConfig,
   getConfigAssignments,
@@ -235,6 +242,7 @@ module.exports = {
   removeAssignment,
   recordSession,
   getAssignmentStats,
+  syncAssignmentSessions,
 
   // Portal validations
   getMyAssignments,

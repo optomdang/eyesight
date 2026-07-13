@@ -185,6 +185,30 @@ const getAssignmentStats = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * POST /exercise-assignments/maintenance/sync-sessions
+ * Align incomplete session snapshots + recalculate stats (admin/doctor).
+ */
+const syncAssignmentSessions = catchAsync(async (req, res) => {
+  const { user } = req;
+  const { patientId, assignmentId } = pick(req.query, ['patientId', 'assignmentId']);
+
+  const filter = { centerId: user.centerId };
+  if (patientId != null && patientId !== '') {
+    filter.patientId = Number(patientId);
+  }
+  if (assignmentId != null && assignmentId !== '') {
+    filter.assignmentId = Number(assignmentId);
+  }
+
+  const result = await exerciseAssignmentService.syncAllActiveAssignmentSessions(filter);
+
+  res.json({
+    message: 'Exercise session snapshots synced',
+    data: result,
+  });
+});
+
 module.exports = {
   assignConfigToPatients,
   getConfigAssignments,
@@ -194,4 +218,5 @@ module.exports = {
   removeAssignment,
   recordSession,
   getAssignmentStats,
+  syncAssignmentSessions,
 };
