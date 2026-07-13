@@ -740,7 +740,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   exerciseName={
                     availableExercises.find((ex) => ex.id === values.exerciseId)?.name ?? null
                   }
-                  lockTemplateFields={isDoctor}
+                  lockTemplateFields={false}
                 />
                 {/* Patient-specific Vision Level Override Section */}
                 <Box sx={{ mt: 3 }}>

@@ -292,7 +292,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                 ? errors.duration?.message || errors.duration
                 : ''
             }
-            disabled={templateLocked || readOnly}
+            disabled={readOnly}
             size="small"
             inputProps={{ min: 0.5, max: 180, step: 0.5 }}
           />
