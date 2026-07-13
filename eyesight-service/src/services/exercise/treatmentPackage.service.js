@@ -426,11 +426,45 @@ const expireStaleAssignments = async (patientId) => {
   );
 };
 
+/**
+ * Walk configReferentId chain (child clone → parent template).
+ * Patient-specific configs created from a package mode keep referentId pointing
+ * at the catalog template that is listed in exerciseConfigIds.
+ */
+const resolveConfigReferentChain = async (exerciseConfigId, transaction = null) => {
+  const chain = [];
+  let currentId = Number(exerciseConfigId);
+  const seen = new Set();
+
+  for (let depth = 0; depth < 10 && Number.isInteger(currentId) && currentId > 0 && !seen.has(currentId); depth += 1) {
+    seen.add(currentId);
+    chain.push(currentId);
+
+    // eslint-disable-next-line no-await-in-loop
+    const row = await ExerciseConfig.findByPk(currentId, {
+      attributes: ['id', 'configReferentId'],
+      transaction,
+    });
+    if (!row?.configReferentId) break;
+    currentId = Number(row.configReferentId);
+  }
+
+  return chain;
+};
+
+const isConfigAllowedByPackage = async (exerciseConfigId, allowedConfigIds, transaction = null) => {
+  const allowed = new Set(normalizeConfigIds(allowedConfigIds));
+  if (!allowed.size) return false;
+
+  const chain = await resolveConfigReferentChain(exerciseConfigId, transaction);
+  return chain.some((id) => allowed.has(id));
+};
+
 const isExerciseConfigAccessibleForPatient = async (patientId, exerciseConfigId) => {
   await expireStaleAssignments(patientId);
   const active = await getActivePatientPackage(patientId);
   if (!active) return true;
-  return active.allowedConfigIds.includes(Number(exerciseConfigId));
+  return isConfigAllowedByPackage(exerciseConfigId, active.allowedConfigIds);
 };
 
 const filterAssignmentsByTreatmentPackage = async (patientId, assignments) => {
@@ -438,10 +472,15 @@ const filterAssignmentsByTreatmentPackage = async (patientId, assignments) => {
   const active = await getActivePatientPackage(patientId);
   if (!active) return assignments;
 
-  return assignments.filter((assignment) => {
-    const configId = assignment.exerciseConfigId ?? assignment.exerciseConfig?.id;
-    return active.allowedConfigIds.includes(Number(configId));
-  });
+  const checks = await Promise.all(
+    assignments.map(async (assignment) => {
+      const configId = assignment.exerciseConfigId ?? assignment.exerciseConfig?.id;
+      const allowed = await isConfigAllowedByPackage(configId, active.allowedConfigIds);
+      return { assignment, allowed };
+    })
+  );
+
+  return checks.filter(({ allowed }) => allowed).map(({ assignment }) => assignment);
 };
 
 module.exports = {
@@ -454,6 +493,8 @@ module.exports = {
   assignPackageToPatient,
   getActivePatientPackage,
   isExerciseConfigAccessibleForPatient,
+  isConfigAllowedByPackage,
+  resolveConfigReferentChain,
   filterAssignmentsByTreatmentPackage,
   normalizeConfigIds,
   canUserMutateTreatmentPackage,
