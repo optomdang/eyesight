@@ -119,6 +119,23 @@ const templateConfigDiffersFromForm = (
   return false;
 };
 
+/** Doctor may override duration, sessions, and notifications vs the selected template. */
+const doctorDerivableFieldsDiffer = (
+  data: PatientAssignmentFormData,
+  template: ExerciseConfig | null
+): boolean => {
+  if (!template) return false;
+  if (Number(data.duration) !== Number(template.duration)) return true;
+  if (Number(data.executionCount) !== Number(template.executionCount)) return true;
+  if (
+    JSON.stringify(data.notificationSettings ?? null) !==
+    JSON.stringify(template.notificationSettings ?? null)
+  ) {
+    return true;
+  }
+  return false;
+};
+
 interface PatientAssignmentModalProps {
   open: boolean;
   onClose: () => void;
@@ -279,17 +296,104 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
       const levelOverrideEnabled = data.levelOverride === true;
       const effectiveVisionLevel = levelOverrideEnabled ? (data.visionLevel ?? null) : null;
       const needsCustomConfig =
-        data.createCustomConfig ||
-        (selectedConfig != null && templateConfigDiffersFromForm(data, selectedConfig));
+        !isDoctor &&
+        (data.createCustomConfig ||
+          (selectedConfig != null && templateConfigDiffersFromForm(data, selectedConfig)));
 
-      if (needsCustomConfig && isDoctor) {
+      const assignmentFields = {
+        notes: data.notes,
+        visionLevel: effectiveVisionLevel,
+        levelOverride: levelOverrideEnabled,
+        trainingEye: data.eye,
+      };
+
+      if (isDoctor) {
+        const template = selectedConfig;
+        if (!template || !data.exerciseId) {
+          showSnackbar(t('patient.assignment.error'), SNACKBAR_SEVERITY.ERROR);
+          return;
+        }
+
+        const exerciseType =
+          availableExercises.find((ex) => ex.id === data.exerciseId)?.exerciseType ?? null;
+
+        if (template.configType === 'doctor' && template.id) {
+          await exerciseService.updateExerciseConfigById(template.id, {
+            duration: data.duration,
+            executionCount: data.executionCount,
+            notificationSettings: data.notificationSettings,
+          } as Parameters<typeof exerciseService.updateExerciseConfigById>[1]);
+
+          if (isEditMode) {
+            await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
+              id: Number(assignmentId),
+              ...assignmentFields,
+            });
+          } else {
+            await assignmentService.assignConfigToPatients(template.id, {
+              patientIds: [patient.id],
+              ...assignmentFields,
+            });
+          }
+        } else if (doctorDerivableFieldsDiffer(data, template)) {
+          const exercise = availableExercises.find((ex) => ex.id === data.exerciseId);
+          const configPayload = normalizeExerciseConfigPayload({
+            name: `${exercise?.name ?? template.name} — ${patient.code}`,
+            eye: template.eye,
+            distance: template.distance,
+            duration: data.duration,
+            frequency: template.frequency,
+            executionCount: data.executionCount,
+            colorScheme: template.colorScheme,
+            configType: 'doctor',
+            exerciseId: data.exerciseId,
+            configReferentId: template.id,
+            visionType: template.visionType,
+            inactivityThreshold: template.inactivityThreshold ?? 30,
+            notificationSettings: data.notificationSettings,
+            vtSettings: resolveVtSettingsForExerciseType(
+              exerciseType,
+              (template as { vtSettings?: Partial<VtSettings> }).vtSettings
+            ),
+          });
+
+          const newConfig = await exerciseService.createExerciseConfig(
+            data.exerciseId,
+            configPayload as Parameters<typeof exerciseService.createExerciseConfig>[1]
+          );
+
+          if (isEditMode) {
+            await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
+              id: Number(assignmentId),
+              exerciseConfigId: newConfig.id,
+              ...assignmentFields,
+            });
+          } else {
+            await assignmentService.assignConfigToPatients(newConfig.id, {
+              patientIds: [patient.id],
+              ...assignmentFields,
+            });
+          }
+        } else if (isEditMode) {
+          await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
+            id: Number(assignmentId),
+            ...assignmentFields,
+          });
+        } else {
+          await assignmentService.assignConfigToPatients(data.exerciseConfigId!, {
+            patientIds: [patient.id],
+            ...assignmentFields,
+          });
+        }
+
         showSnackbar(
-          t(
-            'assignment.customConfigRequired',
-            'Thay đổi thời lượng/cấu hình cần tạo cấu hình tùy chỉnh — chỉ quản trị viên có quyền này'
-          ),
-          SNACKBAR_SEVERITY.WARNING
+          isEditMode
+            ? t('assignment.updateSuccess', 'Cập nhật phân công thành công')
+            : t('patient.assignment.success', { count: 1 }),
+          SNACKBAR_SEVERITY.SUCCESS
         );
+        onAssign();
+        onClose();
         return;
       }
 
@@ -676,29 +780,40 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   disabled={false}
                 />
 
-                {/* Custom Config Toggle */}
-                <Box sx={{ mt: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={values.createCustomConfig}
-                        onChange={handleCustomConfigChange}
-                        color="primary"
-                        disabled={isDoctor}
-                      />
-                    }
-                    label={t('config.createCustomConfig', 'Tạo cấu hình tùy chỉnh')}
-                  />
-                  {!values.createCustomConfig && values.exerciseConfigId ? (
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                      Bật &quot;Tạo cấu hình tùy chỉnh&quot; để đổi thời lượng và các thông số mẫu.
-                    </Typography>
-                  ) : null}
-                </Box>
+                {/* Custom config — admin only */}
+                {!isDoctor && (
+                  <Box sx={{ mt: 2 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={values.createCustomConfig}
+                          onChange={handleCustomConfigChange}
+                          color="primary"
+                        />
+                      }
+                      label={t('config.createCustomConfig', 'Tạo cấu hình tùy chỉnh')}
+                    />
+                    {!values.createCustomConfig && values.exerciseConfigId ? (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                        sx={{ mt: 0.5 }}
+                      >
+                        Bật &quot;Tạo cấu hình tùy chỉnh&quot; để đổi các thông số mẫu nâng cao.
+                      </Typography>
+                    ) : null}
+                  </Box>
+                )}
+                {isDoctor && values.exerciseConfigId ? (
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                    Bác sĩ có thể chỉnh mắt tập, thời lượng, lần tập, mức bắt đầu và thông báo.
+                  </Typography>
+                ) : null}
               </Box>
             )}
 
-            {values.createCustomConfig && (
+            {!isDoctor && values.createCustomConfig && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>
                   {t('config.customizeSettings', 'Tùy chỉnh cấu hình')}
@@ -740,9 +855,9 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   exerciseName={
                     availableExercises.find((ex) => ex.id === values.exerciseId)?.name ?? null
                   }
-                  lockTemplateFields={
-                    !values.createCustomConfig && Boolean(values.exerciseConfigId)
-                  }
+                  lockTemplateFields={false}
+                  doctorLimitedEdit={isDoctor}
+                  isAdmin={!isDoctor}
                 />
                 {/* Patient-specific Vision Level Override Section */}
                 <Box sx={{ mt: 3 }}>
@@ -800,7 +915,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                       {t('exercise.notificationSettingsTab', 'Cấu hình thông báo')}
                     </Typography>
                     <NotificationSettingsFields
-                      isReadOnly={!values.createCustomConfig}
+                      isReadOnly={!isDoctor && !values.createCustomConfig}
                       config={values}
                       onFieldChange={handleConfigFieldChange}
                     />
@@ -815,7 +930,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                         (values as { vtSettings?: Partial<VtSettings> }).vtSettings
                   }
                   onChange={(vt) => handleConfigFieldChange('vtSettings', vt)}
-                  readOnly={!values.createCustomConfig}
+                  readOnly={isDoctor || !values.createCustomConfig}
                 />
                 {/* Preview Button */}
                 {values.exerciseId && (

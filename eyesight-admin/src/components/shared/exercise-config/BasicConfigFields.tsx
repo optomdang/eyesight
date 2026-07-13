@@ -57,8 +57,9 @@ interface BasicConfigFieldsProps {
   isSubmitted?: boolean;
   onFieldChange: (field: string, value: any) => void;
   readOnly?: boolean;
-  /** Doctor: lock template fields (vision, distance, frequency, inactivity, color preset). */
+  /** Doctor: lock template-structure fields; duration/sessions stay editable. */
   lockTemplateFields?: boolean;
+  doctorLimitedEdit?: boolean;
   /** Admin can calibrate anaglyph hex codes for presets (red-blue, red-green). */
   isAdmin?: boolean;
   exercises?: Array<{ id: number; name: string; code: string }>; // Available exercises
@@ -76,12 +77,15 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
   onFieldChange,
   readOnly = false,
   lockTemplateFields = false,
+  doctorLimitedEdit = false,
   isAdmin = false,
   exerciseName = null,
   exerciseType = null,
 }) => {
   const { t } = useTranslation();
-  const templateLocked = readOnly || lockTemplateFields;
+  const structureLocked = readOnly || lockTemplateFields || doctorLimitedEdit;
+  const durationLocked = readOnly || (lockTemplateFields && !doctorLimitedEdit);
+  const sessionsLocked = readOnly || (lockTemplateFields && !doctorLimitedEdit);
   const configSummary = useMemo(
     () =>
       buildExerciseConfigSummary({
@@ -209,7 +213,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
               label={t('config.visionType', 'Loại thị lực')}
               value={values.visionType || 'far'}
               onChange={(e: any) => handleVisionTypeChange(e.target.value)}
-              disabled={templateLocked}
+              disabled={structureLocked}
               size="small"
             >
               <MenuItem value="far">Thị lực xa (Far Vision)</MenuItem>
@@ -270,7 +274,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                 ? errors.distance?.message || errors.distance
                 : ''
             }
-            disabled={templateLocked}
+            disabled={structureLocked}
             size="small"
             inputProps={{ min: 0.1, max: 10, step: 0.1 }}
           />
@@ -292,7 +296,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                 ? errors.duration?.message || errors.duration
                 : ''
             }
-            disabled={templateLocked || readOnly}
+            disabled={durationLocked}
             size="small"
             inputProps={{ min: 0.5, max: 180, step: 0.5 }}
           />
@@ -305,7 +309,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
               value={values.frequency || 'daily'}
               onChange={(e: any) => onFieldChange('frequency', e.target.value)}
               error={shouldShowFieldError(errors.frequency, touched.frequency, isSubmitted)}
-              disabled={templateLocked}
+              disabled={structureLocked}
               label={t('config.frequency')}
             >
               <MenuItem value="daily">{t('config.frequencies.daily')}</MenuItem>
@@ -336,7 +340,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                 ? errors.executionCount?.message || errors.executionCount
                 : ''
             }
-            disabled={templateLocked || readOnly}
+            disabled={sessionsLocked}
             size="small"
             inputProps={{ min: 1, max: 10 }}
           />
@@ -364,7 +368,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                 ? errors.inactivityThreshold?.message || errors.inactivityThreshold
                 : ''
             }
-            disabled={templateLocked}
+            disabled={structureLocked}
             size="small"
             inputProps={{ min: 5, max: 300, step: 1 }}
           />
@@ -408,7 +412,7 @@ export const BasicConfigFields: React.FC<BasicConfigFieldsProps> = ({
                       );
                     }
                   }}
-                  disabled={templateLocked}
+                  disabled={structureLocked}
                   size="small"
                 >
                   <MenuItem value="original">{t('config.colorPresetOriginal', 'Nguyên bản')}</MenuItem>
