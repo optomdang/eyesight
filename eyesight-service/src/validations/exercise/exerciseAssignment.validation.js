@@ -8,7 +8,7 @@ const assignConfig = {
   }),
   body: Joi.object().keys({
     patientIds: Joi.array().items(standardId).required(),
-    notes: Joi.string().max(500).optional(),
+    notes: Joi.string().max(500).allow('').optional(),
     priority: standardEnums.priority.default('normal'),
     templateId: Joi.number().integer().allow(null).optional(),
     visionLevel: Joi.number().integer().min(1).max(20).optional().allow(null),

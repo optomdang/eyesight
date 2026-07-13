@@ -300,11 +300,18 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
         (data.createCustomConfig ||
           (selectedConfig != null && templateConfigDiffersFromForm(data, selectedConfig)));
 
-      const assignmentFields = {
-        notes: data.notes,
-        visionLevel: effectiveVisionLevel,
-        levelOverride: levelOverrideEnabled,
-        trainingEye: data.eye,
+      /** POST assign omits empty `notes`; PATCH allows clearing. */
+      const buildAssignmentFields = (forCreate: boolean) => {
+        const base = {
+          visionLevel: effectiveVisionLevel,
+          levelOverride: levelOverrideEnabled,
+          trainingEye: data.eye,
+        };
+        const trimmedNotes = data.notes?.trim() ?? '';
+        if (forCreate) {
+          return trimmedNotes ? { ...base, notes: trimmedNotes } : base;
+        }
+        return { ...base, notes: data.notes ?? '' };
       };
 
       if (isDoctor) {
@@ -327,12 +334,12 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
           if (isEditMode) {
             await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
               id: Number(assignmentId),
-              ...assignmentFields,
+              ...buildAssignmentFields(false),
             });
           } else {
             await assignmentService.assignConfigToPatients(template.id, {
               patientIds: [patient.id],
-              ...assignmentFields,
+              ...buildAssignmentFields(true),
             });
           }
         } else if (doctorDerivableFieldsDiffer(data, template)) {
@@ -366,23 +373,23 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
             await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
               id: Number(assignmentId),
               exerciseConfigId: newConfig.id,
-              ...assignmentFields,
+              ...buildAssignmentFields(false),
             });
           } else {
             await assignmentService.assignConfigToPatients(newConfig.id, {
               patientIds: [patient.id],
-              ...assignmentFields,
+              ...buildAssignmentFields(true),
             });
           }
         } else if (isEditMode) {
           await PatientService.updatePatientAssignment(patient.id, Number(assignmentId), {
             id: Number(assignmentId),
-            ...assignmentFields,
+            ...buildAssignmentFields(false),
           });
         } else {
           await assignmentService.assignConfigToPatients(data.exerciseConfigId!, {
             patientIds: [patient.id],
-            ...assignmentFields,
+            ...buildAssignmentFields(true),
           });
         }
 
@@ -807,7 +814,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                 )}
                 {isDoctor && values.exerciseConfigId ? (
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                    Bác sĩ có thể chỉnh mắt tập, thời lượng, lần tập, mức bắt đầu và thông báo.
+                    Bác sĩ có thể chỉnh mắt tập, thời lượng, lần tập, mức bắt đầu, thông báo và ghi chú.
                   </Typography>
                 ) : null}
               </Box>

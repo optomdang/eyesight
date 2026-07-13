@@ -374,7 +374,7 @@ const assignConfigToPatients = {
   }),
   body: Joi.object().keys({
     patientIds: Joi.array().items(Joi.number().integer()).min(1).required(),
-    notes: Joi.string().optional(),
+    notes: Joi.string().allow('').optional(),
     priority: Joi.string().valid('low', 'normal', 'high', 'urgent').optional(),
     templateId: Joi.number().integer().allow(null).optional(),
     // Patient-specific vision configuration overrides
