@@ -10,7 +10,7 @@ const { exerciseAssignmentService } = require('../../services');
  */
 const assignConfigToPatients = catchAsync(async (req, res) => {
   const { configId } = req.params;
-  const { patientIds, notes, visionLevel, levelOverride } = req.body;
+  const { patientIds, notes, visionLevel, levelOverride, trainingEye, priority } = req.body;
   const { user } = req;
 
   if (!Array.isArray(patientIds)) {
@@ -20,8 +20,10 @@ const assignConfigToPatients = catchAsync(async (req, res) => {
   const assignmentData = {
     assignedBy: user.id,
     notes: notes || '',
+    priority: priority || 'normal',
     visionLevel: visionLevel || null,
     levelOverride: levelOverride || false,
+    trainingEye: trainingEye || null,
   };
 
   const assignments = await exerciseAssignmentService.assignConfigToPatients(

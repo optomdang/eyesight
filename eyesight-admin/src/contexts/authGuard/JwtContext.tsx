@@ -6,6 +6,17 @@ import { axiosClient, getData, postData } from 'src/utils/request';
 import { deleteFCMToken } from 'src/utils/firebase';
 import useSnackbar from '../UseSnackbar';
 
+const formatLoginError = (err: unknown): string => {
+  if (axios.isAxiosError(err)) {
+    if (err.code === 'ECONNABORTED' || /timeout/i.test(err.message)) {
+      return 'Máy chủ đang khởi động (có thể mất đến 1 phút). Vui lòng đợi vài giây rồi thử đăng nhập lại.';
+    }
+    const message = (err.response?.data as { message?: string })?.message;
+    return message || err.message || 'Đăng nhập thất bại';
+  }
+  return err instanceof Error ? err.message : 'Đăng nhập thất bại';
+};
+
 // Định nghĩa kiểu cho state
 export interface InitialStateType {
   isAuthenticated: boolean;
@@ -140,7 +151,7 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
       const response = await axiosClient.post(
         'auth/login',
         { email, password },
-        { timeout: 30000 },
+        { timeout: 90000 },
       );
       const { tokens, user } = response.data;
 
@@ -154,14 +165,7 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
       });
     } catch (err) {
       console.error('Login failed:', err);
-      if (axios.isAxiosError(err)) {
-        const message =
-          (err.response?.data as { message?: string })?.message ||
-          err.message ||
-          'Đăng nhập thất bại';
-        throw new Error(message);
-      }
-      throw err;
+      throw new Error(formatLoginError(err));
     }
   };
 

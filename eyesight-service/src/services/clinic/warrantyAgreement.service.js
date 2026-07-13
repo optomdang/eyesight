@@ -134,15 +134,22 @@ const getActiveRefundGuaranteePackage = async (patientId) => {
 };
 
 const renderPdfBuffer = async ({ agreement, phases, singlePhase = null }) => {
-  const { renderToBuffer } = await import('@react-pdf/renderer');
-  const fontFamily = await getWarrantyPdfFontFamily();
-  const element = await createWarrantyPdfDocument({
-    fontFamily,
-    agreement: agreement.toJSON ? agreement.toJSON() : agreement,
-    phases: phases.map((p) => (p.toJSON ? p.toJSON() : p)),
-    singlePhase: singlePhase ? (singlePhase.toJSON ? singlePhase.toJSON() : singlePhase) : null,
-  });
-  return renderToBuffer(element);
+  try {
+    const { renderToBuffer } = await import('@react-pdf/renderer');
+    const fontFamily = await getWarrantyPdfFontFamily();
+    const element = await createWarrantyPdfDocument({
+      fontFamily,
+      agreement: agreement.toJSON ? agreement.toJSON() : agreement,
+      phases: phases.map((p) => (p.toJSON ? p.toJSON() : p)),
+      singlePhase: singlePhase ? (singlePhase.toJSON ? singlePhase.toJSON() : singlePhase) : null,
+    });
+    return renderToBuffer(element);
+  } catch (err) {
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      `Không tạo được PDF cam kết bảo hành: ${err.message || 'lỗi không xác định'}`
+    );
+  }
 };
 
 const validatePhaseTypeCreation = (phaseType, phases, agreement) => {

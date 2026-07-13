@@ -3,14 +3,17 @@ const fs = require('fs');
 
 let cachedFontFamily = null;
 
-const resolveFontPath = (filename) =>
-  path.join(process.cwd(), 'node_modules', '@fontsource', 'noto-sans', 'files', filename);
+const resolveNotoFontPath = (filename) => {
+  const packageJsonPath = require.resolve('@fontsource/noto-sans/package.json');
+  return path.join(path.dirname(packageJsonPath), 'files', filename);
+};
 
 const findExistingFontPair = (pairs) =>
-  pairs.find(({ regular, bold }) => fs.existsSync(regular) && fs.existsSync(bold));
+  pairs.find(({ regular, bold }) => regular && bold && fs.existsSync(regular) && fs.existsSync(bold));
 
 /**
  * Register Arial when available, fallback to Noto Sans Vietnamese for safe PDF rendering.
+ * Uses require.resolve for Noto paths so font lookup works regardless of process.cwd().
  * @returns {Promise<string>} font family name
  */
 const getWarrantyPdfFontFamily = async () => {
@@ -50,11 +53,13 @@ const getWarrantyPdfFontFamily = async () => {
     return cachedFontFamily;
   }
 
-  const regularPath = resolveFontPath('noto-sans-vietnamese-400-normal.woff');
-  const boldPath = resolveFontPath('noto-sans-vietnamese-700-normal.woff');
+  const regularPath = resolveNotoFontPath('noto-sans-vietnamese-400-normal.woff');
+  const boldPath = resolveNotoFontPath('noto-sans-vietnamese-700-normal.woff');
 
   if (!fs.existsSync(regularPath) || !fs.existsSync(boldPath)) {
-    throw new Error('Noto Sans Vietnamese font files not found for warranty PDF');
+    throw new Error(
+      `Noto Sans Vietnamese font files not found for warranty PDF (regular=${regularPath}, bold=${boldPath})`
+    );
   }
 
   Font.register({
@@ -71,4 +76,5 @@ const getWarrantyPdfFontFamily = async () => {
 
 module.exports = {
   getWarrantyPdfFontFamily,
+  resolveNotoFontPath,
 };

@@ -1,13 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'src/hooks/useTranslation';
 import { Grid, Box, Typography } from '@mui/material';
 import PageContainer from 'src/components/container/PageContainer';
 import img1 from 'src/assets/images/backgrounds/login-bg.svg';
 import Logo from 'src/layouts/full/shared/logo/Logo';
 import AuthLogin from './authForms/AuthLogin';
+import { wakeApiServer } from 'src/utils/wakeApi';
 
 const Login = () => {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    wakeApiServer();
+  }, []);
   return (
     <PageContainer title={t('auth.loginTitle')} description={t('auth.loginDescription')}>
       <Grid container spacing={0} sx={{ overflowX: 'hidden' }}>

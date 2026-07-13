@@ -100,9 +100,19 @@ const PatientExerciseDetail: React.FC<PatientExerciseDetailProps> = ({ patient }
           customBodyRender: (value) => getConfigTypeChip(value, t),
         }
       ),
-      createNestedColumn('exerciseConfig.eye', t('assignment.eye', 'Mắt'), '-', {
-        customBodyRender: (value) => (value ? getEyeChip(value, t) : '-'),
-      }),
+      {
+        name: 'trainingEye',
+        label: t('assignment.eye', 'Mắt'),
+        options: {
+          filter: false,
+          sort: false,
+          customBodyRender: (value, tableMeta) => {
+            const row = dataRes?.rows?.[tableMeta.rowIndex] as ExerciseAssignment | undefined;
+            const eye = value || row?.exerciseConfig?.eye;
+            return eye ? getEyeChip(eye as string, t) : '-';
+          },
+        },
+      },
       createNestedColumn('exerciseConfig.duration', t('assignment.duration', 'Thời lượng'), '-', {
         customBodyRender: (value) =>
           value != null ? `${value} ${t('common.minutes', 'phút')}` : '-',
@@ -124,7 +134,7 @@ const PatientExerciseDetail: React.FC<PatientExerciseDetailProps> = ({ patient }
         },
       },
     ],
-    [t]
+    [t, dataRes?.rows]
   );
 
   // Memoized event handlers for better performance

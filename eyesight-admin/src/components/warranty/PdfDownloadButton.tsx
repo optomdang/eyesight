@@ -41,7 +41,11 @@ const PdfDownloadButton: React.FC<PdfDownloadButtonProps> = ({
       triggerBlobDownload(blob, filename);
     } catch (error) {
       console.error('PDF download failed:', error);
-      showSnackbar('Không tải được PDF. Vui lòng thử lại.', SNACKBAR_SEVERITY.ERROR);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Không tải được PDF. Vui lòng thử lại.';
+      showSnackbar(message, SNACKBAR_SEVERITY.ERROR);
     } finally {
       setLoading(false);
     }

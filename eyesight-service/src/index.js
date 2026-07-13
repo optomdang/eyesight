@@ -44,6 +44,14 @@ const syncSystemExerciseModes = async () => {
         `System treatment packages up to date for ${pkgResult.centers} center(s) (${pkgResult.skipped} skipped)`
       );
     }
+
+    try {
+      const { getWarrantyPdfFontFamily } = require('./templates/warranty/fonts');
+      const fontFamily = await getWarrantyPdfFontFamily();
+      logger.info(`Warranty PDF fonts ready (${fontFamily})`);
+    } catch (err) {
+      logger.error('Failed to preload warranty PDF fonts (non-fatal):', err);
+    }
   } catch (err) {
     logger.error('Failed to sync system catalog (non-fatal):', err);
   }

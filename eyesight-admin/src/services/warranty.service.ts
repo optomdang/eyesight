@@ -83,11 +83,13 @@ export const signWarrantyPhase = (
 
 /** GET /warranty-agreements/:agreementId/phases/:phaseId/download */
 export const downloadWarrantyPhasePdf = (agreementId: number, phaseId: number): Promise<Blob> =>
-  getBlob(`warranty-agreements/${agreementId}/phases/${phaseId}/download`);
+  getBlob(`warranty-agreements/${agreementId}/phases/${phaseId}/download`, {
+    timeoutMs: 60000,
+  });
 
 /** GET /warranty-agreements/:agreementId/download */
 export const downloadWarrantyAggregatePdf = (agreementId: number): Promise<Blob> =>
-  getBlob(`warranty-agreements/${agreementId}/download`);
+  getBlob(`warranty-agreements/${agreementId}/download`, { timeoutMs: 60000 });
 
 // ============================================================================
 // PORTAL (PATIENT / GUARDIAN)

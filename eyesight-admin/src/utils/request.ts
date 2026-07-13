@@ -13,6 +13,16 @@ export const axiosClient = axios.create({
 
 const BASE_NAME = import.meta.env.PUBLIC_URL || '';
 
+const readBlobErrorMessage = async (blob: Blob): Promise<string> => {
+  const text = await blob.text();
+  try {
+    const json = JSON.parse(text) as { message?: string };
+    return json.message || text || 'Không tải được tệp';
+  } catch {
+    return text || 'Không tải được tệp';
+  }
+};
+
 // Hàm refresh token
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = localStorage.getItem('refreshToken');
@@ -156,9 +166,10 @@ async function deleteData<TResponse, TBody = unknown>(
 }
 
 /** GET binary response (e.g. PDF download) */
-async function getBlob(url: string): Promise<Blob> {
+async function getBlob(url: string, options?: { timeoutMs?: number }): Promise<Blob> {
   const accessToken = localStorage.getItem('accessToken');
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const timeout = options?.timeoutMs ?? 10000;
 
   try {
     const response = await axiosClient({
@@ -166,17 +177,30 @@ async function getBlob(url: string): Promise<Blob> {
       method: 'GET',
       responseType: 'blob',
       headers,
+      timeout,
     });
+
+    const contentType = String(response.headers['content-type'] || '');
+    if (contentType.includes('application/json')) {
+      throw new Error(await readBlobErrorMessage(response.data as Blob));
+    }
+
     return response.data as Blob;
   } catch (error) {
     if (!axios.isAxiosError(error)) {
-      throw new Error('An unexpected error occurred');
+      throw error instanceof Error ? error : new Error('An unexpected error occurred');
     }
     if (error.response?.status === 401) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       window.location.href = `${BASE_NAME}/auth/login`;
       throw new Error('Authentication required');
+    }
+    if (error.response?.data instanceof Blob) {
+      throw new Error(await readBlobErrorMessage(error.response.data));
+    }
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('Hết thời gian chờ khi tải PDF. Vui lòng thử lại.');
     }
     throw error;
   }

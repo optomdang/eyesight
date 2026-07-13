@@ -90,13 +90,15 @@ describe('Warranty Service', () => {
     it('downloads phase PDF', async () => {
       vi.mocked(getBlob).mockResolvedValue(new Blob());
       await downloadWarrantyPhasePdf(1, 2);
-      expect(getBlob).toHaveBeenCalledWith('warranty-agreements/1/phases/2/download');
+      expect(getBlob).toHaveBeenCalledWith('warranty-agreements/1/phases/2/download', {
+        timeoutMs: 60000,
+      });
     });
 
     it('downloads aggregate PDF', async () => {
       vi.mocked(getBlob).mockResolvedValue(new Blob());
       await downloadWarrantyAggregatePdf(5);
-      expect(getBlob).toHaveBeenCalledWith('warranty-agreements/5/download');
+      expect(getBlob).toHaveBeenCalledWith('warranty-agreements/5/download', { timeoutMs: 60000 });
     });
   });
 });
