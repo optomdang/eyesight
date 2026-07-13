@@ -188,17 +188,32 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     }, thresholdMs);
   }, [assignmentId, sessionId, exerciseConfig]);
 
-  // Block navigation when exercise is active
+  const shouldBlockExerciseNavigation = useCallback(() => {
+    const currentSession = gameExecutionRef.current;
+    return (
+      Boolean(currentSession && !currentSession.completed) &&
+      !timeoutTriggeredRef.current &&
+      !showCompletionDialog
+    );
+  }, [showCompletionDialog]);
+
+  // Block navigation when exercise is active (not during timeout completion)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    return Boolean(isGameActive() && currentLocation.pathname !== nextLocation.pathname);
+    return Boolean(
+      shouldBlockExerciseNavigation() &&
+      currentLocation.pathname !== nextLocation.pathname
+    );
   });
 
   // Handle blocked navigation
   React.useEffect(() => {
-    if (blocker.state === 'blocked') {
-      setShowExitDialog(true);
+    if (blocker.state !== 'blocked') return;
+    if (!shouldBlockExerciseNavigation()) {
+      blocker.reset();
+      return;
     }
-  }, [blocker]);
+    setShowExitDialog(true);
+  }, [blocker.state, shouldBlockExerciseNavigation, blocker]);
 
   // Handle exit confirmation with auto-save (for navigation blocking)
   const handleExitConfirm = async () => {
@@ -363,7 +378,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     async (finalScore: number): Promise<boolean> => {
       const currentSession = gameExecutionRef.current;
 
-      if (!currentSession || !assignment || currentSession.completed || !currentResultId) {
+      const resultId = currentResultIdRef.current;
+      if (!currentSession || !assignment || currentSession.completed || !resultId) {
         return false;
       }
 
@@ -382,7 +398,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       }
 
       try {
-        await completeExercise(assignmentId, sessionId, currentResultId, {
+        await completeExercise(assignmentId, sessionId, resultId, {
           ...metrics,
         });
         return true;
@@ -395,7 +411,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         setCurrentResultId(null);
       }
     },
-    [assignmentId, sessionId, assignment, currentResultId, buildExecutionMetrics, showSnackbar]
+    [assignmentId, sessionId, assignment, buildExecutionMetrics, showSnackbar]
   );
 
   const handleTimeoutSubmission = useCallback(async () => {
@@ -405,11 +421,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       return;
     }
 
-    // Complete exercise and show dialog
-    const success = await completeExerciseResult(getFinalScore());
-    if (success) {
-      setShowCompletionDialog(true);
-    }
+    await completeExerciseResult(getFinalScore());
+    setShowCompletionDialog(true);
   }, [assignment, completeExerciseResult, getFinalScore]);
 
   // Update current time every second for real-time UI updates

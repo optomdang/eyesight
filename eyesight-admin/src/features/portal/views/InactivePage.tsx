@@ -1,19 +1,18 @@
 import { FC } from 'react';
 import { Box, Typography, Card, CardContent, Button, CircularProgress } from '@mui/material';
 import { IconAlertCircle, IconLogout, IconPhone } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import { usePatientStatus } from 'src/hooks/usePatientStatus';
+import useAuth from 'src/contexts/authGuard/useAuth';
 
 /**
  * Display support information for inactive patient accounts.
  */
 export const InactivePage: FC = () => {
-  const navigate = useNavigate();
+  const { logout } = useAuth();
   const { patientInfo, loading } = usePatientStatus();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
+    void logout();
   };
 
   if (loading) {

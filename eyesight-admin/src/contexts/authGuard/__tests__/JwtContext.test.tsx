@@ -10,18 +10,27 @@ import React from 'react';
 
 // vi.hoisted ensures mock values are available before module imports are hoisted
 const mockIsValidToken = vi.hoisted(() => vi.fn());
-const mockSetSession = vi.hoisted(() => vi.fn());
+const mockClearSession = vi.hoisted(() => vi.fn());
+const mockGetAccessToken = vi.hoisted(() => vi.fn());
+const mockGetRefreshToken = vi.hoisted(() => vi.fn());
 const mockGetData = vi.hoisted(() => vi.fn());
+const mockRefreshAccessToken = vi.hoisted(() => vi.fn());
 
 vi.mock('src/utils/Jwt', () => ({
   isValidToken: mockIsValidToken,
-  setSession: mockSetSession,
+  clearSession: mockClearSession,
+  getAccessToken: mockGetAccessToken,
+  getRefreshToken: mockGetRefreshToken,
+  getTokenExpiryMs: vi.fn(() => Date.now() + 60_000),
+  setSession: vi.fn(),
 }));
 vi.mock('src/utils/request', () => ({
   getData: mockGetData,
   postData: vi.fn(),
   patchData: vi.fn(),
   deleteData: vi.fn(),
+  refreshAccessToken: mockRefreshAccessToken,
+  axiosClient: { post: vi.fn() },
 }));
 vi.mock('src/utils/firebase', () => ({
   deleteFCMToken: vi.fn().mockResolvedValue(undefined),
@@ -52,23 +61,16 @@ function renderWithAuth() {
   );
 }
 
-// setup.ts globally mocks window.localStorage.getItem to return null.
-// Tests that need a token must override getItem for that specific key.
-function mockStoredToken(token: string) {
-  vi.mocked(window.localStorage.getItem).mockImplementation(
-    (key: string) => key === 'accessToken' ? token : null
-  );
-}
-
 describe('JwtContext - initialize()', () => {
   beforeEach(() => {
-    // vi.clearAllMocks() is already called by setup.ts beforeEach
     mockIsValidToken.mockReturnValue(false);
-    mockSetSession.mockImplementation(() => undefined);
+    mockGetAccessToken.mockReturnValue(null);
+    mockGetRefreshToken.mockReturnValue(null);
+    mockClearSession.mockImplementation(() => undefined);
+    mockRefreshAccessToken.mockReset();
   });
 
-  it('sets isAuthenticated=false when no token is in localStorage', async () => {
-    // getItem returns null by default (setup.ts), isValidToken returns false
+  it('sets isAuthenticated=false when no token is in storage', async () => {
     renderWithAuth();
 
     await waitFor(() =>
@@ -79,7 +81,7 @@ describe('JwtContext - initialize()', () => {
   });
 
   it('sets isAuthenticated=true for an active user with valid token', async () => {
-    mockStoredToken('valid-token');
+    mockGetAccessToken.mockReturnValue('valid-token');
     mockIsValidToken.mockReturnValue(true);
     mockGetData.mockResolvedValue({
       id: 1,
@@ -97,9 +99,30 @@ describe('JwtContext - initialize()', () => {
     expect(screen.getByTestId('userId').textContent).toBe('1');
   });
 
+  it('refreshes access token on init when access is expired but refresh is valid', async () => {
+    mockGetAccessToken.mockReturnValue('expired-token');
+    mockGetRefreshToken.mockReturnValue('valid-refresh-token');
+    mockIsValidToken.mockImplementation((token: string) => token === 'valid-refresh-token');
+    mockRefreshAccessToken.mockResolvedValue('fresh-access-token');
+    mockGetData.mockResolvedValue({
+      id: 2,
+      email: 'patient@test.com',
+      userType: 'patient',
+      active: true,
+    });
+
+    renderWithAuth();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('authenticated').textContent).toBe('true')
+    );
+    expect(mockRefreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(mockGetData).toHaveBeenCalledWith('/me');
+  });
+
   // BUG-08 regression: suspended users must be blocked even when their token is still valid
   it('BUG-08: isAuthenticated=false when /me returns user.active=false', async () => {
-    mockStoredToken('still-valid-but-suspended');
+    mockGetAccessToken.mockReturnValue('still-valid-but-suspended');
     mockIsValidToken.mockReturnValue(true);
     mockGetData.mockResolvedValue({
       id: 42,
@@ -115,12 +138,11 @@ describe('JwtContext - initialize()', () => {
     );
     expect(screen.getByTestId('authenticated').textContent).toBe('false');
     expect(screen.getByTestId('userId').textContent).toBe('none');
-    // JwtContext must clear local session so the token is invalidated
-    expect(mockSetSession).toHaveBeenCalledWith(null);
+    expect(mockClearSession).toHaveBeenCalled();
   });
 
   it('sets isAuthenticated=false when /me throws (token revoked server-side)', async () => {
-    mockStoredToken('expired-server-side');
+    mockGetAccessToken.mockReturnValue('expired-server-side');
     mockIsValidToken.mockReturnValue(true);
     mockGetData.mockRejectedValue(new Error('403 Forbidden'));
 
@@ -130,7 +152,6 @@ describe('JwtContext - initialize()', () => {
       expect(screen.getByTestId('initialized').textContent).toBe('true')
     );
     expect(screen.getByTestId('authenticated').textContent).toBe('false');
-    // catch block must clear session so the bad token is removed
-    expect(mockSetSession).toHaveBeenCalledWith(null);
+    expect(mockClearSession).toHaveBeenCalled();
   });
 });

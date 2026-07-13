@@ -438,13 +438,30 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   // ── Navigation blocker ────────────────────────────────────────────────────
   const isGameActive = useCallback(() => Boolean(executionRef.current && !executionRef.current.completed), []);
 
+  const shouldBlockExerciseNavigation = useCallback(() => {
+    return (
+      !sandboxMode &&
+      isGameActive() &&
+      !timeoutTriggeredRef.current &&
+      !showCompletionDialog
+    );
+  }, [sandboxMode, isGameActive, showCompletionDialog]);
+
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    Boolean(!sandboxMode && isGameActive() && currentLocation.pathname !== nextLocation.pathname)
+    Boolean(
+      shouldBlockExerciseNavigation() &&
+      currentLocation.pathname !== nextLocation.pathname
+    )
   );
 
   useEffect(() => {
-    if (blocker.state === 'blocked') setShowExitDialog(true);
-  }, [blocker]);
+    if (blocker.state !== 'blocked') return;
+    if (!shouldBlockExerciseNavigation()) {
+      blocker.reset();
+      return;
+    }
+    setShowExitDialog(true);
+  }, [blocker.state, shouldBlockExerciseNavigation, blocker]);
 
   // ── Inactivity timer ──────────────────────────────────────────────────────
   const resetInactivityTimer = useCallback(() => {
@@ -595,8 +612,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [assignmentId, sessionId, sandboxMode, buildMetrics, showSnackbar]);
 
   const handleTimeoutSubmission = useCallback(async () => {
-    const success = await completeExerciseResult();
-    if (success) setShowCompletionDialog(true);
+    await completeExerciseResult();
+    setShowCompletionDialog(true);
   }, [completeExerciseResult]);
 
   useEffect(() => {

@@ -37,6 +37,10 @@ jest.mock('../../../src/utils/patterns', () => ({
   withTransaction: jest.fn(async (callback) => callback({ id: 'tx' })),
 }));
 
+jest.mock('../../../src/services/exercise/assignmentSessionSync.service', () => ({
+  syncAssignmentSessionSnapshots: jest.fn().mockResolvedValue({ updated: 0 }),
+}));
+
 jest.mock('../../../src/utils/sessionProvisionUtils', () => ({
   provisionExerciseSessions: jest.fn(),
 }));
@@ -72,6 +76,7 @@ const { ExerciseAssignment, ExerciseConfig, Patient, User, ExerciseSession } = r
 const auditLogService = require('../../../src/services/system/auditLog.service');
 const { standardQuery } = require('../../../src/utils/patterns');
 const { provisionExerciseSessions } = require('../../../src/utils/sessionProvisionUtils');
+const { syncAssignmentSessionSnapshots } = require('../../../src/services/exercise/assignmentSessionSync.service');
 
 describe('Exercise Assignment Service', () => {
   beforeEach(() => {
@@ -201,6 +206,7 @@ describe('Exercise Assignment Service', () => {
       const updated = { id: 20, centerId: 5, patientId: 1, exerciseConfigId: 10, status: 'paused' };
       const assignment = {
         id: 20,
+        exerciseConfigId: 10,
         update: jest.fn().mockResolvedValue(updated),
       };
       ExerciseAssignment.findByPk.mockResolvedValue(assignment);
@@ -209,12 +215,27 @@ describe('Exercise Assignment Service', () => {
 
       expect(result).toBe(updated);
       expect(assignment.update).toHaveBeenCalledWith({ status: 'paused' });
+      expect(syncAssignmentSessionSnapshots).not.toHaveBeenCalled();
       expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'exerciseAssignment.update',
           entityId: 20,
         })
       );
+    });
+
+    test('should sync incomplete sessions when exerciseConfigId changes', async () => {
+      const updated = { id: 20, centerId: 5, patientId: 1, exerciseConfigId: 11, status: 'active' };
+      const assignment = {
+        id: 20,
+        exerciseConfigId: 10,
+        update: jest.fn().mockResolvedValue(updated),
+      };
+      ExerciseAssignment.findByPk.mockResolvedValue(assignment);
+
+      await exerciseAssignmentService.updateAssignment(20, { exerciseConfigId: 11 });
+
+      expect(syncAssignmentSessionSnapshots).toHaveBeenCalledWith(20);
     });
 
     test('should throw for unknown assignment updates', async () => {

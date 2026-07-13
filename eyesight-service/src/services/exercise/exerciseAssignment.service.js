@@ -15,13 +15,23 @@ const { getCurrentCycleDateRange } = require('../../utils/common');
 const { provisionExerciseSessions } = require('../../utils/sessionProvisionUtils');
 const auditLogService = require('../system/auditLog.service');
 const treatmentPackageService = require('./treatmentPackage.service');
+const { syncAssignmentSessionSnapshots } = require('./assignmentSessionSync.service');
 
 /**
- * Calculate compliance percentage for an assignment
- * % tuân thủ = sessionsCompleted / expectedSessionsToDate * 100
- * expectedSessionsToDate = number of frequency periods elapsed since assignedAt
+ * Calculate compliance percentage for an assignment.
+ *
+ * % tuân thủ = effectiveCompleted / expectedSessionsToDate × 100
+ *
+ * effectiveCompleted = sessionsCompleted (buổi đã hoàn thành trọn)
+ *   + validExecutions/requiredCount khi buổi chu kỳ hiện tại chưa xong
+ *   (ví dụ 1/2 lượt đạt chuẩn trong buổi hôm nay → +0.5 buổi).
  */
-const calculateCompliancePercentage = (sessionsCompleted, assignedAt, frequency) => {
+const calculateCompliancePercentage = (
+  sessionsCompleted,
+  assignedAt,
+  frequency,
+  { currentSession = null, executionCount = 1 } = {}
+) => {
   if (!assignedAt || !frequency) return null;
 
   const start = moment(assignedAt);
@@ -46,7 +56,17 @@ const calculateCompliancePercentage = (sessionsCompleted, assignedAt, frequency)
   }
 
   if (expected <= 0) return 100;
-  return Math.min(Math.round(((sessionsCompleted || 0) / expected) * 100), 100);
+
+  let effectiveCompleted = sessionsCompleted || 0;
+
+  if (currentSession && currentSession.status !== 'completed') {
+    const required =
+      parseInt(currentSession.executionCount ?? executionCount ?? 1, 10) || 1;
+    const valid = Math.max(0, parseInt(currentSession.validExecutions ?? 0, 10) || 0);
+    effectiveCompleted += valid / required;
+  }
+
+  return Math.min(Math.round((effectiveCompleted / expected) * 100), 100);
 };
 
 /**
@@ -175,6 +195,9 @@ const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentDa
   setImmediate(async () => {
     await Promise.all(
       assignments.map(async (assignment) => {
+        // Align any pre-existing incomplete sessions (e.g. template provisioned before custom config).
+        await syncAssignmentSessionSnapshots(assignment.id);
+
         const fullAssignment = await ExerciseAssignment.findByPk(assignment.id, {
           include: [{ model: ExerciseConfig, as: 'exerciseConfig' }],
         });
@@ -304,6 +327,8 @@ const getPatientAssignments = async (filter = {}, options = {}) => {
     for (const assignment of result.rows) {
       const frequency = assignment.exerciseConfig?.frequency || 'daily';
       // eslint-disable-next-line no-await-in-loop
+      await syncAssignmentSessionSnapshots(assignment.id);
+      // eslint-disable-next-line no-await-in-loop
       await provisionExerciseSessions(assignment);
 
       const { start: cycleStart, end: cycleEnd } = getCurrentCycleDateRange(frequency, new Date());
@@ -332,12 +357,14 @@ const getPatientAssignments = async (filter = {}, options = {}) => {
 
       assignment.dataValues.currentSession = currentSession;
 
-      // Compute compliance percentage: sessionsCompleted / expectedSessionsToDate * 100
-      // expectedSessionsToDate = number of periods elapsed since assignedAt based on frequency
       assignment.dataValues.compliancePercentage = calculateCompliancePercentage(
         assignment.sessionsCompleted,
         assignment.assignedAt,
-        assignment.exerciseConfig && assignment.exerciseConfig.frequency
+        assignment.exerciseConfig && assignment.exerciseConfig.frequency,
+        {
+          currentSession,
+          executionCount: assignment.exerciseConfig?.executionCount,
+        }
       );
     }
   }
@@ -413,7 +440,17 @@ const updateAssignment = async (assignmentId, updateData) => {
     updateData.visionLevel = null;
   }
 
+  const previousConfigId = assignment.exerciseConfigId;
   const updatedAssignment = await assignment.update(updateData);
+
+  const configIdChanged =
+    'exerciseConfigId' in updateData &&
+    updateData.exerciseConfigId != null &&
+    Number(updateData.exerciseConfigId) !== Number(previousConfigId);
+
+  if (configIdChanged) {
+    await syncAssignmentSessionSnapshots(updatedAssignment.id);
+  }
 
   await auditLogService.logEntityAuditEvent({
     action: 'exerciseAssignment.update',
@@ -540,4 +577,5 @@ module.exports = {
   recordSession,
   getAssignmentStats,
   getAssignmentById,
+  calculateCompliancePercentage,
 };

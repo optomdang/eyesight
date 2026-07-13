@@ -15,6 +15,22 @@ const mockAxios = vi.hoisted(() => {
   return fn;
 });
 
+const storageMock = vi.hoisted(() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+});
+
 vi.mock('axios', () => ({
   default: mockAxios,
   isAxiosError: (error: any) => Boolean(error?.isAxiosError),
@@ -22,34 +38,36 @@ vi.mock('axios', () => ({
 
 vi.mock('src/utils/Jwt.ts', () => ({
   isValidToken: vi.fn(() => true),
+  getAccessToken: vi.fn(() => storageMock.getItem('accessToken')),
+  getRefreshToken: vi.fn(() => storageMock.getItem('refreshToken')),
+  setSession: vi.fn((tokens: { access: { token: string }; refresh: { token: string } } | null) => {
+    if (!tokens) {
+      storageMock.clear();
+      return;
+    }
+    storageMock.setItem('accessToken', tokens.access.token);
+    storageMock.setItem('refreshToken', tokens.refresh.token);
+  }),
+  clearSession: vi.fn(() => storageMock.clear()),
 }));
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = String(value); },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { store = {}; },
-  };
-})();
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+Object.defineProperty(window, 'localStorage', { value: storageMock });
+Object.defineProperty(window, 'sessionStorage', { value: storageMock });
 
 const ACCESS_TOKEN = 'mock-access-token';
 
 describe('Request Utilities', () => {
   beforeEach(() => {
     vi.resetAllMocks(); // clears queued Once values between tests
-    localStorage.clear();
-    localStorage.setItem('accessToken', ACCESS_TOKEN);
+    storageMock.clear();
+    storageMock.setItem('accessToken', ACCESS_TOKEN);
     // Restore plain-function properties after reset
     mockAxios.isAxiosError = (error: any) => Boolean(error?.isAxiosError);
     mockAxios.post = mockAxios;
   });
 
   afterEach(() => {
-    localStorage.clear();
+    storageMock.clear();
   });
 
   describe('getData', () => {
@@ -69,19 +87,25 @@ describe('Request Utilities', () => {
 
     it('should handle 401 error and refresh token', async () => {
       const newToken = 'new-access-token';
-      localStorage.setItem('refreshToken', 'mock-refresh-token');
+      storageMock.setItem('refreshToken', 'mock-refresh-token');
 
       // Call 1: original request → 401
       mockAxios.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401 } });
       // Call 2: axiosClient.post (=== mockAxios) for refresh → new token
-      mockAxios.mockResolvedValueOnce({ data: { accessToken: newToken } });
+      mockAxios.mockResolvedValueOnce({
+        data: {
+          access: { token: newToken },
+          refresh: { token: 'rotated-refresh-token' },
+        },
+      });
       // Call 3: retry with new token → success
       mockAxios.mockResolvedValueOnce({ data: { id: 1, name: 'Test Patient' } });
 
       const result = await getData('patients/1');
 
       expect(result).toEqual({ id: 1, name: 'Test Patient' });
-      expect(localStorage.getItem('accessToken')).toBe(newToken);
+      expect(storageMock.getItem('accessToken')).toBe(newToken);
+      expect(storageMock.getItem('refreshToken')).toBe('rotated-refresh-token');
       expect(mockAxios).toHaveBeenCalledTimes(3);
     });
 
@@ -169,7 +193,7 @@ describe('Request Utilities', () => {
 
   describe('Token Refresh Logic', () => {
     it('should clear tokens and redirect to login when refresh fails', async () => {
-      localStorage.setItem('refreshToken', 'valid-refresh-token');
+      storageMock.setItem('refreshToken', 'valid-refresh-token');
       delete (window as any).location;
       window.location = { href: '' } as any;
 
@@ -179,18 +203,23 @@ describe('Request Utilities', () => {
       mockAxios.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401, data: { message: 'Invalid refresh token' } } });
 
       await expect(getData('patients/1')).rejects.toThrow('Authentication failed');
-      expect(localStorage.getItem('accessToken')).toBeNull();
-      expect(localStorage.getItem('refreshToken')).toBeNull();
+      expect(storageMock.getItem('accessToken')).toBeNull();
+      expect(storageMock.getItem('refreshToken')).toBeNull();
       expect(window.location.href).toContain('/auth/login');
     });
 
     it('should not retry more than once after token refresh', async () => {
-      localStorage.setItem('refreshToken', 'mock-refresh-token');
+      storageMock.setItem('refreshToken', 'mock-refresh-token');
 
       // Call 1: original → 401
       mockAxios.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401 } });
       // Call 2: refresh succeeds
-      mockAxios.mockResolvedValueOnce({ data: { accessToken: 'new-token' } });
+      mockAxios.mockResolvedValueOnce({
+        data: {
+          access: { token: 'new-token' },
+          refresh: { token: 'new-refresh-token' },
+        },
+      });
       // Call 3: retry → 401 again (should NOT retry a 3rd time)
       mockAxios.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401 } });
 

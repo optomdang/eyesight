@@ -4,6 +4,7 @@ const ApiError = require('../../utils/ApiError');
 const { ExerciseConfig, Exercise, ExerciseAssignment, User, Configuration } = require('../../models');
 const { buildPagination, sanitizePagination, buildSortBy } = require('../../utils/query');
 const auditLogService = require('../system/auditLog.service');
+const { syncSessionsForExerciseConfig } = require('./assignmentSessionSync.service');
 
 /**
  * Validate visionType for config creation (no level validation needed)
@@ -334,8 +335,17 @@ const updateExerciseConfigById = async (configId, updateBody) => {
     delete updateBody.vtSettings;
   }
 
+  const timingFieldsChanged =
+    ('duration' in updateBody && parseFloat(updateBody.duration) !== parseFloat(config.duration)) ||
+    ('executionCount' in updateBody &&
+      parseInt(updateBody.executionCount, 10) !== parseInt(config.executionCount, 10));
+
   Object.assign(config, updateBody);
   await config.save();
+
+  if (timingFieldsChanged) {
+    await syncSessionsForExerciseConfig(config.id);
+  }
 
   await auditLogService.logEntityAuditEvent({
     action: 'exerciseConfig.update',

@@ -11,10 +11,10 @@ import { TableHeaderWithHelp } from 'src/components/shared/HelpTooltip';
 import type { PortalExerciseAssignment } from 'src/types/core/portal';
 
 const COMPLIANCE_COLUMN_HELP =
-  'Tỷ lệ buổi hoàn thành đủ chuẩn từ lúc được giao bài đến hôm nay. ' +
-  'Công thức: số buổi hoàn thành ÷ số buổi kỳ vọng × 100. ' +
-  'Số buổi kỳ vọng tính theo tần suất giao (ví dụ hằng ngày = số ngày kể từ ngày giao). ' +
-  'Buổi hoàn thành = đủ tất cả lượt bắt buộc, mỗi lượt tập ≥ 80% thời gian giao.';
+  'Tiến độ tuân thủ từ lúc được giao bài đến hôm nay. ' +
+  'Tính theo số buổi đạt chuẩn ÷ số buổi kỳ vọng × 100; buổi kỳ vọng theo tần suất (hằng ngày = số ngày kể từ ngày giao). ' +
+  'Buổi đang tập dở được tính theo phần lượt đạt chuẩn (ví dụ 1/2 lượt → 50% của một buổi). ' +
+  'Một lượt đạt chuẩn khi tập ≥ 80% thời gian giao cho lượt đó.';
 
 const SESSION_COMPLETION_COLUMN_HELP =
   'Tiến độ buổi tập hôm nay: số lượt đạt chuẩn ÷ tổng lượt bắt buộc trong phiên hiện tại. ' +

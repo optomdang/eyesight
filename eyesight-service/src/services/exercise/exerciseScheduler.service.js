@@ -12,6 +12,7 @@ const { promiseAllInBatches } = require('../../utils/promiseUtils');
 const { buildInTreatmentWhereClause } = require('../../utils/treatmentUtils');
 const { executeAndLogJob } = require('../system/scheduleHistory.service');
 const { closeStaleIncompleteResults } = require('./exerciseStaleResult.service');
+const { syncSessionSnapshotFromAssignment } = require('./assignmentSessionSync.service');
 
 /**
  * Close incomplete results that crossed the day boundary - runs daily at 00:05
@@ -186,7 +187,7 @@ const createSessionIfNotExists = async (assignment, sessionDate) => {
   try {
     // Create-or-skip (idempotent). Requires unique constraint on (exerciseAssignmentId, startedAt)
     const sessionCode = generateCode('SS');
-    const [, created] = await ExerciseSession.findOrCreate({
+    const [session, created] = await ExerciseSession.findOrCreate({
       where: {
         exerciseAssignmentId: assignment.id,
         startedAt: sessionDate,
@@ -204,6 +205,7 @@ const createSessionIfNotExists = async (assignment, sessionDate) => {
     });
 
     if (!created) {
+      await syncSessionSnapshotFromAssignment(session, assignment);
       return false;
     }
 

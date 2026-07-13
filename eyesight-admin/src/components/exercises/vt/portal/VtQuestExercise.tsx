@@ -679,6 +679,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
         'Không lưu được kết quả. Bạn vẫn có thể thoát về danh sách bài tập.',
         'warning'
       );
+      setShowCompletionDialog(true);
     } finally {
       setIsCompletingSession(false);
     }
@@ -735,9 +736,21 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     }
   }, [assignmentId, sessionId, buildMetrics, serializeForPause, showSnackbar, sandboxMode]);
 
+  const shouldBlockExerciseNavigation = useCallback(() => {
+    if (sandboxMode) return false;
+    if (showCompletionDialog) return false;
+    if (timeoutTriggeredRef.current) return false;
+    if (completionInFlightRef.current) return false;
+    if (isCompletingSession) return false;
+    if (engineState.screen === 'session-complete') return false;
+    if (!currentResultIdRef.current) return false;
+    return true;
+  }, [sandboxMode, showCompletionDialog, isCompletingSession, engineState.screen]);
+
   const handlePauseRequest = useCallback(() => {
+    if (!shouldBlockExerciseNavigation()) return;
     setShowExitDialog(true);
-  }, []);
+  }, [shouldBlockExerciseNavigation]);
 
   const handleStopRequest = useCallback(() => {
     setShowStopDialog(true);
@@ -747,16 +760,18 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
   // --- Navigation blocker ---
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      !sandboxMode &&
-      currentLocation.pathname !== nextLocation.pathname &&
-      !showCompletionDialog
+      shouldBlockExerciseNavigation() &&
+      currentLocation.pathname !== nextLocation.pathname
   );
 
   useEffect(() => {
-    if (blocker.state === 'blocked') {
-      setShowExitDialog(true);
+    if (blocker.state !== 'blocked') return;
+    if (!shouldBlockExerciseNavigation()) {
+      blocker.reset();
+      return;
     }
-  }, [blocker.state]);
+    setShowExitDialog(true);
+  }, [blocker.state, shouldBlockExerciseNavigation, blocker]);
 
   const handleExitConfirm = useCallback(async () => {
     setShowExitDialog(false);

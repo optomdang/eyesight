@@ -15,7 +15,15 @@ const decodeToken = (token: string) => {
   }
 };
 
-// @ts-ignore
+export const REMEMBER_ME_KEY = 'authRememberMe';
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const USER_KEY = 'user';
+
+export type AuthTokens = {
+  access: { token: string };
+  refresh: { token: string };
+};
 
 const isValidToken = (accessToken: string) => {
   if (!accessToken) {
@@ -29,14 +37,59 @@ const isValidToken = (accessToken: string) => {
   return decoded.exp > currentTime;
 };
 
-const setSession = (tokens) => {
-  if (tokens) {
-    localStorage.setItem('accessToken', tokens.access.token);
-    localStorage.setItem('refreshToken', tokens.refresh.token);
-  } else {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+const getRememberMePreference = () => localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+
+const resolveActiveStorage = (): Storage => {
+  if (sessionStorage.getItem(ACCESS_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
+    return sessionStorage;
   }
+  return localStorage;
+};
+
+const clearTokensFromAllStorages = () => {
+  for (const storage of [sessionStorage, localStorage]) {
+    storage.removeItem(ACCESS_TOKEN_KEY);
+    storage.removeItem(REFRESH_TOKEN_KEY);
+  }
+};
+
+const getAccessToken = (): string | null =>
+  sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? localStorage.getItem(ACCESS_TOKEN_KEY);
+
+const getRefreshToken = (): string | null =>
+  sessionStorage.getItem(REFRESH_TOKEN_KEY) ?? localStorage.getItem(REFRESH_TOKEN_KEY);
+
+const setSession = (tokens: AuthTokens | null, rememberMe?: boolean) => {
+  clearTokensFromAllStorages();
+
+  if (!tokens) {
+    localStorage.removeItem(USER_KEY);
+    return;
+  }
+
+  if (rememberMe !== undefined) {
+    localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? 'true' : 'false');
+  }
+
+  const storage =
+    rememberMe === true
+      ? localStorage
+      : rememberMe === false
+        ? sessionStorage
+        : resolveActiveStorage();
+
+  storage.setItem(ACCESS_TOKEN_KEY, tokens.access.token);
+  storage.setItem(REFRESH_TOKEN_KEY, tokens.refresh.token);
+};
+
+const clearSession = () => {
+  clearTokensFromAllStorages();
+  localStorage.removeItem(USER_KEY);
+};
+
+const getTokenExpiryMs = (token: string): number | null => {
+  const decoded = decodeToken(token);
+  return decoded?.exp ? decoded.exp * 1000 : null;
 };
 
 const sign = (payload: any, privateKey: string, header: any) => {
@@ -80,4 +133,14 @@ const verify = (token: string, privateKey: string) => {
   return payload;
 };
 
-export { isValidToken, setSession, sign, verify };
+export {
+  isValidToken,
+  setSession,
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  getRememberMePreference,
+  getTokenExpiryMs,
+  sign,
+  verify,
+};

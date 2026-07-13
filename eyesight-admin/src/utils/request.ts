@@ -1,5 +1,12 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { isValidToken } from 'src/utils/Jwt.ts';
+import {
+  isValidToken,
+  setSession,
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  type AuthTokens,
+} from 'src/utils/Jwt.ts';
 import { PaginatedResponse } from 'src/types/core';
 
 export const axiosClient = axios.create({
@@ -23,31 +30,52 @@ const readBlobErrorMessage = async (blob: Blob): Promise<string> => {
   }
 };
 
+const normalizeRefreshResponse = (data: unknown): AuthTokens | null => {
+  if (!data || typeof data !== 'object') return null;
+
+  const payload = data as {
+    access?: { token?: string };
+    refresh?: { token?: string };
+    accessToken?: string;
+    refreshToken?: string;
+  };
+
+  const accessToken = payload.access?.token ?? payload.accessToken;
+  const refreshToken = payload.refresh?.token ?? payload.refreshToken;
+
+  if (!accessToken) return null;
+
+  return {
+    access: { token: accessToken },
+    refresh: { token: refreshToken ?? getRefreshToken() ?? '' },
+  };
+};
+
+const redirectToLogin = () => {
+  window.location.href = `${BASE_NAME}/auth/login`;
+};
+
 // Hàm refresh token
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = localStorage.getItem('refreshToken');
+export async function refreshAccessToken(): Promise<string> {
+  const refreshToken = getRefreshToken();
   if (!refreshToken || !isValidToken(refreshToken)) {
-    // Clear tokens and redirect
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    window.location.href = `${BASE_NAME}/auth/login`;
+    clearSession();
+    redirectToLogin();
     throw new Error('No valid refresh token available');
   }
 
   try {
     const response = await axiosClient.post(`auth/refresh-tokens`, { refreshToken });
-    const { accessToken } = response.data;
+    const tokens = normalizeRefreshResponse(response.data);
 
-    if (!accessToken) {
+    if (!tokens?.access.token) {
       throw new Error('No access token received from refresh');
     }
 
-    localStorage.setItem('accessToken', accessToken);
-    return accessToken;
+    setSession(tokens);
+    return tokens.access.token;
   } catch (error) {
-    // Clear tokens on refresh failure
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    clearSession();
 
     if (axios.isAxiosError(error)) {
       const errorMessage = error.response?.data?.message || 'Failed to refresh token';
@@ -64,7 +92,7 @@ async function requestWithAuth<T>(
   config: AxiosRequestConfig,
   isRetryingAuth: boolean = false
 ): Promise<T> {
-  const accessToken = localStorage.getItem('accessToken');
+  const accessToken = getAccessToken();
   const headers = {
     ...config.headers,
     ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
@@ -99,19 +127,16 @@ async function requestWithAuth<T>(
           true // Đánh dấu đang retry auth - không retry lần 2
         );
       } catch (refreshError) {
-        // Refresh thất bại, redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = `${BASE_NAME}/auth/login`;
+        clearSession();
+        redirectToLogin();
         throw new Error('Authentication failed');
       }
     }
 
     // 401 lần 2 sau khi refresh hoặc các lỗi khác - KHÔNG RETRY, throw ngay
     if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = `${BASE_NAME}/auth/login`;
+      clearSession();
+      redirectToLogin();
       throw new Error('Authentication required');
     }
 
@@ -167,7 +192,7 @@ async function deleteData<TResponse, TBody = unknown>(
 
 /** GET binary response (e.g. PDF download) */
 async function getBlob(url: string, options?: { timeoutMs?: number }): Promise<Blob> {
-  const accessToken = localStorage.getItem('accessToken');
+  const accessToken = getAccessToken();
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   const timeout = options?.timeoutMs ?? 10000;
 
@@ -191,10 +216,25 @@ async function getBlob(url: string, options?: { timeoutMs?: number }): Promise<B
       throw error instanceof Error ? error : new Error('An unexpected error occurred');
     }
     if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = `${BASE_NAME}/auth/login`;
-      throw new Error('Authentication required');
+      try {
+        const newAccessToken = await refreshAccessToken();
+        const retryResponse = await axiosClient({
+          url,
+          method: 'GET',
+          responseType: 'blob',
+          headers: { Authorization: `Bearer ${newAccessToken}` },
+          timeout,
+        });
+        const contentType = String(retryResponse.headers['content-type'] || '');
+        if (contentType.includes('application/json')) {
+          throw new Error(await readBlobErrorMessage(retryResponse.data as Blob));
+        }
+        return retryResponse.data as Blob;
+      } catch {
+        clearSession();
+        redirectToLogin();
+        throw new Error('Authentication required');
+      }
     }
     if (error.response?.data instanceof Blob) {
       throw new Error(await readBlobErrorMessage(error.response.data));

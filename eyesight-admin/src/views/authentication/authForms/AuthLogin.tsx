@@ -12,12 +12,14 @@ import CustomFormLabel from 'src/components/forms/theme-elements/CustomFormLabel
 import { loginSchema, type LoginFormData } from 'src/validations';
 import useMounted from 'src/contexts/authGuard/useMounted';
 import useAuth from 'src/contexts/authGuard/useAuth';
+import { getRememberMePreference } from 'src/utils/Jwt';
 
 const AuthLogin = ({ title }: loginType) => {
   const { t } = useTranslation();
   const mounted = useMounted();
   const { login } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(getRememberMePreference);
 
   const {
     control,
@@ -34,7 +36,7 @@ const AuthLogin = ({ title }: loginType) => {
   const onSubmit = async (values: LoginFormData) => {
     try {
       setSubmitError(null);
-      await login(values.email, values.password);
+      await login(values.email, values.password, rememberMe);
     } catch (err: Error | unknown) {
       if (mounted.current) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -95,8 +97,13 @@ const AuthLogin = ({ title }: loginType) => {
           <Stack justifyContent="space-between" direction="row" alignItems="center" my={2}>
             <FormGroup>
               <FormControlLabel
-                control={<Checkbox defaultChecked />}
-                label="Remeber this Device"
+                control={
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                  />
+                }
+                label="Ghi nhớ đăng nhập"
               />
             </FormGroup>
             <Typography

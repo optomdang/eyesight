@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { postData, getData } from 'src/utils/request';
+import { getAccessToken } from 'src/utils/Jwt';
 
 export type CloudTtsProvider = 'google' | 'azure' | 'elevenlabs';
 
@@ -45,7 +46,7 @@ export async function fetchCloudTtsStatus(): Promise<CloudTtsPreviewStatus> {
 export async function synthesizeCloudTts(
   payload: CloudTtsSynthesizeRequest
 ): Promise<CloudTtsSynthesizeResponse> {
-  const accessToken = localStorage.getItem('accessToken');
+  const accessToken = getAccessToken();
   const response = await axios.post<CloudTtsSynthesizeResponse>(
     `${import.meta.env.VITE_BASE_API_URL}/tts-preview/synthesize`,
     payload,

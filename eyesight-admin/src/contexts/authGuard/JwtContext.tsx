@@ -1,8 +1,15 @@
-import React, { createContext, useEffect, useReducer } from 'react';
+import React, { createContext, useEffect, useReducer, useRef } from 'react';
 import axios from 'axios';
 import { User, ApiResponse } from 'src/types/core';
-import { isValidToken, setSession } from 'src/utils/Jwt';
-import { axiosClient, getData, postData } from 'src/utils/request';
+import {
+  isValidToken,
+  setSession,
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  getTokenExpiryMs,
+} from 'src/utils/Jwt';
+import { axiosClient, getData, postData, refreshAccessToken } from 'src/utils/request';
 import { deleteFCMToken } from 'src/utils/firebase';
 import useSnackbar from '../UseSnackbar';
 
@@ -72,7 +79,7 @@ const reducer = (state: InitialStateType, action: { type: string; payload?: any 
 interface AuthContextType extends InitialStateType {
   platform: 'JWT';
   signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -81,26 +88,65 @@ const AuthContext = createContext<AuthContextType>({
   platform: 'JWT' as const,
   signup: (email: string, password: string, firstName: string, lastName: string) =>
     Promise.resolve(),
-  login: (email: string, password: string) => Promise.resolve(),
+  login: (email: string, password: string, rememberMe?: boolean) => Promise.resolve(),
   logout: () => Promise.resolve(),
 });
+
+const PROACTIVE_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 // AuthProvider component
 function AuthProvider({ children }: { children: React.ReactElement }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { showSnackbar } = useSnackbar();
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleProactiveRefresh = () => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    const accessToken = getAccessToken();
+    const refreshToken = getRefreshToken();
+    if (!accessToken || !refreshToken) return;
+
+    const expiryMs = getTokenExpiryMs(accessToken);
+    if (!expiryMs) return;
+
+    const refreshIn = Math.max(0, expiryMs - Date.now() - PROACTIVE_REFRESH_BUFFER_MS);
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshAccessToken()
+        .then(() => scheduleProactiveRefresh())
+        .catch(() => {
+          // Next API call will handle invalid refresh.
+        });
+    }, refreshIn);
+  };
 
   // Khởi tạo state khi component mount
   useEffect(() => {
     const initialize = async () => {
       try {
-        const accessToken = localStorage.getItem('accessToken');
-        // Kiểm tra token có hợp lệ không
-        if (accessToken && isValidToken(accessToken)) {
-          const user = await getData<User>(`/me`);
-          // BUG-08 fix: reject suspended users even when their token is still valid
-          if (user.active === false) {
-            setSession(null);
+        let accessToken = getAccessToken();
+        const refreshToken = getRefreshToken();
+
+        if (!accessToken || !isValidToken(accessToken)) {
+          if (refreshToken && isValidToken(refreshToken)) {
+            try {
+              accessToken = await refreshAccessToken();
+            } catch {
+              clearSession();
+              dispatch({
+                type: 'INITIALIZE',
+                payload: {
+                  isAuthenticated: false,
+                  user: undefined,
+                },
+              });
+              return;
+            }
+          } else {
+            clearSession();
             dispatch({
               type: 'INITIALIZE',
               payload: {
@@ -110,15 +156,12 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
             });
             return;
           }
-          dispatch({
-            type: 'INITIALIZE',
-            payload: {
-              isAuthenticated: true,
-              user,
-            },
-          });
-        } else {
-          // Token invalid or not exist
+        }
+
+        const user = await getData<User>(`/me`);
+        // BUG-08 fix: reject suspended users even when their token is still valid
+        if (user.active === false) {
+          clearSession();
           dispatch({
             type: 'INITIALIZE',
             payload: {
@@ -126,11 +169,18 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
               user: undefined,
             },
           });
+          return;
         }
+        dispatch({
+          type: 'INITIALIZE',
+          payload: {
+            isAuthenticated: true,
+            user,
+          },
+        });
       } catch (err) {
         console.error('Initialize error:', err);
-        // Clear session on error
-        setSession(null);
+        clearSession();
         dispatch({
           type: 'INITIALIZE',
           payload: {
@@ -144,8 +194,27 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
     void initialize();
   }, []);
 
+  useEffect(() => {
+    if (!state.isAuthenticated) {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      return;
+    }
+
+    scheduleProactiveRefresh();
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [state.isAuthenticated]);
+
   // Hàm đăng nhập sử dụng Axios
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe = false) => {
     try {
       // Public endpoint — must not go through requestWithAuth (401 would trigger refresh → "Authentication failed")
       const response = await axiosClient.post(
@@ -155,7 +224,7 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
       );
       const { tokens, user } = response.data;
 
-      setSession(tokens);
+      setSession(tokens, rememberMe);
       localStorage.setItem('user', JSON.stringify(user));
       dispatch({
         type: 'LOGIN',
@@ -180,7 +249,13 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
       });
       const { accessToken, user } = res;
 
-      window.localStorage.setItem('accessToken', accessToken);
+      setSession(
+        {
+          access: { token: accessToken },
+          refresh: { token: '' },
+        },
+        true
+      );
       localStorage.setItem('user', JSON.stringify(user));
       dispatch({
         type: 'REGISTER',
@@ -197,14 +272,21 @@ function AuthProvider({ children }: { children: React.ReactElement }) {
   // Hàm đăng xuất
   const logout = async () => {
     try {
-      // Delete FCM token from backend before logout
       await deleteFCMToken();
     } catch (error) {
       console.error('Failed to delete FCM token:', error);
-      // Continue with logout even if FCM deletion fails
     }
 
-    setSession(null);
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await axiosClient.post('auth/logout', { refreshToken });
+      } catch (error) {
+        console.error('Failed to revoke refresh token:', error);
+      }
+    }
+
+    clearSession();
     dispatch({ type: 'LOGOUT' });
   };
 
