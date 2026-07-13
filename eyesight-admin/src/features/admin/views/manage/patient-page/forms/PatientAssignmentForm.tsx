@@ -691,7 +691,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   />
                   {!values.createCustomConfig && values.exerciseConfigId ? (
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                      Đổi thời lượng hoặc cấu hình khác so với mẫu sẽ tự bật tùy chỉnh khi bạn sửa.
+                      Bật &quot;Tạo cấu hình tùy chỉnh&quot; để đổi thời lượng và các thông số mẫu.
                     </Typography>
                   ) : null}
                 </Box>
@@ -740,7 +740,9 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                   exerciseName={
                     availableExercises.find((ex) => ex.id === values.exerciseId)?.name ?? null
                   }
-                  lockTemplateFields={false}
+                  lockTemplateFields={
+                    !values.createCustomConfig && Boolean(values.exerciseConfigId)
+                  }
                 />
                 {/* Patient-specific Vision Level Override Section */}
                 <Box sx={{ mt: 3 }}>
@@ -798,7 +800,7 @@ const PatientAssignmentModal: React.FC<PatientAssignmentModalProps> = ({
                       {t('exercise.notificationSettingsTab', 'Cấu hình thông báo')}
                     </Typography>
                     <NotificationSettingsFields
-                      isReadOnly={false}
+                      isReadOnly={!values.createCustomConfig}
                       config={values}
                       onFieldChange={handleConfigFieldChange}
                     />
