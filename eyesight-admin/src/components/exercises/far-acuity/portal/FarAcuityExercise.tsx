@@ -52,7 +52,11 @@ import {
   FAR_ACUITY_CHAR_COUNT,
   type FarAcuityVisionType,
 } from 'src/hooks/exercises/useFarAcuityEngine';
-import { resolvePatientExamCharType, type ExamCharType } from 'src/utils/resolvePatientExamCharType';
+import {
+  rememberFarAcuityCharType,
+  resolveDefaultFarAcuityCharType,
+  type ExamCharType,
+} from 'src/utils/resolvePatientExamCharType';
 import type { PortalExerciseProps } from 'src/components/exercises/portal/types';
 import { evaluateAnswer } from 'src/utils/examUtils';
 import FarAcuityCharTypeStep from './FarAcuityCharTypeStep';
@@ -125,8 +129,6 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
 
   // ── charType + setup phase ────────────────────────────────────────────────
-  const charTypeStorageKey = `far_acuity_char_type_${assignmentId}`;
-
   const [setupPhase, setSetupPhase] = useState<'charType' | 'active'>('charType');
   const [charType, setCharType] = useState<ExamCharType>('E');
   const [suggestedCharType, setSuggestedCharType] = useState<ExamCharType | null>(null);
@@ -137,20 +139,22 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
   const [inputFocusKey, setInputFocusKey] = useState(0);
 
-  // Resolve initial charType: Priority 1 = matching exam type, Priority 2 = localStorage
+  // Default charType: last matching exam → last far-acuity exercise → 'E'
   useEffect(() => {
     if (sandboxMode) return;
-    const cached = localStorage.getItem(charTypeStorageKey) as ExamCharType | null;
-    resolvePatientExamCharType(exerciseConfig?.visionType)
-      .then((fromExam) => {
-        setSuggestedCharType(fromExam);
-        // Priority 1: exam charType always wins for suggestion display
-        // If cached exists it becomes the pre-selected default (Priority 2), but suggestion shown
-        setCharType(cached ?? fromExam);
+    let cancelled = false;
+    resolveDefaultFarAcuityCharType(exerciseConfig?.visionType)
+      .then((resolved) => {
+        if (cancelled) return;
+        setSuggestedCharType(resolved.fromExam);
+        setCharType(resolved.charType);
       })
       .catch(() => {
-        if (cached) setCharType(cached);
+        /* keep initial 'E' */
       });
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxMode]);
 
@@ -293,7 +297,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const restoredRef = useRef(false);
 
   const handleCharTypeConfirm = useCallback(() => {
-    localStorage.setItem(charTypeStorageKey, charType);
+    rememberFarAcuityCharType(charType);
     setSetupPhase('active');
     resetSession({
       farLevel: initialAcuityLevel ?? 1,
@@ -304,7 +308,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     if (charType === 'A' || charType === 'N') {
       setInputFocusKey((k) => k + 1);
     }
-  }, [charTypeStorageKey, initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
+  }, [initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
 
   // ── Visual sizing ─────────────────────────────────────────────────────────
   const distance = useMemo(
@@ -580,6 +584,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         logCS: contrastInfo.score,
         snellen: acuityInfo.score,
         visionType: trainingVisionType,
+        charType,
         roundsCompleted: state.roundsCompleted,
         peakFarLevel: state.peakFarLevel,
         peakContrastLevel: state.peakContrastLevel,
@@ -587,7 +592,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         maxCombo,
       },
     };
-  }, [state, totalCoins, maxCombo, trainingVisionType]);
+  }, [state, totalCoins, maxCombo, trainingVisionType, charType]);
 
   // ── Complete exercise ──────────────────────────────────────────────────────
   const completeExerciseResult = useCallback(async (): Promise<boolean> => {

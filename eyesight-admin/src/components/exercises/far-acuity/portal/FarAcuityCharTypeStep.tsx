@@ -61,7 +61,12 @@ const FarAcuityCharTypeStep: React.FC<FarAcuityCharTypeStepProps> = ({
           color="primary.main"
           sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}
         >
-          💡 Bài khám gợi ý: <strong>{suggestedCharType}</strong>
+          💡 Gợi ý từ bài khám gần nhất: <strong>{suggestedCharType}</strong>
+        </Typography>
+      )}
+      {!suggestedCharType && charType !== 'E' && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
+          Đang dùng loại ký tự từ lần tập gần nhất.
         </Typography>
       )}
 

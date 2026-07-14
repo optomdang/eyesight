@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { useTranslation } from 'src/hooks/useTranslation';
 import ExamChar from './ExamChar';
@@ -8,6 +8,7 @@ import { CHAR_POOL_MAP, FONT_MAP } from 'src/utils/constant.ts';
 import { getCharSpacing, clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { EXAM_CHAR_PADDING_PX } from 'src/services/exam-state';
 import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
+import { OPTOTYPE_LATIN_INPUT_ATTRS, toOptotypeInputChar } from 'src/utils/optotypeInput';
 
 const TestStep = () => {
   const {
@@ -76,7 +77,7 @@ const TestStep = () => {
   }, [allAnswered, isTextCharType, currentLine, currentBatch]);
 
   const handleCharInput = (absoluteIndex: number, batchLocalIndex: number, rawValue: string) => {
-    const value = rawValue.trim().slice(0, 1).toUpperCase();
+    const value = toOptotypeInputChar(rawValue, charType === 'N');
     handleInputChange(absoluteIndex, value);
     if (!value) return;
 
@@ -88,6 +89,20 @@ const TestStep = () => {
       }
       confirmButtonRef.current?.focus();
     }, 0);
+  };
+
+  const handleCharKeyDown = (
+    absoluteIndex: number,
+    batchLocalIndex: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === 'Process' || e.key === 'Dead') {
+      e.preventDefault();
+      return;
+    }
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    handleCharInput(absoluteIndex, batchLocalIndex, e.key);
   };
 
   return (
@@ -253,9 +268,17 @@ const TestStep = () => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     handleCharInput(absoluteIndex, index, e.target.value)
                   }
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                    handleCharKeyDown(absoluteIndex, index, e)
+                  }
+                  onCompositionStart={(e: React.CompositionEvent<HTMLInputElement>) => {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                    e.currentTarget.focus();
+                  }}
                   disabled={item.answer !== undefined}
                   inputProps={{
-                    maxLength: 1,
+                    ...OPTOTYPE_LATIN_INPUT_ATTRS,
                     'aria-label': `${t('exam.enterCharacter')} ${absoluteIndex + 1}`,
                     style: { textAlign: 'center' },
                   }}

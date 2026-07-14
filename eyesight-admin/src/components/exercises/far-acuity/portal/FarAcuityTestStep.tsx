@@ -16,6 +16,7 @@ import {
 } from 'src/utils/visionUtils';
 import type { FarAcuityLetter } from 'src/hooks/exercises/useFarAcuityEngine';
 import type { ExamCharType } from 'src/utils/resolvePatientExamCharType';
+import { OPTOTYPE_LATIN_INPUT_ATTRS, toOptotypeInputChar } from 'src/utils/optotypeInput';
 import OptotypeChar from './OptotypeChar';
 
 const EXAM_CHAR_PADDING_PX = EXAM_HORIZONTAL_PADDING_PX;
@@ -136,7 +137,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
     batchLocalIndex: number,
     rawValue: string
   ) => {
-    const value = rawValue.trim().slice(0, 1).toUpperCase();
+    const value = toOptotypeInputChar(rawValue, charType === 'N');
     onInputChange(absoluteIndex, value);
     if (!value || disabled) return;
 
@@ -148,6 +149,22 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
       }
       confirmButtonRef.current?.focus();
     }, 0);
+  };
+
+  const handleCharKeyDown = (
+    absoluteIndex: number,
+    batchLocalIndex: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (disabled) return;
+    // Block dead-keys / telex sequences from composing accents onto previous cells
+    if (e.key === 'Process' || e.key === 'Dead') {
+      e.preventDefault();
+      return;
+    }
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    handleCharInput(absoluteIndex, batchLocalIndex, e.key);
   };
 
   return (
@@ -328,9 +345,17 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     handleCharInput(absoluteIndex, index, e.target.value)
                   }
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                    handleCharKeyDown(absoluteIndex, index, e)
+                  }
+                  onCompositionStart={(e: React.CompositionEvent<HTMLInputElement>) => {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                    e.currentTarget.focus();
+                  }}
                   disabled={disabled || item.answer !== undefined}
                   inputProps={{
-                    maxLength: 1,
+                    ...OPTOTYPE_LATIN_INPUT_ATTRS,
                     'aria-label': `${t('exam.enterCharacter')} ${absoluteIndex + 1}`,
                     style: { textAlign: 'center' },
                   }}
