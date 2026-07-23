@@ -67,6 +67,8 @@ interface RawSession {
   /** Độ khó snapshot lúc thực hiện buổi. */
   visionLevel?: number | null;
   exerciseAssignment?: {
+    /** Per-patient eye override; chart title prefers this over config.eye. */
+    trainingEye?: string | null;
     exerciseConfig?: {
       id?: number;
       name?: string | null;
@@ -359,7 +361,9 @@ const ExerciseSessionProgressChart: React.FC<ExerciseSessionProgressChartProps> 
         const frequency = config?.frequency;
 
         if (!map.has(id)) {
-          const eyeLabel = formatEyeLabel(config?.eye);
+          const eyeLabel = formatEyeLabel(
+            s.exerciseAssignment?.trainingEye ?? config?.eye
+          );
           const displayName =
             [config?.name, eyeLabel].filter(Boolean).join(' — ') || `Bài tập ${id}`;
           map.set(id, {

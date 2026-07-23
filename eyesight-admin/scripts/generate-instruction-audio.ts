@@ -22,7 +22,7 @@ const AUDIO_ROOT = path.resolve(ADMIN_ROOT, 'public/audio/instructions');
 const MANIFEST_PATH = path.resolve(AUDIO_ROOT, 'manifest.json');
 
 const LANGS: AudioSampleLang[] = ['vi', 'en'];
-const DEFAULT_RATE = 0.95;
+const DEFAULT_RATE = 0.8;
 const VOICES: Record<AudioSampleLang, string> = {
   vi: 'vi-VN-HoaiMyNeural',
   en: 'en-US-JennyNeural',

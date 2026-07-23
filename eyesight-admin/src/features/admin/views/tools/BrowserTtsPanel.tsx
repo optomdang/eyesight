@@ -33,7 +33,7 @@ type VoiceLangFilter = 'vi' | 'en' | 'all';
 
 const RATE_MARKS = [
   { value: 0.7, label: '0.7' },
-  { value: 0.95, label: '0.95' },
+  { value: 0.8, label: '0.8' },
   { value: 1.1, label: '1.1' },
   { value: 1.3, label: '1.3' },
 ];
@@ -46,7 +46,7 @@ interface BrowserTtsPanelProps {
 const BrowserTtsPanel: React.FC<BrowserTtsPanelProps> = ({ lang, onLangChange }) => {
   const [voiceLangFilter, setVoiceLangFilter] = useState<VoiceLangFilter>('vi');
   const [voiceUri, setVoiceUri] = useState('');
-  const [rate, setRate] = useState(0.95);
+  const [rate, setRate] = useState(0.8);
   const [pitch, setPitch] = useState(1);
 
   const { supported, voices, speaking, activeSampleId, speak, speakQueue, stop, refreshVoices } =

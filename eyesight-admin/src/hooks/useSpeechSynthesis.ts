@@ -7,7 +7,7 @@ export interface SpeechSynthesisOptions {
   pitch?: number;
 }
 
-const DEFAULT_RATE = 0.95;
+const DEFAULT_RATE = 0.8;
 const DEFAULT_PITCH = 1;
 
 function resolveVoice(

@@ -152,7 +152,7 @@ async function synthesizeElevenLabs({ text, voice, rate }) {
   };
 }
 
-async function synthesizePreview({ provider, voiceId, text, lang = 'vi', rate = 0.95 }) {
+async function synthesizePreview({ provider, voiceId, text, lang = 'vi', rate = 0.8 }) {
   assertProviderEnabled(provider);
 
   const trimmed = String(text || '').trim();

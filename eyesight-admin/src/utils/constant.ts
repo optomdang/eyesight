@@ -27,14 +27,14 @@ export const CHAR_POOL_MAP: { [key: string]: string[] } = {
     'E',
     'H',
     'K',
-    'M',
     'N',
+    'O',
     'S',
     'T',
     'U',
     'V',
     'X',
-    'Y', // Bỏ I, O, Q, W, Z
+    'Y', // Bỏ I, M, Q, W, Z
   ],
   N: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
   S: ['A', 'B', 'C', 'D'],

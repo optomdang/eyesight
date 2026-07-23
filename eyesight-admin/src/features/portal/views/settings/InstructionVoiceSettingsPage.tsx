@@ -121,7 +121,7 @@ const InstructionVoiceSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedd
             <LabelWithHelp
               help={t(
                 'settings.instructionVoice.rateHelp',
-                'Điều chỉnh tốc độ phát file âm thanh đã tạo sẵn (không gọi API mỗi lần). Giá trị 1.0 là tốc độ gốc của file MP3.'
+                'Điều chỉnh tốc độ phát file âm thanh đã tạo sẵn (không gọi API mỗi lần). Mặc định 0.8×; 1.0 là tốc độ gốc của file MP3.'
               )}
             >
               {t('settings.instructionVoice.rate', 'Tốc độ đọc')}

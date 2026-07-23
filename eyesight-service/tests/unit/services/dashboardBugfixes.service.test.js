@@ -21,10 +21,13 @@ jest.mock('../../../src/models', () => ({
   ExerciseAssignment: {},
   sequelize: {},
 }));
-jest.mock('../../../src/models/exercise/exerciseSession.model', () => ({}));
+jest.mock('../../../src/models/exercise/exerciseSession.model', () => ({
+  count: jest.fn(),
+}));
 jest.mock('../../../src/models/exercise/exerciseConfig.model', () => ({}));
 
 const { ExerciseResult } = require('../../../src/models');
+const ExerciseSession = require('../../../src/models/exercise/exerciseSession.model');
 const exerciseResultService = require('../../../src/services/exercise/exerciseResult.service');
 
 describe('B1/B4 — patient chart queries', () => {
@@ -32,6 +35,7 @@ describe('B1/B4 — patient chart queries', () => {
 
   it('getResultsSummaryByPatient builds Op.gte/Op.lte range + deleted=false', async () => {
     ExerciseResult.findAll.mockResolvedValue([]);
+    ExerciseSession.count.mockResolvedValue(0);
     const start = new Date('2026-01-01');
     const end = new Date('2026-01-31');
 
@@ -45,6 +49,17 @@ describe('B1/B4 — patient chart queries', () => {
     expect(where.createdAt[Op.lte]).toBe(end);
     expect(where.createdAt.$gte).toBeUndefined();
     expect(where.createdAt.$lte).toBeUndefined();
+
+    expect(ExerciseSession.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        patientId: 42,
+        status: 'completed',
+        startedAt: expect.objectContaining({
+          [Op.gte]: start,
+          [Op.lte]: end,
+        }),
+      }),
+    });
   });
 
   it('getResultsSummaryByPatient aggregates totals from rows correctly', async () => {
@@ -54,11 +69,14 @@ describe('B1/B4 — patient chart queries', () => {
       { id: 2, exerciseId: 7, status: 'completed', score: 40, duration: 300 },
       { id: 3, exerciseId: 9, status: 'completed', score: 90, duration: 120 },
     ]);
+    // 3 lượt thuộc 2 buổi hoàn thành
+    ExerciseSession.count.mockResolvedValue(2);
 
     const res = await exerciseResultService.getResultsSummaryByPatient(42, {});
 
-    expect(res.totalSessions).toBe(3);
-    expect(res.totalPassedSessions).toBe(3); // all completed (no pass/fail)
+    expect(res.totalSessions).toBe(2); // buổi, không phải lượt
+    expect(res.totalExecutions).toBe(3);
+    expect(res.totalPassedSessions).toBe(2);
     expect(res.totalTime).toBe(1020);
     expect(res.averageScore).toBeCloseTo((80 + 40 + 90) / 3, 5);
     expect(res.passedSessionsByExercise).toEqual({ 7: 2, 9: 1 });

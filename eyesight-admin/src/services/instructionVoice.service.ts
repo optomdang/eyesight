@@ -9,7 +9,7 @@ export interface InstructionVoiceSettings {
 
 export const INSTRUCTION_VOICE_RATE_MIN = 0.5;
 export const INSTRUCTION_VOICE_RATE_MAX = 1.1;
-export const INSTRUCTION_VOICE_RATE_DEFAULT = 1;
+export const INSTRUCTION_VOICE_RATE_DEFAULT = 0.8;
 
 const DEFAULT_SETTINGS: InstructionVoiceSettings = {
   enabled: true,

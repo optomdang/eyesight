@@ -126,6 +126,25 @@ describe('ExerciseSessionProgressChart — small multiples & states', () => {
     expect(screen.getAllByTestId('composed-chart')).toHaveLength(2);
   });
 
+  it('nhãn mắt ưu tiên trainingEye trên assignment (không dùng config.eye)', () => {
+    renderChart([
+      makeSession({
+        exerciseAssignment: {
+          trainingEye: 'right',
+          exerciseConfig: {
+            id: 1,
+            name: '2048 – N',
+            visionType: 'near',
+            eye: 'both',
+            frequency: 'daily',
+          },
+        },
+      }),
+    ]);
+    expect(screen.getByText('2048 – N — Mắt phải')).toBeInTheDocument();
+    expect(screen.queryByText(/Cả hai mắt/)).not.toBeInTheDocument();
+  });
+
   it('gom nhiều session cùng assignment vào 1 biểu đồ, sắp theo thời gian', () => {
     renderChart([
       makeSession({ id: 2, completedAt: '2026-03-01T08:00:00Z', averageScore: 300 }),

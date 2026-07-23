@@ -224,9 +224,10 @@ describeDb('Dashboard accuracy (real DB)', () => {
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-03-31T23:59:59Z'),
     });
-    // Only the 7 completed are counted; incomplete excluded; all within window.
-    expect(summary.totalSessions).toBe(7);
-    expect(summary.totalPassedSessions).toBe(7);
+    // Only 1 completed buổi (7 completed lượt trong cùng session); incomplete lượt excluded.
+    expect(summary.totalSessions).toBe(1);
+    expect(summary.totalPassedSessions).toBe(1);
+    expect(summary.totalExecutions).toBe(7);
 
     // A window with no data must return zero — proves it is a real range, not equality to garbage.
     const empty = await exerciseResultService.getResultsSummaryByPatient(patientId, {

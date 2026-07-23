@@ -29,6 +29,16 @@ describe('StreakAndAchievements', () => {
     expect(screen.getByText('Tập trung > 95%').closest('div')).toHaveStyle({ opacity: '1' });
   });
 
+  it('does not unlock Chăm Chỉ when totalSessions is under 30 buổi', () => {
+    renderAchievements({ totalSessions: 14, streak: 2 });
+    expect(screen.getByText('30 buổi tập').closest('div')).toHaveStyle({ opacity: '0.4' });
+  });
+
+  it('unlocks Chăm Chỉ only after 30 completed buổi', () => {
+    renderAchievements({ totalSessions: 30, streak: 2 });
+    expect(screen.getByText('30 buổi tập').closest('div')).toHaveStyle({ opacity: '1' });
+  });
+
   it('unlocks Huyền Thoại when streak reaches 100 consecutive days', () => {
     const { rerender } = renderAchievements({ streak: 99 });
     expect(screen.getByText('100 ngày liên tục').closest('div')).toHaveStyle({ opacity: '0.4' });

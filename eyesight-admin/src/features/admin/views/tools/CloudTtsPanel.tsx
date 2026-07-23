@@ -30,7 +30,7 @@ import InstructionAudioSampleTable from './InstructionAudioSampleTable';
 
 const RATE_MARKS = [
   { value: 0.7, label: '0.7' },
-  { value: 0.95, label: '0.95' },
+  { value: 0.8, label: '0.8' },
   { value: 1.1, label: '1.1' },
 ];
 
@@ -45,7 +45,7 @@ const CloudTtsPanel: React.FC<CloudTtsPanelProps> = ({ lang, onLangChange }) => 
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [provider, setProvider] = useState<CloudTtsProvider>('google');
   const [voiceId, setVoiceId] = useState('');
-  const [rate, setRate] = useState(0.95);
+  const [rate, setRate] = useState(0.8);
 
   const { playing, loading, activeSampleId, error, speak, speakQueue, stop } = useCloudTtsPlayback();
 

@@ -402,6 +402,7 @@ const updateSessionStatus = async (sessionId, status) => {
  *
  * Config is included only for display metadata: visionType (format độ khó),
  * name + eye (nhãn assignment), frequency (nhãn trục X thích nghi).
+ * Assignment.trainingEye overrides config.eye on chart titles when set.
  * No ExerciseResult include — session columns already hold the aggregates.
  */
 const getPatientExerciseSessions = async (filter = {}, options = {}) => {
@@ -409,6 +410,7 @@ const getPatientExerciseSessions = async (filter = {}, options = {}) => {
     {
       model: ExerciseAssignment,
       as: 'exerciseAssignment',
+      attributes: ['id', 'trainingEye', 'exerciseConfigId', 'patientId', 'status'],
       include: [
         {
           model: ExerciseConfig,
