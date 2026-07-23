@@ -120,6 +120,13 @@ User.init(
       allowNull: true,
       comment: 'Last successful login timestamp',
     },
+    clientSettings: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment:
+        'Per-user client preferences (e.g. screenCalibrations keyed by device fingerprint)',
+    },
     centerId: { type: DataTypes.INTEGER, allowNull: false },
     updatedBy: { type: DataTypes.INTEGER },
     active: { type: DataTypes.BOOLEAN, defaultValue: true },

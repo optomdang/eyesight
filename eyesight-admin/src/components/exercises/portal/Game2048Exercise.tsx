@@ -23,6 +23,7 @@ import useSnackbar from 'src/contexts/UseSnackbar';
 import {
   getEffectiveExerciseDurationMs,
   getInactivityThresholdMs,
+  getReportedTimeoutDurationSeconds,
 } from 'src/utils/exerciseDuration';
 import { calculateVisualSettings, computeExercisePatientVision, resolveAssignmentTrainingEye } from 'src/utils/visionUtils';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
@@ -78,6 +79,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [completionSlotCounted, setCompletionSlotCounted] = useState(true);
   const [isPausing, setIsPausing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentResultId, setCurrentResultId] = useState<number | null>(null);
@@ -242,8 +244,10 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     setShowEndDialog(false);
 
     if (isGameActive() && currentResultId) {
-      const success = await completeExerciseResult(getFinalScore());
-      if (success) {
+      const outcome = await completeExerciseResult(getFinalScore());
+      if (outcome.success) {
+        setTimeRemaining(0);
+        setCompletionSlotCounted(outcome.slotCounted);
         setShowCompletionDialog(true);
       }
     } else {
@@ -348,47 +352,65 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     return Math.max(gameManager?.score ?? 0, currentSession?.maxScore ?? 0);
   };
 
-  const buildExecutionMetrics = useCallback((options?: { scoreOverride?: number }) => {
-    const currentSession = gameExecutionRef.current;
-    if (!currentSession) {
-      return null;
-    }
+  const buildExecutionMetrics = useCallback(
+    (options?: { scoreOverride?: number; fromTimeout?: boolean }) => {
+      const currentSession = gameExecutionRef.current;
+      if (!currentSession) {
+        return null;
+      }
 
-    const gameManager = gameInstanceRef.current;
-    const movesCount = currentSession.movesCount ?? 0;
-    const scoringMoves = currentSession.scoringMoves ?? 0;
-    const accuracy = movesCount > 0 ? scoringMoves / movesCount : 0;
+      const gameManager = gameInstanceRef.current;
+      const movesCount = currentSession.movesCount ?? 0;
+      const scoringMoves = currentSession.scoringMoves ?? 0;
+      const accuracy = movesCount > 0 ? scoringMoves / movesCount : 0;
+      let duration = Math.floor((Date.now() - currentSession.startTime) / 1000);
 
-    return {
-      score:
-        options?.scoreOverride ?? Math.max(gameManager?.score ?? 0, currentSession.maxScore ?? 0),
-      duration: Math.floor((Date.now() - currentSession.startTime) / 1000),
-      movesCount,
-      accuracy: Math.round(accuracy * 100) / 100,
-    };
-  }, []);
+      // Timeout path: report at least the effective assigned seconds so clock skew /
+      // 1s ticker lag cannot drop a full run below the 80% session threshold.
+      if (options?.fromTimeout && exerciseConfig?.duration != null) {
+        const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+        if (reported != null) {
+          duration = Math.max(duration, reported);
+        }
+      }
+
+      return {
+        score:
+          options?.scoreOverride ?? Math.max(gameManager?.score ?? 0, currentSession.maxScore ?? 0),
+        duration,
+        movesCount,
+        accuracy: Math.round(accuracy * 100) / 100,
+      };
+    },
+    [exerciseConfig?.duration]
+  );
 
   /**
    * Complete exercise (no auto-navigate)
    * Caller decides what to do after completion (show dialog, navigate, etc)
-   *
-   * @returns true if success, false if failed
    */
   const completeExerciseResult = useCallback(
-    async (finalScore: number): Promise<boolean> => {
+    async (
+      finalScore: number,
+      options?: { fromTimeout?: boolean }
+    ): Promise<{ success: boolean; slotCounted: boolean }> => {
       const currentSession = gameExecutionRef.current;
 
       const resultId = currentResultIdRef.current;
       if (!currentSession || !assignment || currentSession.completed || !resultId) {
-        return false;
+        return { success: false, slotCounted: false };
       }
 
       // Mark as completed to prevent duplicate calls
       gameExecutionRef.current = { ...currentSession, completed: true };
 
-      const metrics = buildExecutionMetrics({ scoreOverride: finalScore });
+      const metrics = buildExecutionMetrics({
+        scoreOverride: finalScore,
+        fromTimeout: options?.fromTimeout,
+      });
       if (!metrics) {
-        return false;
+        gameExecutionRef.current = { ...currentSession, completed: false };
+        return { success: false, slotCounted: false };
       }
 
       // Stop inactivity timer
@@ -398,17 +420,19 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       }
 
       try {
-        await completeExercise(assignmentId, sessionId, resultId, {
+        const saved = await completeExercise(assignmentId, sessionId, resultId, {
           ...metrics,
         });
-        return true;
-      } catch {
-        showSnackbar('Không thể lưu kết quả bài tập', 'error');
-        return false;
-      } finally {
-        // Clean up
         gameExecutionRef.current = null;
         setCurrentResultId(null);
+        return {
+          success: true,
+          slotCounted: saved?.status === 'completed',
+        };
+      } catch {
+        gameExecutionRef.current = { ...currentSession, completed: false };
+        showSnackbar('Không thể lưu kết quả bài tập', 'error');
+        return { success: false, slotCounted: false };
       }
     },
     [assignmentId, sessionId, assignment, buildExecutionMetrics, showSnackbar]
@@ -421,8 +445,12 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       return;
     }
 
-    await completeExerciseResult(getFinalScore());
-    setShowCompletionDialog(true);
+    const outcome = await completeExerciseResult(getFinalScore(), { fromTimeout: true });
+    if (outcome.success) {
+      setTimeRemaining(0);
+      setCompletionSlotCounted(outcome.slotCounted);
+      setShowCompletionDialog(true);
+    }
   }, [assignment, completeExerciseResult, getFinalScore]);
 
   // Update current time every second for real-time UI updates
@@ -1088,6 +1116,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
           open={showCompletionDialog}
           onClose={handleCompletionDialogClose}
           container={fullscreenRootRef.current}
+          slotCounted={completionSlotCounted}
         />
       </Box>
     </LoadingBoundary>

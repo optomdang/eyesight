@@ -101,7 +101,11 @@ const exerciseSessionSlotPcts = (session, exerciseResultsBySessionId) => {
   for (let i = 0; i < assigned; i += 1) {
     const r = results[i];
     if (!isExerciseSlotEnded(r)) pcts.push(0);
-    else pcts.push(exerciseSlotCompletionPct(r.duration, durationMin));
+    else {
+      const slotMin =
+        parseFloat(r?.exerciseConfig?.duration) || durationMin;
+      pcts.push(exerciseSlotCompletionPct(r.duration, slotMin));
+    }
   }
   return pcts;
 };

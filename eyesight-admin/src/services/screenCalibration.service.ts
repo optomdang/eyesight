@@ -5,6 +5,13 @@
  * the native screen dimensions so that downstream code can build a precise
  * ScreenInfo without asking the user again in every exam/exercise.
  *
+ * Persistence:
+ *   1. localStorage (fast path for the current browser)
+ *   2. Server under /me/screen-calibration keyed by device fingerprint
+ *      so Safari/Chrome site-data eviction after ~7 days does not force
+ *      recalibration on the same machine. A different machine (different
+ *      fingerprint) still requires a fresh calibration.
+ *
  * @locked Do not modify calibration persistence, PPI formulas, or getPreferredScreenInfo()
  * unless the user explicitly requests screen-calibration / physical-sizing changes.
  * See .cursor/rules/screen-calibration-locked.mdc
@@ -12,6 +19,7 @@
 
 import type { ScreenInfo } from 'src/utils/visionUtils';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
+import { getData, putData } from 'src/utils/request';
 
 const CALIBRATION_KEY = 'eyesight_screen_calibration';
 
@@ -36,9 +44,47 @@ export interface ScreenCalibration {
   calibratedAt: string;
 }
 
+export interface StoredScreenCalibration extends ScreenCalibration {
+  /** Browser-detected screen identity used for same-machine restore. */
+  deviceFingerprint: string;
+}
+
 /** Credit card ISO 7810 ID-1 dimensions (mm). */
 export const CARD_WIDTH_MM = 85.6;
 export const CARD_HEIGHT_MM = 53.98;
+
+export const getDetectedNativeResolution = (): {
+  width: number;
+  height: number;
+  dpr: number;
+} => {
+  if (typeof window === 'undefined') {
+    return { width: 0, height: 0, dpr: 1 };
+  }
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    width: Math.round(window.screen.width * dpr),
+    height: Math.round(window.screen.height * dpr),
+    dpr,
+  };
+};
+
+/**
+ * Stable fingerprint for the current display.
+ * Dimensions are sorted so landscape/portrait rotation of the same panel still matches.
+ */
+export const buildDeviceFingerprint = (
+  width?: number,
+  height?: number,
+  dpr?: number
+): string => {
+  const detected = getDetectedNativeResolution();
+  const w = width ?? detected.width;
+  const h = height ?? detected.height;
+  const ratio = dpr ?? detected.dpr;
+  const [a, b] = w <= h ? [w, h] : [h, w];
+  return `${a}x${b}@${Number(ratio.toFixed(2))}`;
+};
 
 export const saveCalibration = (cal: ScreenCalibration): void => {
   localStorage.setItem(CALIBRATION_KEY, JSON.stringify(cal));
@@ -113,8 +159,82 @@ export const computePpiFromRuler = (rulerLengthMm: number, rulerLengthPx: number
   return rulerLengthPx / rulerLengthInch;
 };
 
+const requestPersistentStorage = (): void => {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      void navigator.storage.persist();
+    }
+  } catch {
+    // Best-effort only — Safari may ignore without installed PWA.
+  }
+};
+
 /**
- * Build a full ScreenCalibration record and persist it.
+ * Push local calibration to the server for the current device fingerprint.
+ * Failures are swallowed so offline / guest flows still keep local calibration.
+ */
+export const syncCalibrationToServer = async (cal: ScreenCalibration): Promise<void> => {
+  const payload: StoredScreenCalibration = {
+    ...cal,
+    deviceFingerprint: buildDeviceFingerprint(),
+  };
+  try {
+    await putData<{ calibration: StoredScreenCalibration }, StoredScreenCalibration>(
+      '/me/screen-calibration',
+      payload
+    );
+  } catch {
+    // Keep local calibration even if sync fails (network / auth race).
+  }
+};
+
+/**
+ * If local calibration is missing, restore from server for this device fingerprint.
+ * @returns true when local storage now has a valid calibration.
+ */
+export const hydrateCalibrationFromServer = async (): Promise<boolean> => {
+  if (isCalibrated()) return true;
+
+  const detected = getDetectedNativeResolution();
+  if (!(detected.width > 0) || !(detected.height > 0)) {
+    return false;
+  }
+  const deviceFingerprint = buildDeviceFingerprint(detected.width, detected.height, detected.dpr);
+
+  try {
+    const { calibration } = await getData<{ calibration: StoredScreenCalibration | null }>(
+      `/me/screen-calibration?deviceFingerprint=${encodeURIComponent(deviceFingerprint)}`
+    );
+    if (
+      !calibration ||
+      typeof calibration.ppi !== 'number' ||
+      calibration.ppi <= 0 ||
+      !(calibration.nativeScreenWidth > 0) ||
+      !(calibration.nativeScreenHeight > 0) ||
+      !(calibration.diagonalInch > 0)
+    ) {
+      return false;
+    }
+
+    const local: ScreenCalibration = {
+      ppi: calibration.ppi,
+      nativeScreenWidth: calibration.nativeScreenWidth,
+      nativeScreenHeight: calibration.nativeScreenHeight,
+      diagonalInch: calibration.diagonalInch,
+      calibratedDiagonalInch: calibration.calibratedDiagonalInch,
+      method: calibration.method === 'ruler' ? 'ruler' : 'card',
+      calibratedAt: calibration.calibratedAt,
+    };
+    saveCalibration(local);
+    requestPersistentStorage();
+    return isCalibrated();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Build a full ScreenCalibration record and persist it locally (+ best-effort server sync).
  * @param ppi             Calibrated PPI from card or ruler method.
  * @param method          'card' | 'ruler'
  * @param nativeScreenWidth   Physical pixel width (CSS px × DPR).
@@ -126,7 +246,7 @@ export const buildAndSaveCalibration = (
   method: 'card' | 'ruler',
   nativeScreenWidth: number,
   nativeScreenHeight: number,
-  diagonalInch: number,
+  diagonalInch: number
 ): ScreenCalibration => {
   const diagPx = Math.sqrt(nativeScreenWidth * nativeScreenWidth + nativeScreenHeight * nativeScreenHeight);
   const calibratedDiagonalInch = diagPx / ppi;
@@ -141,5 +261,7 @@ export const buildAndSaveCalibration = (
     calibratedAt: new Date().toISOString(),
   };
   saveCalibration(cal);
+  requestPersistentStorage();
+  void syncCalibrationToServer(cal);
   return cal;
 };

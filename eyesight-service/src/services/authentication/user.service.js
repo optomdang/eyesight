@@ -425,6 +425,88 @@ const getUserByPhone = async (phoneNumber) => {
   });
 };
 
+const MAX_SCREEN_CALIBRATIONS = 10;
+
+const isValidScreenCalibrationEntry = (entry) =>
+  entry &&
+  typeof entry.deviceFingerprint === 'string' &&
+  entry.deviceFingerprint.length > 0 &&
+  typeof entry.ppi === 'number' &&
+  entry.ppi > 0 &&
+  typeof entry.nativeScreenWidth === 'number' &&
+  entry.nativeScreenWidth > 0 &&
+  typeof entry.nativeScreenHeight === 'number' &&
+  entry.nativeScreenHeight > 0 &&
+  typeof entry.diagonalInch === 'number' &&
+  entry.diagonalInch > 0;
+
+/**
+ * Find a stored screen calibration for the current user + device fingerprint.
+ * @param {number} userId
+ * @param {string} deviceFingerprint
+ * @returns {Promise<object|null>}
+ */
+const getScreenCalibration = async (userId, deviceFingerprint) => {
+  const user = await User.findByPk(userId, { attributes: ['id', 'clientSettings'] });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Tài khoản không tồn tại');
+  }
+
+  const calibrations = user.clientSettings?.screenCalibrations;
+  if (!Array.isArray(calibrations)) {
+    return null;
+  }
+
+  const match = calibrations.find(
+    (entry) => isValidScreenCalibrationEntry(entry) && entry.deviceFingerprint === deviceFingerprint
+  );
+  return match || null;
+};
+
+/**
+ * Upsert screen calibration for a device fingerprint under the user.
+ * Keeps at most MAX_SCREEN_CALIBRATIONS entries (most recent first).
+ * @param {number} userId
+ * @param {object} calibration
+ * @returns {Promise<object>}
+ */
+const upsertScreenCalibration = async (userId, calibration) => {
+  if (!isValidScreenCalibrationEntry(calibration)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Dữ liệu hiệu chuẩn màn hình không hợp lệ');
+  }
+
+  const user = await User.findByPk(userId);
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Tài khoản không tồn tại');
+  }
+
+  const settings = user.clientSettings && typeof user.clientSettings === 'object' ? { ...user.clientSettings } : {};
+  const existing = Array.isArray(settings.screenCalibrations) ? [...settings.screenCalibrations] : [];
+
+  const entry = {
+    deviceFingerprint: calibration.deviceFingerprint,
+    ppi: calibration.ppi,
+    nativeScreenWidth: calibration.nativeScreenWidth,
+    nativeScreenHeight: calibration.nativeScreenHeight,
+    diagonalInch: calibration.diagonalInch,
+    calibratedDiagonalInch: calibration.calibratedDiagonalInch ?? null,
+    method: calibration.method === 'ruler' ? 'ruler' : 'card',
+    calibratedAt: calibration.calibratedAt || new Date().toISOString(),
+  };
+
+  const next = [entry, ...existing.filter((item) => item?.deviceFingerprint !== entry.deviceFingerprint)].slice(
+    0,
+    MAX_SCREEN_CALIBRATIONS
+  );
+
+  settings.screenCalibrations = next;
+  user.clientSettings = settings;
+  user.changed('clientSettings', true);
+  await user.save();
+
+  return entry;
+};
+
 module.exports = {
   createUser,
   queryUsers,
@@ -435,4 +517,6 @@ module.exports = {
   deleteUserByIds,
   storeRegistrationToken,
   getUserByPhone,
+  getScreenCalibration,
+  upsertScreenCalibration,
 };

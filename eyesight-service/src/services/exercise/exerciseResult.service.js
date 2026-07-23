@@ -437,7 +437,7 @@ const completeExercise = async (resultId, finalData, patientId = null) => {
   }
 
   // #21-clamp: thời gian thực không được vượt thời gian được giao (vượt = bug FE) → cap = giao.
-  const assignedMin = result.exerciseConfig?.duration || 0;
+  const assignedMin = resolveResultAssignedDurationMin(result);
   const assignedSec = assignedMin * 60;
   let clampedDuration = finalData.duration;
   if (assignedSec > 0 && clampedDuration > assignedSec) {
@@ -486,6 +486,21 @@ const completeExercise = async (resultId, finalData, patientId = null) => {
 };
 
 /**
+ * Assigned minutes for ≥80% checks: prefer the config snapshot frozen on the result
+ * (what the patient actually played against). Falling back to a stale session.executionDuration
+ * that is longer than the live config under-counts validExecutions (stuck at 0/2, 1/2).
+ */
+const resolveResultAssignedDurationMin = (result, session = null, config = null) => {
+  const fromResult = parseFloat(result?.exerciseConfig?.duration);
+  if (Number.isFinite(fromResult) && fromResult > 0) return fromResult;
+  const fromSession = parseFloat(session?.executionDuration);
+  if (Number.isFinite(fromSession) && fromSession > 0) return fromSession;
+  const fromConfig = parseFloat(config?.duration);
+  if (Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
+  return 0;
+};
+
+/**
  * Update session statistics after result completion.
  * Session complete = đủ lượt đạt ≥80% thời gian giao (executionCount).
  *
@@ -513,10 +528,11 @@ const updateSessionStats = async (sessionId) => {
 
   const config = session.exerciseAssignment.exerciseConfig;
   const requiredCount = session.executionCount ?? config.executionCount ?? 1;
-  const assignedMin = parseFloat(session.executionDuration) || config.duration || 0;
 
   const endedResults = results.filter((r) => isExerciseSlotEnded(r));
-  const fullyCompleteResults = endedResults.filter((r) => isExerciseSlotFullyComplete(r.duration, assignedMin));
+  const fullyCompleteResults = endedResults.filter((r) =>
+    isExerciseSlotFullyComplete(r.duration, resolveResultAssignedDurationMin(r, session, config))
+  );
   const fullyCompleteCount = fullyCompleteResults.length;
 
   const now = new Date();
@@ -716,8 +732,8 @@ const getLatestResultsForExerciseAssignment = async (exerciseAssignmentId, limit
 
 /**
  * Get results summary by patient (updated for status field)
- * Only counts completed exercises (passed or failed), not incomplete ones
- * Optimized: uses raw queries over large datasets
+ * Only aggregates completed executions (lượt) for time/score metrics.
+ * totalSessions = số buổi (ExerciseSession.status = completed) — dùng cho huy hiệu "buổi tập".
  */
 const getResultsSummaryByPatient = async (patientId, dateFilter = {}) => {
   const whereClause = {
@@ -739,16 +755,14 @@ const getResultsSummaryByPatient = async (patientId, dateFilter = {}) => {
     raw: true,
   });
 
-  const totalSessions = results.length;
-  // No pass/fail: every fetched result is 'completed'. Kept the field name for API compatibility.
-  const totalPassedSessions = totalSessions;
+  const totalExecutions = results.length;
 
   // Calculate total time (duration is in seconds) - only for completed exercises
   const totalTime = results.reduce((sum, r) => sum + (r.duration || 0), 0);
 
   // Calculate average score - only for completed exercises
   const totalScore = results.reduce((sum, r) => sum + (r.score || 0), 0);
-  const averageScore = totalSessions > 0 ? totalScore / totalSessions : 0;
+  const averageScore = totalExecutions > 0 ? totalScore / totalExecutions : 0;
 
   const resultsByExercise = results.reduce((acc, result) => {
     if (!acc[result.exerciseId]) {
@@ -760,12 +774,28 @@ const getResultsSummaryByPatient = async (patientId, dateFilter = {}) => {
 
   const passedSessionsByExercise = {};
   Object.entries(resultsByExercise).forEach(([exerciseId, exerciseResults]) => {
-    passedSessionsByExercise[exerciseId] = exerciseResults.length; // all completed
+    passedSessionsByExercise[exerciseId] = exerciseResults.length; // completed lượt per exercise
   });
+
+  // Buổi tập hoàn thành (không đếm từng lượt — tránh mở huy hiệu "30 buổi" sau vài ngày)
+  const sessionWhere = {
+    patientId,
+    status: 'completed',
+  };
+  // startedAt luôn có; completedAt có thể null trên bản ghi cũ
+  if (dateFilter.startDate || dateFilter.endDate) {
+    sessionWhere.startedAt = {};
+    if (dateFilter.startDate) sessionWhere.startedAt[Op.gte] = dateFilter.startDate;
+    if (dateFilter.endDate) sessionWhere.startedAt[Op.lte] = dateFilter.endDate;
+  }
+
+  const totalSessions = await ExerciseSession.count({ where: sessionWhere });
 
   return {
     totalSessions,
-    totalPassedSessions,
+    totalExecutions,
+    // API compatibility: previously aliased to result count; now same as completed buổi
+    totalPassedSessions: totalSessions,
     passedSessionsByExercise,
     totalTime,
     averageScore,

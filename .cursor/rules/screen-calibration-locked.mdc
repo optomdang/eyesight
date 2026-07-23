@@ -40,11 +40,15 @@ Chỉ được sửa khi user **yêu cầu rõ ràng** liên quan hiệu chuẩn
 ## Luồng dữ liệu (không phá vỡ)
 
 ```
-ScreenCalibrationPage → buildAndSaveCalibration → localStorage
+ScreenCalibrationPage → buildAndSaveCalibration
+  → localStorage (+ best-effort PUT /me/screen-calibration theo deviceFingerprint)
+CalibrationGate → isCalibrated() || hydrateCalibrationFromServer() (cùng fingerprint)
 getPreferredScreenInfo() → ScreenInfo (exam, exercise, preview)
 clinicalMmToLayoutPx(mm, screenInfo) → CSS px (dùng PPI hiệu chuẩn nếu có)
 calculateVisualSettings / calculateFarFontSize / calculateNearFontSize → mm trước khi render
 ```
+
+Fingerprint = độ phân giải native đã sắp xếp + DPR (`WxH@dpr`). Máy khác → fingerprint khác → bắt hiệu chuẩn lại.
 
 ## Được phép không cần hỏi lại
 

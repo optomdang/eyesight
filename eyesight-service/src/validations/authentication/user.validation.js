@@ -370,6 +370,27 @@ const changeAdminCenter = {
   }),
 };
 
+const getScreenCalibration = {
+  query: Joi.object().keys({
+    deviceFingerprint: Joi.string().min(3).max(64).required(),
+  }),
+};
+
+const upsertScreenCalibration = {
+  body: Joi.object()
+    .keys({
+      deviceFingerprint: Joi.string().min(3).max(64).required(),
+      ppi: Joi.number().positive().required(),
+      nativeScreenWidth: Joi.number().integer().min(640).max(8192).required(),
+      nativeScreenHeight: Joi.number().integer().min(480).max(4320).required(),
+      diagonalInch: Joi.number().min(5).max(80).required(),
+      calibratedDiagonalInch: Joi.number().positive().allow(null).optional(),
+      method: Joi.string().valid('card', 'ruler').required(),
+      calibratedAt: Joi.string().isoDate().optional(),
+    })
+    .required(),
+};
+
 module.exports = {
   createUser,
   getUsers,
@@ -381,4 +402,6 @@ module.exports = {
   markNotificationRead,
   updateCurrentUser,
   changeAdminCenter,
+  getScreenCalibration,
+  upsertScreenCalibration,
 };

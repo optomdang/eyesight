@@ -405,4 +405,69 @@ describe('User Service', () => {
       await expect(userService.storeRegistrationToken(999, 'fcm-token-123')).rejects.toThrow('Tài khoản không tồn tại');
     });
   });
+
+  describe('screen calibration sync', () => {
+    const sampleCalibration = {
+      deviceFingerprint: '1080x1920@2',
+      ppi: 220,
+      nativeScreenWidth: 1920,
+      nativeScreenHeight: 1080,
+      diagonalInch: 15.6,
+      calibratedDiagonalInch: 15.4,
+      method: 'card',
+      calibratedAt: '2026-07-24T00:00:00.000Z',
+    };
+
+    test('getScreenCalibration returns matching fingerprint entry', async () => {
+      User.findByPk.mockResolvedValue({
+        id: 1,
+        clientSettings: {
+          screenCalibrations: [
+            { ...sampleCalibration, deviceFingerprint: 'other' },
+            sampleCalibration,
+          ],
+        },
+      });
+
+      const result = await userService.getScreenCalibration(1, '1080x1920@2');
+      expect(result).toEqual(sampleCalibration);
+    });
+
+    test('getScreenCalibration returns null when fingerprint differs (other machine)', async () => {
+      User.findByPk.mockResolvedValue({
+        id: 1,
+        clientSettings: { screenCalibrations: [sampleCalibration] },
+      });
+
+      const result = await userService.getScreenCalibration(1, '1440x2560@2');
+      expect(result).toBeNull();
+    });
+
+    test('upsertScreenCalibration replaces same fingerprint and keeps newest first', async () => {
+      const mockUser = {
+        id: 1,
+        clientSettings: {
+          screenCalibrations: [
+            { ...sampleCalibration, ppi: 100 },
+            { ...sampleCalibration, deviceFingerprint: '900x1600@2', ppi: 150 },
+          ],
+        },
+        changed: jest.fn(),
+        save: jest.fn(),
+      };
+      User.findByPk.mockResolvedValue(mockUser);
+
+      const updated = await userService.upsertScreenCalibration(1, {
+        ...sampleCalibration,
+        ppi: 225,
+      });
+
+      expect(updated.ppi).toBe(225);
+      expect(mockUser.clientSettings.screenCalibrations).toHaveLength(2);
+      expect(mockUser.clientSettings.screenCalibrations[0].ppi).toBe(225);
+      expect(mockUser.clientSettings.screenCalibrations[0].deviceFingerprint).toBe('1080x1920@2');
+      expect(mockUser.changed).toHaveBeenCalledWith('clientSettings', true);
+      expect(mockUser.save).toHaveBeenCalled();
+    });
+  });
 });

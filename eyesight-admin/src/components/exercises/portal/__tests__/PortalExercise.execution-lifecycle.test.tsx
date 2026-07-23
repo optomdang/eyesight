@@ -64,6 +64,18 @@ vi.mock('src/contexts/UseSnackbar', () => ({
   }),
 }));
 
+vi.mock('src/utils/exerciseVisionPrerequisites', () => ({
+  hasExerciseVisionLevel: () => true,
+}));
+
+vi.mock('src/features/portal/views/exerciseResult/components/ExerciseVisionRequiredAlert', () => ({
+  default: () => null,
+}));
+
+vi.mock('src/hooks/useFreshPatientExamResults', () => ({
+  default: () => ({ examResults: null, loading: false, error: null }),
+}));
+
 vi.mock('src/utils/visionUtils', async () => {
   const actual = await vi.importActual<any>('src/utils/visionUtils');
   return {
@@ -74,6 +86,8 @@ vi.mock('src/utils/visionUtils', async () => {
       contrast: 100,
       scaleFactor: 1,
     }),
+    computeExercisePatientVision: () => ({ far: 0.5, near: 0.5 }),
+    hasExerciseVisionLevel: undefined,
   };
 });
 
@@ -118,7 +132,7 @@ describe('Game2048Exercise execution lifecycle', () => {
     onGameInitHook = undefined;
     gameInstanceRef.current = null;
     mockPauseExercise.mockResolvedValue({ success: true });
-    mockCompleteExercise.mockResolvedValue({ success: true });
+    mockCompleteExercise.mockResolvedValue({ status: 'completed', id: 1 });
   });
 
   it('restores resume state after game engine becomes ready', async () => {
@@ -227,6 +241,49 @@ describe('Game2048Exercise execution lifecycle', () => {
 
     expect(screen.queryByText('Tiếp tục luyện')).not.toBeInTheDocument();
     expect(screen.getAllByText('Kết thúc').length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not show saved dialog when timeout complete API fails', async () => {
+    gameInstanceRef.current = {
+      score: 512,
+      storageManager: { setGameState: vi.fn() },
+      setup: vi.fn(),
+      serialize: vi.fn(() => ({ score: 512 })),
+    };
+    engineReady = true;
+    mockCompleteExercise.mockRejectedValue(new Error('network'));
+
+    mockStartExercise.mockResolvedValue({
+      action: 'continue',
+      result: {
+        id: 78,
+        startedAt: '2026-03-27T09:58:00.000Z',
+        duration: 61,
+        score: 0,
+        movesCount: 4,
+        level: 14,
+        exerciseState: null,
+      },
+    });
+
+    render(
+      <Game2048Exercise
+        assignmentId={10}
+        sessionId={20}
+        assignment={assignment}
+        screenParams={screenParams}
+      />
+    );
+
+    await waitFor(() => expect(mockCompleteExercise).toHaveBeenCalledTimes(1));
+
+    expect(
+      screen.queryByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.')
+    ).not.toBeInTheDocument();
+    expect(showSnackbarMock).toHaveBeenCalledWith('Không thể lưu kết quả bài tập', 'error');
   });
 
   it('tracks moves via inputManager events and updates move counter', async () => {

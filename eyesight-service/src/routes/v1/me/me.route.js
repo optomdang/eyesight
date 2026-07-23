@@ -39,6 +39,12 @@ router
   .patch(auth(), validate(userValidation.storeRegistrationToken), userController.storeRegistrationToken)
   .delete(auth(), userController.deleteRegistrationToken);
 
+// Screen calibration (per device fingerprint — survives browser localStorage wipe)
+router
+  .route('/screen-calibration')
+  .get(auth(), validate(userValidation.getScreenCalibration), userController.getScreenCalibration)
+  .put(auth(), validate(userValidation.upsertScreenCalibration), userController.upsertScreenCalibration);
+
 // Current user notifications
 router
   .route('/notifications')

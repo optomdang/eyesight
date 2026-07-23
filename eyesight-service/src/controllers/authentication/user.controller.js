@@ -41,6 +41,7 @@ const updateCurrentUser = catchAsync(async (req, res) => {
     'isEmailVerified',
     'active',
     'deleted',
+    'clientSettings',
   ];
   restrictedFields.forEach((field) => {
     if (req.body[field] !== undefined) {
@@ -150,6 +151,17 @@ const storeRegistrationToken = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const getScreenCalibration = catchAsync(async (req, res) => {
+  const { deviceFingerprint } = req.query;
+  const calibration = await userService.getScreenCalibration(req.user.id, deviceFingerprint);
+  res.send({ calibration });
+});
+
+const upsertScreenCalibration = catchAsync(async (req, res) => {
+  const calibration = await userService.upsertScreenCalibration(req.user.id, req.body);
+  res.send({ calibration });
+});
+
 const deleteRegistrationToken = catchAsync(async (req, res) => {
   // Clear FCM token for current user
   await userService.storeRegistrationToken(req.user.id, null);
@@ -241,6 +253,8 @@ module.exports = {
   removeClinicFromUser,
   storeRegistrationToken,
   deleteRegistrationToken,
+  getScreenCalibration,
+  upsertScreenCalibration,
   getNotificationsByUser,
   getNotificationSummaryByUser,
   getUnreadNotificationCount,

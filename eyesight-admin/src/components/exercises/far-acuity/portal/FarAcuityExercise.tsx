@@ -33,6 +33,7 @@ import {
 } from 'src/services/patient.service';
 import {
   getEffectiveExerciseDurationMs,
+  getReportedTimeoutDurationSeconds,
   getInactivityThresholdMs,
 } from 'src/utils/exerciseDuration';
 import {
@@ -178,6 +179,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [completionSlotCounted, setCompletionSlotCounted] = useState(true);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
@@ -570,55 +572,95 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [isActive]);
 
   // ── Metrics builder ───────────────────────────────────────────────────────
-  const buildMetrics = useCallback(() => {
-    if (!executionRef.current) return null;
-    const contrastInfo = getContrastLevelInfo(state.contrastLevel);
-    const acuityInfo = getAcuityLevelInfo(trainingVisionType, state.farLevel);
-    return {
-      score: totalCoins,
-      duration: Math.floor((Date.now() - executionRef.current.startTime) / 1000),
-      accuracy: state.roundsCompleted > 0 ? 1 : 0,
-      resultMetrics: {
-        farLevel: state.farLevel,
-        contrastLevel: state.contrastLevel,
-        logCS: contrastInfo.score,
-        snellen: acuityInfo.score,
-        visionType: trainingVisionType,
-        charType,
-        roundsCompleted: state.roundsCompleted,
-        peakFarLevel: state.peakFarLevel,
-        peakContrastLevel: state.peakContrastLevel,
-        totalCoins,
-        maxCombo,
-      },
-    };
-  }, [state, totalCoins, maxCombo, trainingVisionType, charType]);
+  const buildMetrics = useCallback(
+    (options?: { fromTimeout?: boolean }) => {
+      if (!executionRef.current) return null;
+      const contrastInfo = getContrastLevelInfo(state.contrastLevel);
+      const acuityInfo = getAcuityLevelInfo(trainingVisionType, state.farLevel);
+      let duration = Math.floor((Date.now() - executionRef.current.startTime) / 1000);
+      if (options?.fromTimeout && exerciseConfig?.duration != null) {
+        const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+        if (reported != null) {
+          duration = Math.max(duration, reported);
+        }
+      }
+      return {
+        score: totalCoins,
+        duration,
+        accuracy: state.roundsCompleted > 0 ? 1 : 0,
+        resultMetrics: {
+          farLevel: state.farLevel,
+          contrastLevel: state.contrastLevel,
+          logCS: contrastInfo.score,
+          snellen: acuityInfo.score,
+          visionType: trainingVisionType,
+          charType,
+          roundsCompleted: state.roundsCompleted,
+          peakFarLevel: state.peakFarLevel,
+          peakContrastLevel: state.peakContrastLevel,
+          totalCoins,
+          maxCombo,
+        },
+      };
+    },
+    [state, totalCoins, maxCombo, trainingVisionType, charType, exerciseConfig?.duration]
+  );
 
   // ── Complete exercise ──────────────────────────────────────────────────────
-  const completeExerciseResult = useCallback(async (): Promise<boolean> => {
-    if (!executionRef.current || executionRef.current.completed) return false;
-    if (!sandboxMode && !currentResultIdRef.current) return false;
-    executionRef.current.completed = true;
-    setIsActive(false);
+  const completeExerciseResult = useCallback(
+    async (options?: {
+      fromTimeout?: boolean;
+    }): Promise<{ success: boolean; slotCounted: boolean }> => {
+      if (!executionRef.current || executionRef.current.completed) {
+        return { success: false, slotCounted: false };
+      }
+      if (!sandboxMode && !currentResultIdRef.current) {
+        return { success: false, slotCounted: false };
+      }
+      executionRef.current.completed = true;
+      setIsActive(false);
 
-    const metrics = buildMetrics();
-    if (!metrics) return false;
+      const metrics = buildMetrics({ fromTimeout: options?.fromTimeout });
+      if (!metrics) {
+        executionRef.current.completed = false;
+        setIsActive(true);
+        return { success: false, slotCounted: false };
+      }
 
-    if (inactivityTimerRef.current) { clearTimeout(inactivityTimerRef.current); inactivityTimerRef.current = null; }
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
 
-    try {
-      if (sandboxMode) return true;
-      await completeExercise(assignmentId, sessionId, currentResultIdRef.current as number, metrics);
-      return true;
-    } catch {
-      showSnackbar('Không thể lưu kết quả bài tập', 'error');
-      return false;
-    }
-  }, [assignmentId, sessionId, sandboxMode, buildMetrics, showSnackbar]);
+      try {
+        if (sandboxMode) return { success: true, slotCounted: true };
+        const saved = await completeExercise(
+          assignmentId,
+          sessionId,
+          currentResultIdRef.current as number,
+          metrics
+        );
+        return {
+          success: true,
+          slotCounted: saved?.status === 'completed',
+        };
+      } catch {
+        executionRef.current.completed = false;
+        setIsActive(true);
+        showSnackbar('Không thể lưu kết quả bài tập', 'error');
+        return { success: false, slotCounted: false };
+      }
+    },
+    [assignmentId, sessionId, sandboxMode, buildMetrics, showSnackbar]
+  );
 
   const handleTimeoutSubmission = useCallback(async () => {
-    await completeExerciseResult();
-    setShowCompletionDialog(true);
+    const outcome = await completeExerciseResult({ fromTimeout: true });
+    if (outcome.success) {
+      setTimeRemaining(0);
+      setCompletionSlotCounted(outcome.slotCounted);
+      setShowCompletionDialog(true);
+    }
   }, [completeExerciseResult]);
 
   useEffect(() => {
@@ -687,8 +729,12 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   // ── End / exit dialogs ────────────────────────────────────────────────────
   const handleEndConfirm = useCallback(async () => {
     setShowEndDialog(false);
-    const success = await completeExerciseResult();
-    if (success) setShowCompletionDialog(true);
+    const outcome = await completeExerciseResult();
+    if (outcome.success) {
+      setTimeRemaining(0);
+      setCompletionSlotCounted(outcome.slotCounted);
+      setShowCompletionDialog(true);
+    }
   }, [completeExerciseResult]);
 
   const handleExitConfirm = useCallback(async () => {
@@ -1062,6 +1108,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
           open={showCompletionDialog}
           onClose={handleCompletionClose}
           container={fullscreenRootRef.current}
+          slotCounted={completionSlotCounted}
         />
       </Box>
     </LoadingBoundary>

@@ -3,14 +3,21 @@
  * If the user hasn't calibrated yet, shows a full-page prompt instead of the
  * protected content.
  *
+ * Hydrates from the server (same user + same device fingerprint) when
+ * localStorage was cleared by the browser, so patients are not forced to
+ * recalibrate every ~7 days on the same machine.
+ *
  * @locked Gate logic tied to isCalibrated() — do not weaken/bypass without explicit request.
  * See .cursor/rules/screen-calibration-locked.mdc
  */
-import React, { useState } from 'react';
-import { Alert, Box, Button, Paper, Typography } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import { useNavigate } from 'react-router-dom';
-import { isCalibrated } from 'src/services/screenCalibration.service';
+import {
+  hydrateCalibrationFromServer,
+  isCalibrated,
+} from 'src/services/screenCalibration.service';
 import ScreenCalibrationPage from 'src/features/portal/views/settings/ScreenCalibrationPage';
 
 interface CalibrationGateProps {
@@ -19,11 +26,49 @@ interface CalibrationGateProps {
 
 const CalibrationGate: React.FC<CalibrationGateProps> = ({ children }) => {
   const [calibrated, setCalibrated] = useState(() => isCalibrated());
+  const [checkingServer, setCheckingServer] = useState(() => !isCalibrated());
   const [showInline, setShowInline] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (calibrated) {
+      setCheckingServer(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const restored = await hydrateCalibrationFromServer();
+      if (cancelled) return;
+      if (restored) {
+        setCalibrated(true);
+      }
+      setCheckingServer(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calibrated]);
+
   if (calibrated) {
     return <>{children}</>;
+  }
+
+  if (checkingServer) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   if (showInline) {
@@ -78,7 +123,7 @@ const CalibrationGate: React.FC<CalibrationGateProps> = ({ children }) => {
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Để kích thước chữ trong bài kiểm tra và bài tập thị lực chính xác về mặt vật lý,
-          bạn cần hiệu chuẩn màn hình <strong>một lần duy nhất</strong> trước khi bắt đầu.
+          bạn cần hiệu chuẩn màn hình <strong>một lần trên mỗi máy</strong> trước khi bắt đầu.
         </Typography>
 
         <Alert severity="warning" sx={{ mb: 3, textAlign: 'left' }}>

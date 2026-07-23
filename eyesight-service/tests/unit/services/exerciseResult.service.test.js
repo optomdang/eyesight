@@ -760,6 +760,36 @@ describe('updateSessionStats (via completeExercise)', () => {
     expect(recordSessionCompletion).toHaveBeenCalled();
   });
 
+  test('counts validExecutions from result.exerciseConfig when session.executionDuration is stale/longer', async () => {
+    // Patient played a 10-min config (600s). Session snapshot still says 30 min —
+    // using session duration alone would treat 600/1800 as 33% and keep 0/2.
+    const session = await driveStats({
+      results: [
+        {
+          status: 'completed',
+          score: 100,
+          duration: 600,
+          pauseCount: 0,
+          inactivityCount: 0,
+          exerciseConfig: { duration: 10 },
+        },
+      ],
+      sessionOverrides: {
+        executionDuration: 30,
+        executionCount: 2,
+        exerciseAssignment: { exerciseConfig: { executionCount: 2, duration: 10 } },
+      },
+    });
+
+    expect(session.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validExecutions: 1,
+        executionsCompleted: 1,
+        status: 'incomplete',
+      })
+    );
+  });
+
   test('session stays incomplete when fully-complete lượt < executionCount', async () => {
     const session = await driveStats({
       results: [

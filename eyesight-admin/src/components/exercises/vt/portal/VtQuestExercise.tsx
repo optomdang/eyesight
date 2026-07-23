@@ -26,6 +26,7 @@ import { getErrorMessage } from 'src/utils/errorHandler';
 import {
   getEffectiveExerciseDurationMs,
   getInactivityThresholdMs,
+  getReportedTimeoutDurationSeconds,
 } from 'src/utils/exerciseDuration';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
 import { resolveExerciseStartVisionLevel } from 'src/utils/exerciseDifficultyBaseline';
@@ -129,6 +130,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [completionSlotCounted, setCompletionSlotCounted] = useState(true);
   const [isCompletingSession, setIsCompletingSession] = useState(false);
   const [sessionSaved, setSessionSaved] = useState(false);
   const [isPausing, setIsPausing] = useState(false);
@@ -517,7 +519,8 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
   }, [assignment, sandboxMode]);
 
   // --- Build metrics ---
-  const buildMetrics = useCallback(() => {
+  const buildMetrics = useCallback(
+    (options?: { fromTimeout?: boolean }) => {
     const { session } = engineState;
     const stages = session.completedStages;
     const totalTrials = stages.reduce((sum, s) => sum + s.trials.length, 0);
@@ -526,9 +529,15 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       0
     );
     const accuracy = totalTrials > 0 ? totalCorrect / totalTrials : 0;
-    const durationSec = sessionStartTimeRef.current
+    let durationSec = sessionStartTimeRef.current
       ? Math.floor((Date.now() - sessionStartTimeRef.current) / 1000)
       : 0;
+    if (options?.fromTimeout && exerciseConfig?.duration != null) {
+      const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+      if (reported != null) {
+        durationSec = Math.max(durationSec, reported);
+      }
+    }
     const score = session.totalStars * 100 + session.totalCoins;
 
     const worlds: VtResultMetrics['worlds'] = {};
@@ -634,7 +643,9 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     };
 
     return { score, duration: durationSec, movesCount: totalTrials, accuracy, resultMetrics };
-  }, [engineState, exerciseType, vtVisionSizing]);
+  },
+  [engineState, exerciseType, vtVisionSizing, exerciseConfig?.duration]
+  );
 
   // --- Complete ---
   const handleExitToPortal = useCallback(() => {
@@ -645,49 +656,59 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     navigate('/portal/exercises');
   }, [navigate, sandboxMode, onSandboxExit]);
 
-  const handleCompleteExercise = useCallback(async () => {
-    if (completionInFlightRef.current || showCompletionDialog) return;
-    completionInFlightRef.current = true;
+  const handleCompleteExercise = useCallback(
+    async (options?: { fromTimeout?: boolean }): Promise<{ success: boolean; slotCounted: boolean }> => {
+      if (completionInFlightRef.current || showCompletionDialog) {
+        return { success: false, slotCounted: false };
+      }
+      completionInFlightRef.current = true;
 
-    if (sandboxMode) {
-      setSessionSaved(true);
-      setShowCompletionDialog(true);
-      return;
-    }
-    const resultId = currentResultIdRef.current;
-    if (!resultId) {
-      completionInFlightRef.current = false;
-      setSessionSaved(false);
-      return;
-    }
-    const metrics = buildMetrics();
-    setIsCompletingSession(true);
-    try {
-      await completeExercise(assignmentId, sessionId, resultId, {
-        score: metrics.score,
-        duration: metrics.duration,
-        movesCount: metrics.movesCount,
-        accuracy: metrics.accuracy,
-        resultMetrics: metrics.resultMetrics as unknown as Record<string, unknown>,
-      });
-      setSessionSaved(true);
-      setShowCompletionDialog(true);
-    } catch {
-      completionInFlightRef.current = false;
-      setSessionSaved(false);
-      showSnackbar(
-        'Không lưu được kết quả. Bạn vẫn có thể thoát về danh sách bài tập.',
-        'warning'
-      );
-      setShowCompletionDialog(true);
-    } finally {
-      setIsCompletingSession(false);
-    }
-  }, [assignmentId, sessionId, buildMetrics, showSnackbar, sandboxMode, showCompletionDialog]);
+      if (sandboxMode) {
+        setSessionSaved(true);
+        setCompletionSlotCounted(true);
+        setShowCompletionDialog(true);
+        return { success: true, slotCounted: true };
+      }
+      const resultId = currentResultIdRef.current;
+      if (!resultId) {
+        completionInFlightRef.current = false;
+        setSessionSaved(false);
+        return { success: false, slotCounted: false };
+      }
+      const metrics = buildMetrics({ fromTimeout: options?.fromTimeout });
+      setIsCompletingSession(true);
+      try {
+        const saved = await completeExercise(assignmentId, sessionId, resultId, {
+          score: metrics.score,
+          duration: metrics.duration,
+          movesCount: metrics.movesCount,
+          accuracy: metrics.accuracy,
+          resultMetrics: metrics.resultMetrics as unknown as Record<string, unknown>,
+        });
+        const slotCounted = saved?.status === 'completed';
+        setSessionSaved(true);
+        setCompletionSlotCounted(slotCounted);
+        setTimeRemaining(0);
+        setShowCompletionDialog(true);
+        return { success: true, slotCounted };
+      } catch {
+        completionInFlightRef.current = false;
+        setSessionSaved(false);
+        showSnackbar(
+          'Không lưu được kết quả. Bạn vẫn có thể thoát về danh sách bài tập.',
+          'warning'
+        );
+        return { success: false, slotCounted: false };
+      } finally {
+        setIsCompletingSession(false);
+      }
+    },
+    [assignmentId, sessionId, buildMetrics, showSnackbar, sandboxMode, showCompletionDialog]
+  );
 
   const handleTimeoutComplete = useCallback(async () => {
     forceComplete();
-    await handleCompleteExercise();
+    await handleCompleteExercise({ fromTimeout: true });
   }, [forceComplete, handleCompleteExercise]);
 
   const handleStopConfirm = useCallback(async () => {
@@ -698,9 +719,14 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       inactivityTimerRef.current = null;
     }
     forceComplete();
-    await handleCompleteExercise();
-    if (!sandboxMode) {
-      showSnackbar('Đã dừng tập và lưu kết quả. Lần sau sẽ bắt đầu phiên mới.', 'success');
+    const outcome = await handleCompleteExercise();
+    if (!sandboxMode && outcome.success) {
+      showSnackbar(
+        outcome.slotCounted
+          ? 'Đã dừng tập và lưu kết quả. Lần sau sẽ bắt đầu phiên mới.'
+          : 'Đã lưu kết quả nhưng chưa đủ 80% thời gian nên chưa tính vào tiến độ phiên.',
+        outcome.slotCounted ? 'success' : 'warning'
+      );
     }
   }, [forceComplete, handleCompleteExercise, sandboxMode, showSnackbar]);
 
@@ -1136,6 +1162,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
         open={showCompletionDialog}
         onClose={handleExitToPortal}
         container={fullscreenRootRef.current}
+        slotCounted={completionSlotCounted}
       />
 
       {sandboxMode && (
