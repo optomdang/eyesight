@@ -3,7 +3,7 @@ import { Box, Typography, Card, CardContent, Grid, Alert } from '@mui/material';
 import LoadingBoundary from 'src/components/shared/LoadingBoundary';
 import {
   IconEye,
-  IconActivity,
+  IconPercentage,
   IconTrophy,
   IconFlame,
   IconClock,
@@ -254,9 +254,10 @@ const PortalHomePage: React.FC = () => {
                 <Grid container spacing={3} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                     <StatCard
-                      title="Bài Tập Hoạt Động"
-                      value={stats.summary.activeAssignments}
-                      icon={IconActivity}
+                      title="% Hoàn thành (tổng)"
+                      value={`${Math.round(stats.summary.overallCompletionPct ?? 0)}%`}
+                      subtitle="Test + bài tập"
+                      icon={IconPercentage}
                       color="primary.main"
                     />
                   </Grid>

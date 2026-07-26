@@ -29,6 +29,7 @@ const {
 const { recordSessionCompletion } = require('../exercise/exerciseSessionCompletion.service');
 const { recalculatePatientComplianceByType } = require('./compliance.service');
 const auditLogService = require('../system/auditLog.service');
+const dashboardUserService = require('../dashboard/dashboardUser.service');
 
 const VN_UTC_OFFSET_MINUTES = 7 * 60;
 const EXERCISE_COMPLETE_THRESHOLD = 0.8;
@@ -300,6 +301,9 @@ const getMonthCalendar = async (patientId, month, actor) => {
     month,
     patientId: patient.id,
     thresholdPct: EXERCISE_COMPLETE_THRESHOLD * 100,
+    overallCompletionPct: await dashboardUserService
+      .getPatientOverallCompletionPct(patient.id)
+      .catch(() => 0),
     days,
   };
 };

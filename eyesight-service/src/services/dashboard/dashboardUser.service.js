@@ -607,6 +607,133 @@ const getLeaderboard = async (centerId, doctorId = null) => {
 };
 
 /**
+ * Overall completion % for one patient — same formula as BXH "HOÀN THÀNH" (#8).
+ * @param {number} patientId
+ * @returns {Promise<number>} 0–100
+ */
+const getPatientOverallCompletionPct = async (patientId) => {
+  const id = Number(patientId);
+  if (!Number.isFinite(id) || id <= 0) return 0;
+
+  const [
+    examSessions,
+    examResults,
+    exerciseSessions,
+    exerciseResults,
+    exerciseAssignments,
+    examAssignments,
+  ] = await Promise.all([
+    ExamSession.findAll({
+      where: { patientId: id, deleted: false },
+      attributes: ['id', 'patientId', 'examType', 'scheduledDate'],
+      raw: true,
+    }),
+    ExamResult.findAll({
+      where: { patientId: id, deleted: false },
+      attributes: [
+        'id',
+        'patientId',
+        'examSessionId',
+        'examType',
+        'status',
+        'leftEyeLevel',
+        'rightEyeLevel',
+        'bothEyeLevel',
+        'completedAt',
+        'createdAt',
+      ],
+      order: [
+        ['completedAt', 'DESC NULLS LAST'],
+        ['createdAt', 'DESC'],
+      ],
+      raw: true,
+    }),
+    ExerciseSession.findAll({
+      where: { patientId: id, deleted: false },
+      attributes: [
+        'id',
+        'patientId',
+        'exerciseAssignmentId',
+        'executionCount',
+        'executionDuration',
+        'startedAt',
+      ],
+      raw: true,
+    }),
+    ExerciseResult.findAll({
+      where: { patientId: id, deleted: false },
+      attributes: [
+        'id',
+        'patientId',
+        'exerciseSessionId',
+        'status',
+        'duration',
+        'movesCount',
+        'pauseCount',
+        'inactivityCount',
+        'focusScore',
+        'createdAt',
+      ],
+      order: [['createdAt', 'ASC']],
+      raw: true,
+    }),
+    ExerciseAssignment.findAll({
+      where: { patientId: id, status: 'active' },
+      attributes: ['id', 'patientId', 'assignedAt', 'exerciseConfigId'],
+      include: [
+        {
+          model: ExerciseConfig,
+          as: 'exerciseConfig',
+          attributes: ['frequency', 'executionCount', 'duration'],
+        },
+      ],
+    }),
+    ExamAssignment.findAll({
+      where: { patientId: id, isEnabled: true },
+      attributes: ['id', 'patientId', 'examType', 'frequency', 'createdAt'],
+      raw: true,
+    }),
+  ]);
+
+  const examResultBySessionId = {};
+  examResults.forEach((r) => {
+    if (!r.examSessionId) return;
+    if (!examResultBySessionId[r.examSessionId]) {
+      examResultBySessionId[r.examSessionId] = r;
+    }
+  });
+
+  const exerciseResultsBySessionId = {};
+  exerciseResults.forEach((r) => {
+    if (!r.exerciseSessionId) return;
+    if (!exerciseResultsBySessionId[r.exerciseSessionId]) {
+      exerciseResultsBySessionId[r.exerciseSessionId] = [];
+    }
+    exerciseResultsBySessionId[r.exerciseSessionId].push(r);
+  });
+
+  const mappedAssignments = exerciseAssignments.map((a) => ({
+    id: a.id,
+    patientId: a.patientId,
+    assignedAt: a.assignedAt,
+    frequency: a.exerciseConfig?.frequency,
+    executionCount: a.exerciseConfig?.executionCount,
+    exerciseConfig: a.exerciseConfig,
+  }));
+
+  return round2(
+    computePatientCompletionPct({
+      examAssignments,
+      examSessions,
+      examResultBySessionId,
+      exerciseAssignments: mappedAssignments,
+      exerciseSessions,
+      exerciseResultsBySessionId,
+    })
+  );
+};
+
+/**
  * Get comprehensive patient statistics
  * Combines all metrics into one response
  * @param {Object} params
@@ -694,5 +821,6 @@ module.exports = {
   getInactivePatients,
   getUserActivityTrend,
   getLeaderboard,
+  getPatientOverallCompletionPct,
   getPatientStatistics,
 };

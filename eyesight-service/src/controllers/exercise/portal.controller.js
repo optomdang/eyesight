@@ -297,6 +297,10 @@ const getMyAssignmentStats = catchAsync(async (req, res) => {
   );
 
   // Combined response
+  const overallCompletionPct = await dashboardUserService
+    .getPatientOverallCompletionPct(patient.id)
+    .catch(() => 0);
+
   res.send({
     // Today's overview
     assignments: assignmentOverview,
@@ -308,6 +312,7 @@ const getMyAssignmentStats = catchAsync(async (req, res) => {
       totalSessions: exerciseResults.totalSessions || 0,
       averageScore: exerciseResults.averageScore || 0,
       totalTime: exerciseResults.totalTime || 0,
+      overallCompletionPct,
       complianceOverview: {
         compliant: (assignments.rows && assignments.rows.filter((a) => a.complianceStatus === 'compliant').length) || 0,
         overdue: (assignments.rows && assignments.rows.filter((a) => a.complianceStatus === 'overdue').length) || 0,

@@ -145,6 +145,8 @@ export interface AssignmentStats {
     totalSessions: number;
     averageScore: number;
     totalTime: number;
+    /** Overall completion % (same formula as BXH HOÀN THÀNH) */
+    overallCompletionPct?: number;
     complianceOverview: {
       compliant: number;
       overdue: number;

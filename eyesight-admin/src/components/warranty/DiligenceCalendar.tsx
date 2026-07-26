@@ -29,8 +29,18 @@ import {
 import useSnackbar from 'src/contexts/UseSnackbar';
 import { SNACKBAR_SEVERITY } from 'src/utils/constant';
 import { getErrorMessage } from 'src/utils/errorHandler';
+import { LabelWithHelp } from 'src/components/shared/HelpTooltip';
 
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+const OVERALL_COMPLETION_HELP =
+  'Tỷ lệ hoàn thành tổng của bệnh nhân (cùng công thức BXH): trung bình % hoàn thành các buổi test và lượt tập theo chu kỳ được giao.';
+
+const overallCompletionColor = (pct: number): string => {
+  if (pct > 90) return '#2e7d32'; // xanh
+  if (pct >= 80) return '#f9a825'; // vàng
+  return '#ed6c02'; // cam
+};
 
 const STATUS_COLORS: Record<DiligenceCalendarDay['status'], string> = {
   complete: '#1976d2',
@@ -152,8 +162,32 @@ const DiligenceCalendar: React.FC<DiligenceCalendarProps> = ({
     }
   };
 
+  const overallPct =
+    data?.overallCompletionPct != null ? Math.round(data.overallCompletionPct) : null;
+  const overallColor =
+    overallPct != null ? overallCompletionColor(overallPct) : 'text.secondary';
+
   return (
-    <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+    <Box sx={{ mt: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2, mb: 1.5, textAlign: 'center' }}>
+        <Typography
+          component="div"
+          title="% Hoàn thành (tổng)"
+          aria-label="% Hoàn thành (tổng)"
+          sx={{
+            fontWeight: 800,
+            lineHeight: 1,
+            fontSize: '4.5rem', // ~3× default h3 (~1.5rem)
+            color: overallColor,
+          }}
+        >
+          <LabelWithHelp help={OVERALL_COMPLETION_HELP} variant="info">
+            {overallPct != null ? `${overallPct}%` : loading ? '…' : '—'}
+          </LabelWithHelp>
+        </Typography>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           Lịch theo dõi hoàn thành
@@ -309,7 +343,8 @@ const DiligenceCalendar: React.FC<DiligenceCalendarProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+      </Paper>
+    </Box>
   );
 };
 

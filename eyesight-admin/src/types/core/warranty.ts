@@ -124,5 +124,7 @@ export interface DiligenceCalendarResponse {
   month: string;
   patientId: number;
   thresholdPct: number;
+  /** Overall completion % (same formula as BXH HOÀN THÀNH) */
+  overallCompletionPct?: number;
   days: DiligenceCalendarDay[];
 }
