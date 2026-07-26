@@ -3,7 +3,7 @@ import { Box, Typography, Card, CardContent, Grid, Alert } from '@mui/material';
 import LoadingBoundary from 'src/components/shared/LoadingBoundary';
 import {
   IconEye,
-  IconPercentage,
+  IconBarbell,
   IconTrophy,
   IconFlame,
   IconClock,
@@ -207,6 +207,16 @@ const PortalHomePage: React.FC = () => {
     return 'Hãy cùng nhau tiến bộ mỗi ngày!';
   };
 
+  /** Format practice time: minutes (m), switch to hours (h) when minutes > 10_000; `.` as thousands sep. */
+  const formatTotalPracticeTime = (totalSeconds: number): string => {
+    const minutes = Math.round((totalSeconds || 0) / 60);
+    const withDots = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    if (minutes > 10000) {
+      return `${withDots(Math.round(minutes / 60))}h`;
+    }
+    return `${withDots(minutes)}m`;
+  };
+
   const incompleteCount = stats?.assignments.filter((a) => !a.isCompleted).length || 0;
   const totalToday = stats?.assignments.length || 0;
 
@@ -254,18 +264,16 @@ const PortalHomePage: React.FC = () => {
                 <Grid container spacing={3} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                     <StatCard
-                      title="% Hoàn thành (tổng)"
+                      title="Hoàn thành"
                       value={`${Math.round(stats.summary.overallCompletionPct ?? 0)}%`}
-                      subtitle="Test + bài tập"
-                      icon={IconPercentage}
+                      icon={IconBarbell}
                       color="primary.main"
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
                     <StatCard
                       title="Thời Gian Tập"
-                      value={Math.round((stats.summary.totalTime || 0) / 60) + 'm'}
-                      subtitle="Tổng thời gian"
+                      value={formatTotalPracticeTime(stats.summary.totalTime || 0)}
                       icon={IconClock}
                       color="secondary.main"
                     />
