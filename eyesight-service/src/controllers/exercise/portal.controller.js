@@ -44,7 +44,10 @@ const getMyAssignments = catchAsync(async (req, res) => {
       activePackage.allowedConfigIds,
       { centerId: patient.centerId }
     );
-    packageFilter = { exerciseConfigId: allowedConfigIds };
+    // Never apply an empty IN () — that hides every assignment (looks like "Không có dữ liệu").
+    if (allowedConfigIds.length > 0) {
+      packageFilter = { exerciseConfigId: allowedConfigIds };
+    }
   }
 
   const filter = {

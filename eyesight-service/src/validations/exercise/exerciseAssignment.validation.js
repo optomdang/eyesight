@@ -125,7 +125,10 @@ const getMyAssignments = {
     exerciseId: Joi.number().integer().positive().optional(),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(1000).default(10),
-    sortBy: Joi.string().valid('assignedAt', 'lastCompletedAt').default('assignedAt'),
+    // FE sends "field:ASC|DESC"; bare field also accepted (direction via sortOrder).
+    sortBy: Joi.string()
+      .pattern(/^(assignedAt|lastCompletedAt)(:(asc|desc|ASC|DESC))?$/)
+      .default('assignedAt'),
     sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
   }),
 };

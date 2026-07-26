@@ -48,6 +48,7 @@ import PhaseTimeline from 'src/components/warranty/PhaseTimeline';
 import PdfDownloadButton from 'src/components/warranty/PdfDownloadButton';
 import ClinicalDataForm from 'src/components/warranty/ClinicalDataForm';
 import DoctorSignForm from 'src/components/warranty/DoctorSignForm';
+import DiligenceCalendar from 'src/components/warranty/DiligenceCalendar';
 import useAuth from 'src/contexts/authGuard/useAuth';
 import { getErrorMessage } from 'src/utils/errorHandler';
 
@@ -393,6 +394,11 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                 </Button>
               )}
             </Stack>
+
+            <DiligenceCalendar
+              patientId={patientId}
+              canEdit={user?.userType === 'admin' || user?.userType === 'doctor'}
+            />
 
             {reexamEarly && (
               <Alert severity="warning" sx={{ mt: 2 }}>

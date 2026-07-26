@@ -316,6 +316,37 @@ const getPatientActiveTreatmentPackage = {
   }),
 };
 
+const getDiligenceCalendar = {
+  params: Joi.object().keys({
+    patientId: Joi.number().integer().required(),
+  }),
+  query: Joi.object().keys({
+    month: Joi.string()
+      .pattern(/^\d{4}-\d{2}$/)
+      .required(),
+  }),
+};
+
+const getMyDiligenceCalendar = {
+  query: Joi.object().keys({
+    month: Joi.string()
+      .pattern(/^\d{4}-\d{2}$/)
+      .required(),
+  }),
+};
+
+const overrideDiligenceDay = {
+  params: Joi.object().keys({
+    patientId: Joi.number().integer().required(),
+    date: Joi.string()
+      .pattern(/^\d{4}-\d{2}-\d{2}$/)
+      .required(),
+  }),
+  body: Joi.object().keys({
+    reason: Joi.string().allow('', null).max(500),
+  }),
+};
+
 module.exports = {
   createPatient,
   getPatients,
@@ -328,4 +359,7 @@ module.exports = {
   getPatientByUserId,
   updateMedicalRecord,
   getPatientActiveTreatmentPackage,
+  getDiligenceCalendar,
+  getMyDiligenceCalendar,
+  overrideDiligenceDay,
 };

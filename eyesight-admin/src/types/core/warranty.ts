@@ -99,3 +99,30 @@ export interface SignWarrantyPhasePayload {
   signerRelation?: string;
   consentAccepted: true;
 }
+
+export type DiligenceDayStatus = 'none' | 'partial' | 'complete';
+
+export interface DiligenceCalendarDay {
+  date: string;
+  status: DiligenceDayStatus;
+  completionPct: number;
+  assignedSec: number;
+  actualSec: number;
+  hasLogin: boolean;
+  dailyExamRequired: number;
+  dailyExamCompleted: number;
+  overridden: boolean;
+  override?: {
+    status: string;
+    reason?: string | null;
+    overriddenBy?: number | null;
+    overriddenAt?: string | null;
+  } | null;
+}
+
+export interface DiligenceCalendarResponse {
+  month: string;
+  patientId: number;
+  thresholdPct: number;
+  days: DiligenceCalendarDay[];
+}

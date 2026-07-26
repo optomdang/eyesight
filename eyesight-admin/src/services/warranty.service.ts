@@ -4,13 +4,14 @@
  */
 
 import axios from 'axios';
-import { getData, postData, patchData, getBlob } from 'src/utils/request';
 import type {
   WarrantyAgreement,
   CreateWarrantyPhasePayload,
   UpdateWarrantyClinicalDataPayload,
   SignWarrantyPhasePayload,
+  DiligenceCalendarResponse,
 } from 'src/types/core/warranty';
+import { getData, postData, patchData, putData, getBlob } from 'src/utils/request';
 
 export interface WarrantySignData {
   /** Who should sign when opening the link; null when phase is already completed */
@@ -138,6 +139,27 @@ export const downloadWarrantyPdfByToken = async (token: string): Promise<Blob> =
   });
   return res.data;
 };
+
+/** GET /patients/:patientId/diligence-calendar?month=YYYY-MM */
+export const getPatientDiligenceCalendar = (
+  patientId: number,
+  month: string
+): Promise<DiligenceCalendarResponse> =>
+  getData<DiligenceCalendarResponse>(
+    `patients/${patientId}/diligence-calendar?month=${encodeURIComponent(month)}`
+  );
+
+/** GET /me/diligence-calendar?month=YYYY-MM — patient portal (own calendar) */
+export const getMyDiligenceCalendar = (month: string): Promise<DiligenceCalendarResponse> =>
+  getData<DiligenceCalendarResponse>(`me/diligence-calendar?month=${encodeURIComponent(month)}`);
+
+/** PUT /patients/:patientId/diligence-calendar/:date — mark day complete */
+export const overridePatientDiligenceDay = (
+  patientId: number,
+  date: string,
+  payload?: { reason?: string }
+): Promise<{ date: string; day: DiligenceCalendarResponse['days'][number] | null; calendar: DiligenceCalendarResponse }> =>
+  putData(`patients/${patientId}/diligence-calendar/${date}`, payload || {});
 
 /** Trigger browser download from blob */
 export function triggerBlobDownload(blob: Blob, filename: string): void {

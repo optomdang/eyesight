@@ -24,6 +24,7 @@ import {
   getEffectiveExerciseDurationMs,
   getInactivityThresholdMs,
   getReportedTimeoutDurationSeconds,
+  resolveAssignedDurationMinutes,
 } from 'src/utils/exerciseDuration';
 import { calculateVisualSettings, computeExercisePatientVision, resolveAssignmentTrainingEye } from 'src/utils/visionUtils';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
@@ -68,6 +69,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const fullscreenRootRef = useRef<HTMLDivElement>(null);
   const timeoutTriggeredRef = useRef(false);
   const currentResultIdRef = useRef<number | null>(null);
+  /** Duration minutes frozen on the result — must match BE ≥80% scoring. */
+  const assignedDurationMinRef = useRef<number | null>(null);
 
   const [sessionBootstrap, setSessionBootstrap] = useState<{
     engineEnabled: boolean;
@@ -244,7 +247,10 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     setShowEndDialog(false);
 
     if (isGameActive() && currentResultId) {
-      const outcome = await completeExerciseResult(getFinalScore());
+      // If the timer already hit 0 (e.g. timeout save failed), still floor duration
+      // so a full run is not under-counted as <80%.
+      const fromTimeout = timeRemaining === 0;
+      const outcome = await completeExerciseResult(getFinalScore(), { fromTimeout });
       if (outcome.success) {
         setTimeRemaining(0);
         setCompletionSlotCounted(outcome.slotCounted);
@@ -365,10 +371,14 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       const accuracy = movesCount > 0 ? scoringMoves / movesCount : 0;
       let duration = Math.floor((Date.now() - currentSession.startTime) / 1000);
 
+      const assignedMin =
+        assignedDurationMinRef.current ??
+        resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+
       // Timeout path: report at least the effective assigned seconds so clock skew /
       // 1s ticker lag cannot drop a full run below the 80% session threshold.
-      if (options?.fromTimeout && exerciseConfig?.duration != null) {
-        const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+      if (options?.fromTimeout && assignedMin != null) {
+        const reported = getReportedTimeoutDurationSeconds(assignedMin);
         if (reported != null) {
           duration = Math.max(duration, reported);
         }
@@ -397,7 +407,14 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       const currentSession = gameExecutionRef.current;
 
       const resultId = currentResultIdRef.current;
-      if (!currentSession || !assignment || currentSession.completed || !resultId) {
+      if (!currentSession || !assignment || currentSession.completed) {
+        return { success: false, slotCounted: false };
+      }
+      if (!resultId) {
+        showSnackbar(
+          'Phiên tập chưa được khởi tạo trên máy chủ — kết quả không thể lưu. Vui lòng tải lại trang.',
+          'error'
+        );
         return { success: false, slotCounted: false };
       }
 
@@ -431,6 +448,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         };
       } catch {
         gameExecutionRef.current = { ...currentSession, completed: false };
+        // Allow timeout path to retry on the next tick / via End button
+        timeoutTriggeredRef.current = false;
         showSnackbar('Không thể lưu kết quả bài tập', 'error');
         return { success: false, slotCounted: false };
       }
@@ -442,6 +461,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     const currentSession = gameExecutionRef.current;
 
     if (!currentSession || !assignment || !currentResultIdRef.current || currentSession.completed) {
+      timeoutTriggeredRef.current = false;
       return;
     }
 
@@ -466,12 +486,15 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 
   // Countdown timer based on exercise duration - follow existing pattern
   useEffect(() => {
-    if (!exerciseConfig?.duration || !gameExecutionRef.current?.startTime) {
+    const assignedMin =
+      assignedDurationMinRef.current ??
+      resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+    if (!assignedMin || !gameExecutionRef.current?.startTime) {
       setTimeRemaining(null);
       return;
     }
 
-    const durationMs = getEffectiveExerciseDurationMs(exerciseConfig.duration);
+    const durationMs = getEffectiveExerciseDurationMs(assignedMin);
     if (durationMs === null) {
       setTimeRemaining(null);
       return;
@@ -812,6 +835,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 
     setIsLoading(true);
     timeoutTriggeredRef.current = false;
+    assignedDurationMinRef.current = null;
     setSessionBootstrap({ engineEnabled: false, resumeState: null });
 
     // Clear any running inactivity timer before starting new execution
@@ -837,6 +861,12 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       }
 
       setCurrentResultId(result.id);
+      currentResultIdRef.current = result.id;
+
+      assignedDurationMinRef.current = resolveAssignedDurationMinutes(
+        result.exerciseConfig?.duration,
+        exerciseConfig?.duration
+      );
 
       if (action === 'resume') {
         showSnackbar('Tiếp tục từ lần chơi trước', 'info');
@@ -896,26 +926,14 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     } catch (error) {
       console.error('Error starting game execution:', error);
       setIsLoading(false);
-      // Fallback to local execution if API fails
-      const startTime = Date.now();
-      const execution: GameSession = {
-        // Game2048Result properties
-        score: 0,
-        moves: 0,
-        highestTile: 0,
-        efficiency: 0,
-        // ExerciseResult properties
-        startTime: startTime,
-        movesCount: 0,
-        scoringMoves: 0,
-        maxScore: 0,
-        completed: false,
-        exerciseId: assignment?.exerciseConfig?.exerciseId || 0,
-        level: 0,
-        sessionId: 0,
-      };
-
-      gameExecutionRef.current = execution;
+      gameExecutionRef.current = null;
+      setCurrentResultId(null);
+      assignedDurationMinRef.current = null;
+      showSnackbar(
+        'Không thể bắt đầu bài tập trên máy chủ. Vui lòng thử lại — kết quả sẽ không được lưu nếu tiếp tục offline.',
+        'error'
+      );
+      navigate('/portal/exercises');
     }
   };
 
@@ -924,8 +942,9 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
    */
   const endExerciseResult = useCallback(
     async (_gameWon: boolean, finalScore: number) => {
-      const success = await completeExerciseResult(finalScore);
-      if (success) {
+      const outcome = await completeExerciseResult(finalScore);
+      if (outcome.success) {
+        setCompletionSlotCounted(outcome.slotCounted);
         setShowCompletionDialog(true);
       }
     },

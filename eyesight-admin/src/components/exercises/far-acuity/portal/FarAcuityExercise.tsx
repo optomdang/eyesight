@@ -35,6 +35,7 @@ import {
   getEffectiveExerciseDurationMs,
   getReportedTimeoutDurationSeconds,
   getInactivityThresholdMs,
+  resolveAssignedDurationMinutes,
 } from 'src/utils/exerciseDuration';
 import {
   resolveAssignmentTrainingEye,
@@ -170,6 +171,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const fullscreenRootRef = useRef<HTMLDivElement>(null);
   const currentResultIdRef = useRef<number | null>(null);
   const timeoutTriggeredRef = useRef(false);
+  const assignedDurationMinRef = useRef<number | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -578,8 +580,11 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       const contrastInfo = getContrastLevelInfo(state.contrastLevel);
       const acuityInfo = getAcuityLevelInfo(trainingVisionType, state.farLevel);
       let duration = Math.floor((Date.now() - executionRef.current.startTime) / 1000);
-      if (options?.fromTimeout && exerciseConfig?.duration != null) {
-        const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+      const assignedMin =
+        assignedDurationMinRef.current ??
+        resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+      if (options?.fromTimeout && assignedMin != null) {
+        const reported = getReportedTimeoutDurationSeconds(assignedMin);
         if (reported != null) {
           duration = Math.max(duration, reported);
         }
@@ -615,6 +620,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         return { success: false, slotCounted: false };
       }
       if (!sandboxMode && !currentResultIdRef.current) {
+        showSnackbar(
+          'Phiên tập chưa được khởi tạo trên máy chủ — kết quả không thể lưu. Vui lòng tải lại trang.',
+          'error'
+        );
         return { success: false, slotCounted: false };
       }
       executionRef.current.completed = true;
@@ -647,6 +656,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       } catch {
         executionRef.current.completed = false;
         setIsActive(true);
+        timeoutTriggeredRef.current = false;
         showSnackbar('Không thể lưu kết quả bài tập', 'error');
         return { success: false, slotCounted: false };
       }
@@ -655,20 +665,27 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
 
   const handleTimeoutSubmission = useCallback(async () => {
+    if (!sandboxMode && !currentResultIdRef.current) {
+      timeoutTriggeredRef.current = false;
+      return;
+    }
     const outcome = await completeExerciseResult({ fromTimeout: true });
     if (outcome.success) {
       setTimeRemaining(0);
       setCompletionSlotCounted(outcome.slotCounted);
       setShowCompletionDialog(true);
     }
-  }, [completeExerciseResult]);
+  }, [completeExerciseResult, sandboxMode]);
 
   useEffect(() => {
-    if (!exerciseConfig?.duration || !executionRef.current?.startTime || !isActive) {
+    const assignedMin =
+      assignedDurationMinRef.current ??
+      resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+    if (!assignedMin || !executionRef.current?.startTime || !isActive) {
       setTimeRemaining(null);
       return;
     }
-    const durationMs = getEffectiveExerciseDurationMs(exerciseConfig.duration);
+    const durationMs = getEffectiveExerciseDurationMs(assignedMin);
     if (durationMs === null) { setTimeRemaining(null); return; }
 
     const startTime = executionRef.current.startTime;
@@ -729,13 +746,14 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   // ── End / exit dialogs ────────────────────────────────────────────────────
   const handleEndConfirm = useCallback(async () => {
     setShowEndDialog(false);
-    const outcome = await completeExerciseResult();
+    const fromTimeout = timeRemaining === 0;
+    const outcome = await completeExerciseResult({ fromTimeout });
     if (outcome.success) {
       setTimeRemaining(0);
       setCompletionSlotCounted(outcome.slotCounted);
       setShowCompletionDialog(true);
     }
-  }, [completeExerciseResult]);
+  }, [completeExerciseResult, timeRemaining]);
 
   const handleExitConfirm = useCallback(async () => {
     setShowExitDialog(false);
@@ -798,6 +816,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
 
         setCurrentResultId(result.id);
         currentResultIdRef.current = result.id;
+        assignedDurationMinRef.current = resolveAssignedDurationMinutes(
+          result.exerciseConfig?.duration,
+          exerciseConfig?.duration
+        );
 
         if (action === 'resume' && result.exerciseState) {
           try {
@@ -828,13 +850,19 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         setIsLoading(false);
       } catch {
         setIsLoading(false);
-        const startTime = Date.now();
-        executionRef.current = { startTime, completed: false };
-        setCurrentTime(startTime);
-        setIsActive(true);
+        executionRef.current = null;
+        setCurrentResultId(null);
+        currentResultIdRef.current = null;
+        assignedDurationMinRef.current = null;
+        setIsActive(false);
+        showSnackbar(
+          'Không thể bắt đầu bài tập trên máy chủ. Vui lòng thử lại.',
+          'error'
+        );
+        navigate('/portal/exercises');
       }
     })();
-  }, [assignment, assignmentId, sessionId, sandboxMode]);
+  }, [assignment, assignmentId, sessionId, sandboxMode, exerciseConfig?.duration, showSnackbar, navigate]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
   if (!assignment) {

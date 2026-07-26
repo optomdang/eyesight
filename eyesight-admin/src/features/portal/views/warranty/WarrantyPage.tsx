@@ -14,6 +14,7 @@ import {
 import PolicyViewer from 'src/components/warranty/PolicyViewer';
 import PhaseTimeline from 'src/components/warranty/PhaseTimeline';
 import PdfDownloadButton from 'src/components/warranty/PdfDownloadButton';
+import DiligenceCalendar from 'src/components/warranty/DiligenceCalendar';
 
 const PortalWarrantyPage: React.FC = () => {
   const { showSnackbar } = useSnackbar();
@@ -64,9 +65,16 @@ const PortalWarrantyPage: React.FC = () => {
 
       <LoadingBoundary loading={loading} height="300px">
         {!agreement ? (
-          <Alert severity="info">
-            Chưa có hồ sơ cam kết bảo hành. Vui lòng liên hệ bác sĩ/phòng khám để được hỗ trợ.
-          </Alert>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <DiligenceCalendar self canEdit={false} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 8 }}>
+              <Alert severity="info">
+                Chưa có hồ sơ cam kết bảo hành. Vui lòng liên hệ bác sĩ/phòng khám để được hỗ trợ.
+              </Alert>
+            </Grid>
+          </Grid>
         ) : (
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 4 }}>
@@ -100,6 +108,8 @@ const PortalWarrantyPage: React.FC = () => {
                   />
                 </Box>
               </Paper>
+
+              <DiligenceCalendar self canEdit={false} />
             </Grid>
 
             <Grid size={{ xs: 12, md: 8 }}>

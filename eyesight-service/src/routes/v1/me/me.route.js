@@ -223,6 +223,13 @@ router
   .route('/leaderboard')
   .get(auth(allRights.manageOwnExercises.code), checkPatientActive, portalController.getMyLeaderboard);
 
+// Monthly diligence calendar (warranty page — read-only for patient)
+router.route('/diligence-calendar').get(
+  auth(allRights.manageOwnExercises.code),
+  validate(patientValidation.getMyDiligenceCalendar),
+  patientController.getMyDiligenceCalendar
+);
+
 // Current user exercise results - get all exercise results
 router
   .route('/exercise-results')

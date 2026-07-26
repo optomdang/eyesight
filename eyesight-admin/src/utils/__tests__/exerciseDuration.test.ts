@@ -4,6 +4,7 @@ import {
   getEffectiveExerciseDurationSeconds,
   getReportedTimeoutDurationSeconds,
   getInactivityThresholdMs,
+  resolveAssignedDurationMinutes,
   DEFAULT_INACTIVITY_THRESHOLD_SECONDS,
 } from '../exerciseDuration';
 
@@ -56,6 +57,23 @@ describe('exerciseDuration fast E2E override', () => {
     vi.stubEnv('VITE_E2E_EXERCISE_DURATION_SECONDS', '60');
 
     expect(getReportedTimeoutDurationSeconds(0.5)).toBe(30);
+  });
+});
+
+describe('resolveAssignedDurationMinutes', () => {
+  it('prefers the result config snapshot over the live assignment duration', () => {
+    expect(resolveAssignedDurationMinutes(30, 10)).toBe(30);
+    expect(resolveAssignedDurationMinutes('15', 10)).toBe(15);
+  });
+
+  it('falls back to assignment duration when result snapshot is missing', () => {
+    expect(resolveAssignedDurationMinutes(undefined, 10)).toBe(10);
+    expect(resolveAssignedDurationMinutes(null, '12')).toBe(12);
+  });
+
+  it('returns null when neither source is valid', () => {
+    expect(resolveAssignedDurationMinutes(undefined, undefined)).toBeNull();
+    expect(resolveAssignedDurationMinutes(0, -1)).toBeNull();
   });
 });
 

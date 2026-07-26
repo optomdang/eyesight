@@ -226,6 +226,9 @@ export type {
   CreateWarrantyPhasePayload,
   UpdateWarrantyClinicalDataPayload,
   SignWarrantyPhasePayload,
+  DiligenceDayStatus,
+  DiligenceCalendarDay,
+  DiligenceCalendarResponse,
 } from './warranty';
 
 // Common/Utility Types

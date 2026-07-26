@@ -152,6 +152,13 @@ Patient.init(
         },
       },
     },
+    diligenceDayOverrides: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment:
+        'Doctor/admin overrides for daily diligence calendar keyed by YYYY-MM-DD',
+    },
     updatedBy: { type: DataTypes.INTEGER },
     deletedAt: { type: DataTypes.DATE },
     deleted: { type: DataTypes.BOOLEAN, defaultValue: false },

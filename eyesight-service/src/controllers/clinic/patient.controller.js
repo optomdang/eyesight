@@ -197,6 +197,34 @@ const getPatientActiveTreatmentPackage = catchAsync(async (req, res) => {
   res.send(active);
 });
 
+const diligenceCalendarService = require('../../services/clinic/diligenceCalendar.service');
+
+const getDiligenceCalendar = catchAsync(async (req, res) => {
+  const patientId = parseInt(req.params.patientId, 10);
+  const month = req.query.month;
+  const calendar = await diligenceCalendarService.getMonthCalendar(patientId, month, req.user);
+  res.send(calendar);
+});
+
+const getMyDiligenceCalendar = catchAsync(async (req, res) => {
+  const patient = await patientService.getPatientByUserId(req.user.id);
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy hồ sơ bệnh nhân');
+  }
+  const calendar = await diligenceCalendarService.getMonthCalendar(patient.id, req.query.month, req.user);
+  res.send(calendar);
+});
+
+const overrideDiligenceDay = catchAsync(async (req, res) => {
+  const patientId = parseInt(req.params.patientId, 10);
+  const { date } = req.params;
+  const result = await diligenceCalendarService.overrideDayComplete(patientId, date, {
+    reason: req.body?.reason,
+    actor: req.user,
+  });
+  res.send(result);
+});
+
 module.exports = {
   createPatient,
   getPatients,
@@ -212,4 +240,7 @@ module.exports = {
   getMyPatients,
   updateMedicalRecord,
   getPatientActiveTreatmentPackage,
+  getDiligenceCalendar,
+  getMyDiligenceCalendar,
+  overrideDiligenceDay,
 };

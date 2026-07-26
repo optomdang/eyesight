@@ -94,11 +94,15 @@ const DataTableProvider = <T,>({ children, endpoint, defaultRowsPerPage = 10, fi
       } catch (error) {
         console.error('Lỗi khi fetch dữ liệu:', error);
         // Keep previous rows on failure — clearing first caused empty "Không có dữ liệu" on sort errors.
+        showSnackbar(
+          getErrorMessage(error, 'Không tải được danh sách. Vui lòng thử lại.'),
+          SNACKBAR_SEVERITY.ERROR
+        );
       } finally {
         setLoading(false);
       }
     },
-    [tableState.page, tableState.rowsPerPage, tableState.sortOrder, getQueryString, endpoint]
+    [tableState.page, tableState.rowsPerPage, tableState.sortOrder, getQueryString, endpoint, showSnackbar]
   );
 
   // Hàm khi nhấn "Search"

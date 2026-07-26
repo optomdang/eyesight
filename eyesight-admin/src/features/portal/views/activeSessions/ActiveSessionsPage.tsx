@@ -53,7 +53,7 @@ const ActiveSessionsPage: React.FC = () => {
   };
 
   const columns: MUIDataTableColumnDef[] = [
-    createNestedColumn('exerciseConfig.exercise.name', 'Bài tập'),
+    createNestedColumn('exerciseConfig.exercise.name', 'Bài tập', 'N/A', { sort: false }),
     {
       name: 'trainingEye',
       label: 'Mắt',
@@ -113,7 +113,9 @@ const ActiveSessionsPage: React.FC = () => {
       ),
       options: {
         filter: false,
-        sort: true,
+        // Portal API only allows sortBy=assignedAt|lastCompletedAt — sorting this
+        // column used to 400 and leave the table looking empty.
+        sort: false,
         customBodyRender: (value: number | null) => {
           if (value === null || value === undefined)
             return (

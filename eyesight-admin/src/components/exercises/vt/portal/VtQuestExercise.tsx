@@ -27,6 +27,7 @@ import {
   getEffectiveExerciseDurationMs,
   getInactivityThresholdMs,
   getReportedTimeoutDurationSeconds,
+  resolveAssignedDurationMinutes,
 } from 'src/utils/exerciseDuration';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
 import { resolveExerciseStartVisionLevel } from 'src/utils/exerciseDifficultyBaseline';
@@ -140,6 +141,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trialEaseHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutTriggeredRef = useRef(false);
+  const assignedDurationMinRef = useRef<number | null>(null);
   const completionInFlightRef = useRef(false);
   const [showTrialEaseHint, setShowTrialEaseHint] = useState(false);
   const fullscreenRootRef = useRef<HTMLDivElement>(null);
@@ -342,9 +344,16 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Defined early so the countdown effect can call it safely (ref always current).
+  const handleTimeoutCompleteRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => {
-    if (sandboxMode || !sessionStartTimeRef.current || !exerciseConfig?.duration) return;
-    const limitMs = getEffectiveExerciseDurationMs(exerciseConfig?.duration);
+    if (sandboxMode || !sessionStartTimeRef.current) return;
+    const assignedMin =
+      assignedDurationMinRef.current ??
+      resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+    if (!assignedMin) return;
+    const limitMs = getEffectiveExerciseDurationMs(assignedMin);
     if (limitMs === null) return;
     const elapsed = currentTime - sessionStartTimeRef.current;
     const remaining = Math.max(0, limitMs - elapsed);
@@ -352,9 +361,9 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
 
     if (remaining === 0 && !timeoutTriggeredRef.current) {
       timeoutTriggeredRef.current = true;
-      void handleTimeoutComplete();
+      void handleTimeoutCompleteRef.current();
     }
-  }, [currentTime, exerciseConfig]);
+  }, [currentTime, exerciseConfig, sandboxMode]);
 
   const inactivityThresholdMs = useMemo(
     () => getInactivityThresholdMs(exerciseConfig),
@@ -435,6 +444,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     try {
       setIsLoading(true);
       timeoutTriggeredRef.current = false;
+      assignedDurationMinRef.current = null;
 
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
@@ -454,6 +464,11 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       if (!resultId) throw new Error('No result ID');
 
       setCurrentResultId(resultId);
+      currentResultIdRef.current = resultId;
+      assignedDurationMinRef.current = resolveAssignedDurationMinutes(
+        result.exerciseConfig?.duration,
+        exerciseConfig?.duration
+      );
 
       if (action === 'resume') {
         showSnackbar('Tiếp tục từ lần chơi trước', 'info');
@@ -481,7 +496,10 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       sessionStartTimeRef.current = Date.now() - elapsedSec * 1000;
       setCurrentTime(Date.now());
 
-      const limitMs = getEffectiveExerciseDurationMs(exerciseConfig?.duration);
+      const assignedMin =
+        assignedDurationMinRef.current ??
+        resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+      const limitMs = getEffectiveExerciseDurationMs(assignedMin);
       if (limitMs != null) {
         setTimeRemaining(Math.max(0, limitMs - elapsedSec * 1000));
       }
@@ -532,8 +550,11 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     let durationSec = sessionStartTimeRef.current
       ? Math.floor((Date.now() - sessionStartTimeRef.current) / 1000)
       : 0;
-    if (options?.fromTimeout && exerciseConfig?.duration != null) {
-      const reported = getReportedTimeoutDurationSeconds(exerciseConfig.duration);
+    const assignedMin =
+      assignedDurationMinRef.current ??
+      resolveAssignedDurationMinutes(undefined, exerciseConfig?.duration);
+    if (options?.fromTimeout && assignedMin != null) {
+      const reported = getReportedTimeoutDurationSeconds(assignedMin);
       if (reported != null) {
         durationSec = Math.max(durationSec, reported);
       }
@@ -673,6 +694,11 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       if (!resultId) {
         completionInFlightRef.current = false;
         setSessionSaved(false);
+        timeoutTriggeredRef.current = false;
+        showSnackbar(
+          'Phiên tập chưa được khởi tạo trên máy chủ — kết quả không thể lưu. Vui lòng tải lại trang.',
+          'error'
+        );
         return { success: false, slotCounted: false };
       }
       const metrics = buildMetrics({ fromTimeout: options?.fromTimeout });
@@ -694,6 +720,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       } catch {
         completionInFlightRef.current = false;
         setSessionSaved(false);
+        timeoutTriggeredRef.current = false;
         showSnackbar(
           'Không lưu được kết quả. Bạn vẫn có thể thoát về danh sách bài tập.',
           'warning'
@@ -707,9 +734,12 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
   );
 
   const handleTimeoutComplete = useCallback(async () => {
+    // Single complete path (like 2048) — do NOT rely on session-complete effect.
     forceComplete();
     await handleCompleteExercise({ fromTimeout: true });
   }, [forceComplete, handleCompleteExercise]);
+
+  handleTimeoutCompleteRef.current = handleTimeoutComplete;
 
   const handleStopConfirm = useCallback(async () => {
     setShowStopDialog(false);
@@ -719,7 +749,9 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
       inactivityTimerRef.current = null;
     }
     forceComplete();
-    const outcome = await handleCompleteExercise();
+    // If the timer already hit 0, floor duration like a timeout so a full run still counts.
+    const fromTimeout = timeRemaining === 0;
+    const outcome = await handleCompleteExercise({ fromTimeout });
     if (!sandboxMode && outcome.success) {
       showSnackbar(
         outcome.slotCounted
@@ -728,7 +760,7 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
         outcome.slotCounted ? 'success' : 'warning'
       );
     }
-  }, [forceComplete, handleCompleteExercise, sandboxMode, showSnackbar]);
+  }, [forceComplete, handleCompleteExercise, sandboxMode, showSnackbar, timeRemaining]);
 
   const handleStopCancel = useCallback(() => {
     setShowStopDialog(false);
@@ -822,12 +854,14 @@ const VtQuestExercise: React.FC<PortalExerciseProps> = ({
     if (blocker.state === 'blocked') blocker.reset();
   }, [blocker]);
 
-  // Auto-complete when engine reaches session-complete
+  // Safety net only: session-complete without timeout/stop already saving (should be rare).
+  // Gabor/Vernier always end via timeout/stop which call handleCompleteExercise directly —
+  // running complete again here raced and could drop fromTimeout / drop under 80%.
   useEffect(() => {
-    if (engineState.screen === 'session-complete' && !showCompletionDialog) {
-      void handleCompleteExercise();
-    }
-  }, [engineState.screen]);
+    if (engineState.screen !== 'session-complete' || showCompletionDialog) return;
+    if (timeoutTriggeredRef.current || completionInFlightRef.current) return;
+    void handleCompleteExercise({ fromTimeout: timeRemaining === 0 });
+  }, [engineState.screen, showCompletionDialog, handleCompleteExercise, timeRemaining]);
 
   // --- Vision gate ---
   if (!canDetermineVisionLevel && !isLoading) {

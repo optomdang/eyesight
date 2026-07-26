@@ -91,6 +91,23 @@ router.route('/:patientId/active-treatment-package').get(
   })
 );
 
+// Daily diligence calendar (warranty tab)
+router
+  .route('/:patientId/diligence-calendar')
+  .get(
+    auth(allRights.getPatients.code),
+    validate(patientValidation.getDiligenceCalendar),
+    patientController.getDiligenceCalendar
+  );
+
+router
+  .route('/:patientId/diligence-calendar/:date')
+  .put(
+    auth(allRights.managePatients.code),
+    validate(patientValidation.overrideDiligenceDay),
+    patientController.overrideDiligenceDay
+  );
+
 // Specialized endpoint: Medical record update
 router
   .route('/:patientId/medical-record')

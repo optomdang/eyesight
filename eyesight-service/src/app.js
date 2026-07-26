@@ -50,7 +50,9 @@ app.use(compression());
 // enable cors — production: set CORS_ORIGINS=https://app.nhuocthi.vn,https://nhuocthi.vn
 const defaultCorsOrigins = [
   'http://localhost:4001',
+  'http://127.0.0.1:4001',
   'http://localhost',
+  'http://127.0.0.1',
   'https://plankton-app-i43v5.ondigitalocean.app',
   'https://sea-lion-app-xajc7.ondigitalocean.app',
   'https://app.nhuocthi.vn',

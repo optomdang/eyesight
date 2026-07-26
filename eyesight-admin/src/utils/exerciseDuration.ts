@@ -68,6 +68,19 @@ export const getReportedTimeoutDurationSeconds = (
   return effectiveSeconds < configuredSeconds ? configuredSeconds : effectiveSeconds;
 };
 
+/**
+ * Prefer the duration snapshot frozen on the exercise result (what BE uses for ≥80%),
+ * then fall back to the live assignment config.
+ */
+export const resolveAssignedDurationMinutes = (
+  resultConfigDuration?: unknown,
+  assignmentDuration?: unknown
+): number | null => {
+  const fromResult = parsePositiveNumber(resultConfigDuration);
+  if (fromResult !== null) return fromResult;
+  return parsePositiveNumber(assignmentDuration);
+};
+
 export const getEffectiveExerciseDurationMs = (durationMinutes?: number | null): number | null => {
   const effectiveSeconds = getEffectiveExerciseDurationSeconds(durationMinutes);
   return effectiveSeconds === null ? null : effectiveSeconds * 1000;

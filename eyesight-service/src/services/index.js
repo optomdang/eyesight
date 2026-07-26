@@ -11,6 +11,7 @@ module.exports.clinicService = require('./system/clinic.service');
 module.exports.notificationService = require('./system/notification.service');
 module.exports.notificationTemplateService = require('./system/notificationTemplate.service');
 module.exports.patientService = require('./clinic/patient.service');
+module.exports.diligenceCalendarService = require('./clinic/diligenceCalendar.service');
 module.exports.warrantyAgreementService = require('./clinic/warrantyAgreement.service');
 module.exports.doctorService = require('./clinic/doctor.service');
 module.exports.examAssignmentService = require('./clinic/examAssignment.service');
