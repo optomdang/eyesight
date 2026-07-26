@@ -37,7 +37,7 @@ const OVERALL_COMPLETION_HELP =
   'Tỷ lệ hoàn thành tổng của bệnh nhân (cùng công thức BXH): trung bình % hoàn thành các buổi test và lượt tập theo chu kỳ được giao.';
 
 const overallCompletionColor = (pct: number): string => {
-  if (pct > 90) return '#2e7d32'; // xanh
+  if (pct > 90) return '#9B8EC4'; // xanh tím pastel
   if (pct >= 80) return '#f9a825'; // vàng
   return '#ed6c02'; // cam
 };
