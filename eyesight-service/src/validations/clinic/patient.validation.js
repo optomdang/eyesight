@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const { CAUSE_CODES } = require('../../config/causes');
+const { bulkDeleteValidation } = require('../../utils/validation');
 
 const createPatient = {
   body: Joi.object().keys({
@@ -240,9 +241,7 @@ const deletePatient = {
   }),
 };
 
-const deletePatients = {
-  body: Joi.array().items(Joi.number()),
-};
+const deletePatients = bulkDeleteValidation();
 
 const getPatientByUserId = {
   params: Joi.object().keys({

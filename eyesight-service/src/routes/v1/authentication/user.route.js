@@ -35,7 +35,7 @@ router
   .delete(
     ...routePatterns.bulkDelete({
       right: allRights.manageUsers.code,
-      validation: userValidation.deleteUser,
+      validation: userValidation.deleteUsers,
       controller: userController.deleteUsers,
     })
   );

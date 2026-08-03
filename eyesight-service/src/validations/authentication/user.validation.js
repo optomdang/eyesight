@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const { password } = require('../custom.validation');
+const { bulkDeleteValidation } = require('../../utils/validation');
 
 const createUser = {
   body: Joi.object().keys({
@@ -317,9 +318,7 @@ const deleteUser = {
   }),
 };
 
-const deleteUsers = {
-  body: Joi.array().items(Joi.number()),
-};
+const deleteUsers = bulkDeleteValidation();
 
 const storeRegistrationToken = {
   body: Joi.object().keys({
