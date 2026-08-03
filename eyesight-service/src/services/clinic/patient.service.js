@@ -76,9 +76,9 @@ const queryPatients = async (originalFilter, options) => {
     // Extract special filters - inactiveDays/effectiveness are computed fields, not DB columns
     const { severityLevel, country, status, name, phoneNumber, inactiveDays, effectiveness, ...basicFilter } = filter;
 
-    // Build base where clause with multi-tenant filter
+    // Build base where clause with multi-tenant filter; hide soft-deleted rows
     const whereClause = FILTERS.multiTenant(basicFilter.centerId);
-    Object.assign(whereClause, basicFilter);
+    Object.assign(whereClause, basicFilter, { deleted: false });
 
     // Add severityLevel filter directly (it's a column)
     if (severityLevel) {
