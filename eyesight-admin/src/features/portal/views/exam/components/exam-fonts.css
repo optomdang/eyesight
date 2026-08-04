@@ -1,7 +1,7 @@
 @font-face {
     font-family: 'OptomDangELetterChart';
     src: url('/fonts/OptomDangELetterChart-abcdef.otf') format('opentype');
-    font-display: block;
+    font-display: swap;
     font-style: normal;
     font-weight: 400;
 }
@@ -9,7 +9,7 @@
 @font-face {
     font-family: 'OptomDangNumber';
     src: url('/fonts/OptomDangNumber-1234567890.otf') format('opentype');
-    font-display: block;
+    font-display: swap;
     font-style: normal;
     font-weight: 400;
 }
@@ -17,7 +17,7 @@
 @font-face {
     font-family: 'OptomDangLatinChart';
     src: url('/fonts/OptomDangLatinChart.otf') format('opentype');
-    font-display: block;
+    font-display: swap;
     font-style: normal;
     font-weight: 400;
 }
@@ -25,7 +25,7 @@
 @font-face {
     font-family: 'OptomDangLandotC';
     src: url('/fonts/OptomDangLandotC-abcdefgh.otf') format('opentype');
-    font-display: block;
+    font-display: swap;
     font-style: normal;
     font-weight: 400;
 }
@@ -33,7 +33,7 @@
 @font-face {
     font-family: 'OptomDangLeaChart';
     src: url('/fonts/OptomDangLeaChart-abcdef.otf') format('opentype');
-    font-display: block;
+    font-display: swap;
     font-style: normal;
     font-weight: 400;
 }

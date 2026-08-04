@@ -8,7 +8,7 @@ import { FONT_MAP } from 'src/utils/constant';
 import { clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import type { ScreenInfo } from 'src/utils/visionUtils';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
-import { useOptotypeFontsReady } from 'src/utils/optotypeFonts';
+import { ensureOptotypeFontsLoaded } from 'src/utils/optotypeFonts';
 import 'src/features/portal/views/exam/components/exam-fonts.css';
 
 interface OptotypeCharProps {
@@ -32,8 +32,6 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
   spacing = 0,
   style,
 }) => {
-  const fontsReady = useOptotypeFontsReady();
-
   let fontSizePx: number;
   try {
     fontSizePx = clinicalMmToLayoutPx(sizeMm, screenInfo);
@@ -44,6 +42,10 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
 
   const fontFamily = FONT_MAP[char as keyof typeof FONT_MAP] || 'OptomDangLatinChart';
   const [containerHeight, setContainerHeight] = useState<string>('100%');
+
+  useEffect(() => {
+    void ensureOptotypeFontsLoaded();
+  }, []);
 
   useEffect(() => {
     const viewportHeight = window.innerHeight;
@@ -60,7 +62,6 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
     <Box
       data-testid="optotype-char"
       data-char={display}
-      data-fonts-ready={fontsReady ? 'true' : 'false'}
       sx={{
         height: containerHeight,
         fontSize: `${fontSizePx}px`,
@@ -77,7 +78,6 @@ const OptotypeChar: React.FC<OptotypeCharProps> = ({
         lineHeight: 1,
         textAlign: 'center',
         marginRight: spacing ? `${spacing}px` : 0,
-        visibility: fontsReady ? 'visible' : 'hidden',
         ...style,
       }}
     >

@@ -1,12 +1,12 @@
 /**
  * Optotype chart fonts used by exam + Far Acuity.
- * Prevents FOUT double-paint (system glyph + chart glyph overlapping).
+ * Preloads faces so FOUT is rare; never permanently hide letters if check() flakes.
  */
 import 'src/features/portal/views/exam/components/exam-fonts.css';
 import { FONT_MAP } from 'src/utils/constant';
 import { useEffect, useState } from 'react';
 
-/** All chart font-family names that must be ready before showing letters. */
+/** All chart font-family names used by exam / Far Acuity. */
 export const OPTOTYPE_FONT_FAMILIES = Array.from(
   new Set(Object.values(FONT_MAP).filter((family): family is string => Boolean(family)))
 );
@@ -37,8 +37,8 @@ function injectPreloadLinks() {
 }
 
 /**
- * Resolve when every optotype @font-face is available for text shaping.
- * Safe to call repeatedly — shares one in-flight promise.
+ * Best-effort load of every optotype @font-face.
+ * Always resolves true after the attempt so UI never stays blank on flaky check().
  */
 export function ensureOptotypeFontsLoaded(): Promise<boolean> {
   if (typeof document === 'undefined' || !document.fonts) {
@@ -47,32 +47,42 @@ export function ensureOptotypeFontsLoaded(): Promise<boolean> {
   if (!fontsReadyPromise) {
     injectPreloadLinks();
     fontsReadyPromise = Promise.all(
-      FONT_FILES.map(({ family }) => document.fonts.load(`16px "${family}"`))
+      FONT_FILES.map(({ family }) =>
+        document.fonts.load(`16px "${family}"`).catch(() => [] as FontFace[])
+      )
     )
       .then(() => document.fonts.ready)
-      .then(() =>
-        OPTOTYPE_FONT_FAMILIES.every((family) => document.fonts.check(`16px "${family}"`))
-      )
-      .catch(() => false);
+      .then(() => true)
+      .catch(() => true);
   }
   return fontsReadyPromise;
 }
 
-/** React helper — false until chart fonts are ready (avoids system+optotype double paint). */
+/**
+ * True once font load has been attempted (or timed out).
+ * Letters should still render even if a face failed — blank forever is worse than brief FOUT.
+ */
 export function useOptotypeFontsReady(): boolean {
   const [ready, setReady] = useState(() => {
     if (typeof document === 'undefined' || !document.fonts) return true;
-    return OPTOTYPE_FONT_FAMILIES.every((family) => document.fonts.check(`16px "${family}"`));
+    // Optimistic: if any chart face already checks out, treat as ready.
+    return OPTOTYPE_FONT_FAMILIES.some((family) => document.fonts.check(`16px "${family}"`));
   });
 
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
-    void ensureOptotypeFontsLoaded().then((ok) => {
-      if (!cancelled) setReady(ok);
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 1500);
+
+    void ensureOptotypeFontsLoaded().then(() => {
+      if (!cancelled) setReady(true);
     });
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [ready]);
 

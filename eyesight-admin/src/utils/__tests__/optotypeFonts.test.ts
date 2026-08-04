@@ -22,9 +22,9 @@ describe('optotypeFonts', () => {
     );
   });
 
-  it('ensureOptotypeFontsLoaded resolves via document.fonts', async () => {
+  it('ensureOptotypeFontsLoaded resolves true after load attempt', async () => {
     const load = vi.fn().mockResolvedValue([]);
-    const check = vi.fn().mockReturnValue(true);
+    const check = vi.fn().mockReturnValue(false); // flaky check must not force false
     Object.defineProperty(document, 'fonts', {
       configurable: true,
       value: {
@@ -34,7 +34,6 @@ describe('optotypeFonts', () => {
       },
     });
 
-    // Fresh module so shared promise resets
     const mod = await import('../optotypeFonts');
     const ok = await mod.ensureOptotypeFontsLoaded();
     expect(ok).toBe(true);
