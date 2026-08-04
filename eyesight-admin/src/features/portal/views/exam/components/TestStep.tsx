@@ -3,12 +3,13 @@ import { Box, Button, Typography } from '@mui/material';
 import { useTranslation } from 'src/hooks/useTranslation';
 import ExamChar from './ExamChar';
 import { useExamContext } from 'src/contexts/ExamContext';
-import CustomTextField from 'src/components/forms/theme-elements/CustomTextField.tsx';
 import { CHAR_POOL_MAP, FONT_MAP } from 'src/utils/constant.ts';
 import { getCharSpacing, clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { EXAM_CHAR_PADDING_PX } from 'src/services/exam-state';
 import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
-import { OPTOTYPE_LATIN_INPUT_ATTRS, toOptotypeInputChar } from 'src/utils/optotypeInput';
+import OptotypeAnswerField, {
+  useOptotypeAnswerLeakGuard,
+} from 'src/components/shared/OptotypeAnswerField';
 
 const TestStep = () => {
   const {
@@ -61,6 +62,7 @@ const TestStep = () => {
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const leakGuard = useOptotypeAnswerLeakGuard();
 
   useEffect(() => {
     if (!isTextCharType) return;
@@ -76,34 +78,6 @@ const TestStep = () => {
     window.setTimeout(() => confirmButtonRef.current?.focus(), 0);
   }, [allAnswered, isTextCharType, currentLine, currentBatch]);
 
-  const handleCharInput = (absoluteIndex: number, batchLocalIndex: number, rawValue: string) => {
-    const value = toOptotypeInputChar(rawValue, charType === 'N');
-    handleInputChange(absoluteIndex, value);
-    if (!value) return;
-
-    window.setTimeout(() => {
-      const nextInput = inputRefs.current[batchLocalIndex + 1];
-      if (nextInput) {
-        nextInput.focus();
-        return;
-      }
-      confirmButtonRef.current?.focus();
-    }, 0);
-  };
-
-  const handleCharKeyDown = (
-    absoluteIndex: number,
-    batchLocalIndex: number,
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (e.key === 'Process' || e.key === 'Dead') {
-      e.preventDefault();
-      return;
-    }
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-    e.preventDefault();
-    handleCharInput(absoluteIndex, batchLocalIndex, e.key);
-  };
 
   return (
     <Box
@@ -176,7 +150,7 @@ const TestStep = () => {
             >
               {currentBatchItems.map((item: any, index: number) => (
                 <ExamChar
-                  key={index}
+                  key={`${batchStart + index}-${item.display}`}
                   char={item.char}
                   display={item.display}
                   size={fontSize}
@@ -252,45 +226,22 @@ const TestStep = () => {
           <Box display="flex" gap={1} justifyContent="center" flexWrap="wrap">
             {currentBatchItems.map((item: any, index: number) => {
               const absoluteIndex = batchStart + index;
+              const fieldValue =
+                item.answer !== undefined ? item.answer : inputValues[absoluteIndex] || '';
               return (
-                <CustomTextField
+                <OptotypeAnswerField
                   key={absoluteIndex}
-                  size="small"
+                  absoluteIndex={absoluteIndex}
+                  batchLocalIndex={index}
+                  value={fieldValue}
                   label={`${t('exam.enterCharacter')} ${absoluteIndex + 1}`}
-                  inputRef={(el: HTMLInputElement | null) => {
-                    inputRefs.current[index] = el;
-                  }}
-                  value={
-                    item.answer !== undefined
-                      ? item.answer
-                      : inputValues[absoluteIndex] || ''
-                  }
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleCharInput(absoluteIndex, index, e.target.value)
-                  }
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-                    handleCharKeyDown(absoluteIndex, index, e)
-                  }
-                  onCompositionStart={(e: React.CompositionEvent<HTMLInputElement>) => {
-                    e.preventDefault();
-                    e.currentTarget.blur();
-                    e.currentTarget.focus();
-                  }}
+                  ariaLabel={`${t('exam.enterCharacter')} ${absoluteIndex + 1}`}
                   disabled={item.answer !== undefined}
-                  inputProps={{
-                    ...OPTOTYPE_LATIN_INPUT_ATTRS,
-                    'aria-label': `${t('exam.enterCharacter')} ${absoluteIndex + 1}`,
-                    style: { textAlign: 'center' },
-                  }}
-                  sx={{
-                    minWidth: 130,
-                    width: 'auto',
-                    flex: '0 0 auto',
-                    '& .MuiOutlinedInput-input': {
-                      textAlign: 'center',
-                      px: 0.5,
-                    },
-                  }}
+                  numbersOnly={charType === 'N'}
+                  leakGuard={leakGuard}
+                  inputRefs={inputRefs}
+                  confirmButtonRef={confirmButtonRef}
+                  onCommit={handleInputChange}
                 />
               );
             })}

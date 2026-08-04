@@ -63,6 +63,7 @@ import type { PortalExerciseProps } from 'src/components/exercises/portal/types'
 import { evaluateAnswer } from 'src/utils/examUtils';
 import FarAcuityCharTypeStep from './FarAcuityCharTypeStep';
 import FarAcuityTestStep from './FarAcuityTestStep';
+import { ensureOptotypeFontsLoaded } from 'src/utils/optotypeFonts';
 import FarAcuityRoundFeedbackOverlay from './FarAcuityRoundFeedbackOverlay';
 import { useFarAcuityGamification } from '../gamification/useFarAcuityGamification';
 import { COPY } from 'src/components/exercises/vt/gamification/copy.vi';
@@ -159,6 +160,11 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sandboxMode]);
+
+  // Warm optotype fonts early to avoid FOUT ghosting on the letter row
+  useEffect(() => {
+    void ensureOptotypeFontsLoaded();
+  }, []);
 
   const resetInputState = useCallback(() => {
     setCurrentBatch(0);

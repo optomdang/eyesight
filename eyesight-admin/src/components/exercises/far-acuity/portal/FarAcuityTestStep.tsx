@@ -5,7 +5,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { useTranslation } from 'src/hooks/useTranslation';
-import CustomTextField from 'src/components/forms/theme-elements/CustomTextField';
 import { CHAR_POOL_MAP, FONT_MAP } from 'src/utils/constant';
 import {
   buildExamDisplayStrategy,
@@ -16,7 +15,9 @@ import {
 } from 'src/utils/visionUtils';
 import type { FarAcuityLetter } from 'src/hooks/exercises/useFarAcuityEngine';
 import type { ExamCharType } from 'src/utils/resolvePatientExamCharType';
-import { OPTOTYPE_LATIN_INPUT_ATTRS, toOptotypeInputChar } from 'src/utils/optotypeInput';
+import OptotypeAnswerField, {
+  useOptotypeAnswerLeakGuard,
+} from 'src/components/shared/OptotypeAnswerField';
 import OptotypeChar from './OptotypeChar';
 
 const EXAM_CHAR_PADDING_PX = EXAM_HORIZONTAL_PADDING_PX;
@@ -122,6 +123,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
   const firstInputRef = useRef<HTMLInputElement>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const leakGuard = useOptotypeAnswerLeakGuard();
 
   useEffect(() => {
     if (!isTextCharType || disabled) return;
@@ -132,40 +134,6 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
     return () => cancelAnimationFrame(frame);
   }, [inputFocusKey, currentBatch, disabled, isTextCharType]);
 
-  const handleCharInput = (
-    absoluteIndex: number,
-    batchLocalIndex: number,
-    rawValue: string
-  ) => {
-    const value = toOptotypeInputChar(rawValue, charType === 'N');
-    onInputChange(absoluteIndex, value);
-    if (!value || disabled) return;
-
-    window.setTimeout(() => {
-      const nextInput = inputRefs.current[batchLocalIndex + 1];
-      if (nextInput) {
-        nextInput.focus();
-        return;
-      }
-      confirmButtonRef.current?.focus();
-    }, 0);
-  };
-
-  const handleCharKeyDown = (
-    absoluteIndex: number,
-    batchLocalIndex: number,
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (disabled) return;
-    // Block dead-keys / telex sequences from composing accents onto previous cells
-    if (e.key === 'Process' || e.key === 'Dead') {
-      e.preventDefault();
-      return;
-    }
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-    e.preventDefault();
-    handleCharInput(absoluteIndex, batchLocalIndex, e.key);
-  };
 
   return (
     <Box
@@ -251,7 +219,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                   : textColor;
                 return (
                   <OptotypeChar
-                    key={absoluteIndex}
+                    key={`${absoluteIndex}-${item.display}`}
                     char={item.char}
                     display={item.display}
                     sizeMm={fontSizeMm}
@@ -326,47 +294,24 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
           <Box display="flex" gap={1} justifyContent="center" flexWrap="wrap">
             {currentBatchItems.map((item, index) => {
               const absoluteIndex = batchStart + index;
+              const fieldValue =
+                item.answer !== undefined ? item.answer : inputValues[absoluteIndex] || '';
               return (
-                <CustomTextField
+                <OptotypeAnswerField
                   key={absoluteIndex}
-                  size="small"
+                  absoluteIndex={absoluteIndex}
+                  batchLocalIndex={index}
+                  value={fieldValue}
                   label={`${absoluteIndex + 1}`}
-                  inputRef={(el: HTMLInputElement | null) => {
-                    inputRefs.current[index] = el;
-                    if (index === 0) {
-                      (firstInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
-                    }
-                  }}
-                  value={
-                    item.answer !== undefined
-                      ? item.answer
-                      : inputValues[absoluteIndex] || ''
-                  }
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    handleCharInput(absoluteIndex, index, e.target.value)
-                  }
-                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-                    handleCharKeyDown(absoluteIndex, index, e)
-                  }
-                  onCompositionStart={(e: React.CompositionEvent<HTMLInputElement>) => {
-                    e.preventDefault();
-                    e.currentTarget.blur();
-                    e.currentTarget.focus();
-                  }}
+                  ariaLabel={`${t('exam.enterCharacter')} ${absoluteIndex + 1}`}
                   disabled={disabled || item.answer !== undefined}
-                  inputProps={{
-                    ...OPTOTYPE_LATIN_INPUT_ATTRS,
-                    'aria-label': `${t('exam.enterCharacter')} ${absoluteIndex + 1}`,
-                    style: { textAlign: 'center' },
-                  }}
-                  sx={{
-                    width: 56,
-                    flex: '0 0 auto',
-                    '& .MuiOutlinedInput-input': {
-                      textAlign: 'center',
-                      px: 0.5,
-                    },
-                  }}
+                  numbersOnly={charType === 'N'}
+                  narrow
+                  leakGuard={leakGuard}
+                  inputRefs={inputRefs}
+                  confirmButtonRef={confirmButtonRef}
+                  firstInputRef={firstInputRef}
+                  onCommit={onInputChange}
                 />
               );
             })}

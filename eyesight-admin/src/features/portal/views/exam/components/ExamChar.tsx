@@ -5,6 +5,7 @@ import { FONT_MAP } from 'src/utils/constant';
 import { useExamContext } from 'src/contexts/ExamContext';
 import { clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
+import { useOptotypeFontsReady } from 'src/utils/optotypeFonts';
 
 interface ExamCharProps {
   char: 'E' | 'C' | 'A' | 'N' | 'S' | 'I' | string;
@@ -16,13 +17,14 @@ interface ExamCharProps {
 
 const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing }) => {
   const { screenInfo } = useExamContext();
+  const fontsReady = useOptotypeFontsReady();
 
   let fontSizePx: number;
   let hasFallback = false;
 
   try {
     fontSizePx = clinicalMmToLayoutPx(size, screenInfo);
-  } catch (error) {
+  } catch {
     // screenInfo from exam context is invalid — try the screen the user already
     // configured and saved (via ScreenSetupForm → localStorage).
     // Last resort: 15.6" 1920×1080 (the most common laptop size).
@@ -31,7 +33,7 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
     hasFallback = true;
   }
 
-  const fontFamily = FONT_MAP[char as keyof typeof FONT_MAP] || 'sans-serif';
+  const fontFamily = FONT_MAP[char as keyof typeof FONT_MAP] || 'OptomDangLatinChart';
 
   const [containerHeight, setContainerHeight] = useState<string>('100%');
 
@@ -57,6 +59,7 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
     <Box
       data-testid="exam-char"
       data-char={display}
+      data-fonts-ready={fontsReady ? 'true' : 'false'}
       sx={{
         height: containerHeight,
         fontSize: `${fontSizePx}px`,
@@ -66,16 +69,32 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily,
+        // Only the chart face — no system fallback that can paint under the optotype (FOUT ghosting).
+        fontFamily: `"${fontFamily}"`,
+        fontSynthesis: 'none',
         color: 'black',
-        overflow: 'visible',
+        // Clip glyph sidebearing overflow so neighbors never paint into this cell.
+        overflow: 'hidden',
         lineHeight: 1,
         textAlign: 'center',
         marginRight: spacing ? `${spacing}px` : 0,
+        visibility: fontsReady ? 'visible' : 'hidden',
         ...style,
       }}
     >
-      {display}
+      {/* Remount on glyph change so browser never composites previous letter ink */}
+      <Box
+        key={display}
+        component="span"
+        sx={{
+          display: 'block',
+          width: '100%',
+          textAlign: 'center',
+          lineHeight: 1,
+        }}
+      >
+        {display}
+      </Box>
     </Box>
   );
 };

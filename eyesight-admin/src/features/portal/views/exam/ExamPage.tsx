@@ -1,5 +1,6 @@
 import { useParams, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
+import { useEffect } from 'react';
 import { ExamProvider, useExamContext } from 'src/contexts/ExamContext';
 // Removed legacy getExamAssignments import
 
@@ -11,6 +12,7 @@ import SwitchEyeStep from './components/SwitchEyeStep';
 import ResultStep from './components/ResultStep';
 import ExamContainer from './components/ExamContainer';
 import StereopsisStep from './components/StereopsisStep';
+import { ensureOptotypeFontsLoaded } from 'src/utils/optotypeFonts';
 
 /**
  * ExamPage component
@@ -19,6 +21,11 @@ import StereopsisStep from './components/StereopsisStep';
 const ExamPageContent = () => {
   // Use the shared exam context
   const { step } = useExamContext();
+
+  // Warm chart fonts before the test step to avoid FOUT double-glyph paint
+  useEffect(() => {
+    void ensureOptotypeFontsLoaded();
+  }, []);
 
   // Render the appropriate step based on the current step
   return (
