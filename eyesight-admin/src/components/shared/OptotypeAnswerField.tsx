@@ -1,8 +1,13 @@
 /**
- * Single-character optotype answer input with IME / focus-leak hardening.
- * Used by exam TestStep and Far Acuity exercise.
+ * Single-character optotype answer input.
+ *
+ * Design rules (clinical acuity entry):
+ * 1. Native text insertion is always blocked (beforeInput preventDefault).
+ * 2. One keystroke → at most one commit + one focus advance (debounce guard).
+ * 3. After advance, the next field ignores ALL input briefly (leak lock).
+ * 4. onChange never drives state (controlled value only from parent).
  */
-import React, { useRef } from 'react';
+import React from 'react';
 import CustomTextField from 'src/components/forms/theme-elements/CustomTextField';
 import {
   OPTOTYPE_LATIN_INPUT_ATTRS,
@@ -19,7 +24,6 @@ export type OptotypeAnswerFieldProps = {
   ariaLabel: string;
   disabled?: boolean;
   numbersOnly?: boolean;
-  /** Narrow layout (far-acuity bar) vs wider exam labels */
   narrow?: boolean;
   leakGuard: OptotypeFocusLeakGuard;
   inputRefs: React.MutableRefObject<Array<HTMLInputElement | null>>;
@@ -28,11 +32,8 @@ export type OptotypeAnswerFieldProps = {
   onCommit: (absoluteIndex: number, value: string) => void;
 };
 
-/**
- * Shared guard factory for a batch of answer fields (one per TestStep mount).
- */
 export function useOptotypeAnswerLeakGuard(): OptotypeFocusLeakGuard {
-  const guardRef = useRef<OptotypeFocusLeakGuard | null>(null);
+  const guardRef = React.useRef<OptotypeFocusLeakGuard | null>(null);
   if (!guardRef.current) {
     guardRef.current = createOptotypeFocusLeakGuard();
   }
@@ -54,40 +55,42 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
   firstInputRef,
   onCommit,
 }) => {
-  /** Skip onChange that echoes a keydown we already handled. */
-  const skipChangeRef = useRef(false);
-
-  const focusNext = () => {
+  const focusNeighbor = (direction: 1 | -1) => {
     window.setTimeout(() => {
-      const nextInput = inputRefs.current[batchLocalIndex + 1];
-      if (nextInput) {
-        nextInput.focus();
+      if (direction > 0) {
+        const nextInput = inputRefs.current[batchLocalIndex + 1];
+        if (nextInput) {
+          nextInput.focus();
+          return;
+        }
+        confirmButtonRef?.current?.focus();
         return;
       }
-      confirmButtonRef?.current?.focus();
+      if (batchLocalIndex > 0) {
+        inputRefs.current[batchLocalIndex - 1]?.focus();
+      }
     }, 0);
   };
 
-  const commit = (raw: string, options?: { fromKeyDown?: boolean }) => {
+  const commitChar = (raw: string) => {
     if (disabled) return;
+    if (leakGuard.shouldIgnore(absoluteIndex)) return;
+
     const next = toOptotypeInputChar(raw, numbersOnly);
-    if (next && leakGuard.shouldIgnore(absoluteIndex, next)) {
-      return;
-    }
+    if (!next) return;
+    if (!leakGuard.tryBeginCommit(absoluteIndex)) return;
 
     onCommit(absoluteIndex, next);
+    leakGuard.armNextField(absoluteIndex + 1);
+    focusNeighbor(1);
+  };
 
-    if (options?.fromKeyDown) {
-      skipChangeRef.current = true;
-      window.setTimeout(() => {
-        skipChangeRef.current = false;
-      }, 0);
+  const clearChar = () => {
+    if (disabled) return;
+    onCommit(absoluteIndex, '');
+    if (!value) {
+      focusNeighbor(-1);
     }
-
-    if (!next) return;
-
-    leakGuard.armNextField(absoluteIndex + 1, next);
-    focusNext();
   };
 
   return (
@@ -101,15 +104,14 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
         }
       }}
       value={value}
+      // Controlled only — never let native change events mutate answers / advance focus.
       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-        if (skipChangeRef.current) return;
-        const native = e.nativeEvent as InputEvent;
-        if (native.isComposing) return;
-        commit(e.target.value);
+        e.preventDefault();
       }}
       onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
         if (disabled) return;
 
+        // Block IME composition keys; characters arrive via beforeInput instead.
         if (e.nativeEvent.isComposing || e.key === 'Process' || e.key === 'Dead') {
           e.preventDefault();
           return;
@@ -117,35 +119,55 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
 
         if (e.key === 'Backspace' || e.key === 'Delete') {
           e.preventDefault();
-          onCommit(absoluteIndex, '');
-          if (!value && batchLocalIndex > 0) {
-            window.setTimeout(() => inputRefs.current[batchLocalIndex - 1]?.focus(), 0);
-          }
+          e.stopPropagation();
+          clearChar();
           return;
         }
 
-        if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-        e.preventDefault();
-        e.stopPropagation();
-        commit(e.key, { fromKeyDown: true });
+        if (e.key === 'Tab' || e.key === 'Enter') return;
+
+        // Printable key: handle here on desktop. beforeInput is also prevented so
+        // tryBeginCommit collapses the duplicate gesture into one commit.
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          commitChar(e.key);
+        }
       }}
       onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
         e.preventDefault();
-        commit(e.clipboardData.getData('text') || '');
+        commitChar(e.clipboardData.getData('text') || '');
       }}
       onCompositionStart={(e: React.CompositionEvent<HTMLInputElement>) => {
-        // Cancel IME composition without blur/focus thrash (that caused cross-field leaks).
+        e.preventDefault();
+      }}
+      onCompositionUpdate={(e: React.CompositionEvent<HTMLInputElement>) => {
         e.preventDefault();
       }}
       onCompositionEnd={(e: React.CompositionEvent<HTMLInputElement>) => {
         e.preventDefault();
-        commit(e.data || e.currentTarget.value);
+        // Do not commit here — keydown/beforeInput already own the gesture.
       }}
       disabled={disabled}
       inputProps={{
         ...OPTOTYPE_LATIN_INPUT_ATTRS,
         'aria-label': ariaLabel,
         style: { textAlign: 'center' },
+        enterKeyHint: 'next',
+        onBeforeInput: (e: InputEvent) => {
+          e.preventDefault();
+          if (disabled) return;
+          if (e.inputType?.startsWith('delete')) {
+            clearChar();
+            return;
+          }
+          if (
+            (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') &&
+            e.data
+          ) {
+            commitChar(e.data);
+          }
+        },
       }}
       sx={{
         width: narrow ? 56 : undefined,

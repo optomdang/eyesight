@@ -3,6 +3,7 @@ import {
   toOptotypeInputChar,
   createOptotypeFocusLeakGuard,
   OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS,
+  OPTOTYPE_COMMIT_DEBOUNCE_MS,
 } from '../optotypeInput';
 
 describe('toOptotypeInputChar', () => {
@@ -18,7 +19,6 @@ describe('toOptotypeInputChar', () => {
   });
 
   it('keeps the last printable latin/digit when multiple arrive in one event', () => {
-    // Focus/IME race can dump two keystrokes into one box; keep the latest.
     expect(toOptotypeInputChar('UX')).toBe('X');
     expect(toOptotypeInputChar('CK')).toBe('K');
     expect(toOptotypeInputChar('12')).toBe('2');
@@ -44,20 +44,29 @@ describe('createOptotypeFocusLeakGuard', () => {
     vi.restoreAllMocks();
   });
 
-  it('ignores the same char leaking into the next field within the suppress window', () => {
+  it('blocks any input on the next field within the suppress window', () => {
     const guard = createOptotypeFocusLeakGuard(100);
-    guard.armNextField(1, 'C');
+    guard.armNextField(1);
 
-    expect(guard.shouldIgnore(1, 'C')).toBe(true);
-    expect(guard.shouldIgnore(1, 'K')).toBe(false);
-    expect(guard.shouldIgnore(0, 'C')).toBe(false);
+    expect(guard.shouldIgnore(1)).toBe(true);
+    expect(guard.shouldIgnore(0)).toBe(false);
+    expect(guard.shouldIgnore(2)).toBe(false);
   });
 
-  it('stops suppressing after the window elapses', () => {
+  it('stops locking after the window elapses', () => {
     const guard = createOptotypeFocusLeakGuard(OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS);
-    guard.armNextField(1, 'C');
+    guard.armNextField(1);
 
     vi.spyOn(performance, 'now').mockReturnValue(1000 + OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS + 1);
-    expect(guard.shouldIgnore(1, 'C')).toBe(false);
+    expect(guard.shouldIgnore(1)).toBe(false);
+  });
+
+  it('collapses keydown+beforeInput into a single commit', () => {
+    const guard = createOptotypeFocusLeakGuard(100, OPTOTYPE_COMMIT_DEBOUNCE_MS);
+    expect(guard.tryBeginCommit(0)).toBe(true);
+    expect(guard.tryBeginCommit(0)).toBe(false);
+
+    vi.spyOn(performance, 'now').mockReturnValue(1000 + OPTOTYPE_COMMIT_DEBOUNCE_MS + 1);
+    expect(guard.tryBeginCommit(0)).toBe(true);
   });
 });

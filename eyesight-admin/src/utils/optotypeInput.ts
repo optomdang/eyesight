@@ -1,8 +1,7 @@
 /**
  * Helpers for single-character optotype answer boxes (letters/digits).
- * Prevents Vietnamese Telex IME from applying diacritics across adjacent fields
- * and blocks the common “key leak” where the same keystroke is written into the
- * next box after auto-advance (e.g. typed C,K but answers become C,C).
+ * Prevents Vietnamese Telex IME diacritics and focus-race leaks that write the
+ * same keystroke into the next box (or double-advance the caret).
  */
 
 /** Strip combining marks / telex product and keep one ASCII letter or digit. */
@@ -11,8 +10,7 @@ export function toOptotypeInputChar(raw: string, numbersOnly = false): string {
   const base = raw.normalize('NFD').replace(/\p{M}/gu, '');
   const matches = numbersOnly ? base.match(/[0-9]/g) : base.match(/[A-Za-z0-9]/g);
   if (!matches?.length) return '';
-  // Prefer the last alphanumeric — when focus-race / IME dumps two keystrokes
-  // into one box ("CK"), keep the most recently typed character.
+  // Prefer the last alphanumeric — when a race dumps two keystrokes into one box.
   return matches[matches.length - 1].toUpperCase();
 }
 
@@ -27,38 +25,49 @@ export const OPTOTYPE_LATIN_INPUT_ATTRS = {
   inputMode: 'text' as const,
 };
 
-/** How long to ignore leaked keystrokes on the next field after auto-advance. */
-export const OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS = 100;
+/** Ignore ALL input on the next field after auto-advance (not only same char). */
+export const OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS = 220;
+
+/** Ignore a second commit on the same field from keydown+beforeInput in one gesture. */
+export const OPTOTYPE_COMMIT_DEBOUNCE_MS = 80;
 
 export type OptotypeFocusLeakGuard = {
-  /** Call after committing a char and before focusing the next field. */
-  armNextField: (nextAbsoluteIndex: number, committedChar: string) => void;
-  /** True when this field should ignore a leaked duplicate of the previous key. */
-  shouldIgnore: (absoluteIndex: number, candidateChar: string) => boolean;
+  /** Lock the next field against any input after advancing. */
+  armNextField: (nextAbsoluteIndex: number) => void;
+  /** True while this field should ignore leaked / duplicate input. */
+  shouldIgnore: (absoluteIndex: number) => boolean;
+  /**
+   * Returns false if this field already accepted a char in the debounce window
+   * (keydown + beforeInput both firing). True if the commit should proceed.
+   */
+  tryBeginCommit: (absoluteIndex: number) => boolean;
 };
 
-/**
- * Suppresses the duplicate character that can land on the newly focused field
- * in the same keystroke turn (keydown → setState → focus next → leftover input).
- */
 export function createOptotypeFocusLeakGuard(
-  suppressMs: number = OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS
+  suppressMs: number = OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS,
+  commitDebounceMs: number = OPTOTYPE_COMMIT_DEBOUNCE_MS
 ): OptotypeFocusLeakGuard {
-  let until = 0;
-  let index = -1;
-  let char = '';
+  let lockedIndex = -1;
+  let lockedUntil = 0;
+  let lastCommitIndex = -1;
+  let lastCommitUntil = 0;
 
   return {
-    armNextField(nextAbsoluteIndex, committedChar) {
-      if (!committedChar) return;
-      index = nextAbsoluteIndex;
-      char = committedChar;
-      until = performance.now() + suppressMs;
+    armNextField(nextAbsoluteIndex) {
+      lockedIndex = nextAbsoluteIndex;
+      lockedUntil = performance.now() + suppressMs;
     },
-    shouldIgnore(absoluteIndex, candidateChar) {
-      if (absoluteIndex !== index || !candidateChar) return false;
-      if (performance.now() >= until) return false;
-      return candidateChar === char;
+    shouldIgnore(absoluteIndex) {
+      return absoluteIndex === lockedIndex && performance.now() < lockedUntil;
+    },
+    tryBeginCommit(absoluteIndex) {
+      const now = performance.now();
+      if (absoluteIndex === lastCommitIndex && now < lastCommitUntil) {
+        return false;
+      }
+      lastCommitIndex = absoluteIndex;
+      lastCommitUntil = now + commitDebounceMs;
+      return true;
     },
   };
 }
