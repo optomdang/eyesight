@@ -70,11 +70,27 @@ const updatePatient = catchAsync(async (req, res) => {
   if (patient.centerId !== req.user.centerId) {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to update this patient');
   }
+  if (req.user.userType !== 'admin') {
+    const activationFields = ['activeFrom', 'activeTo', 'treatmentStatus'];
+    const attempted = activationFields.filter((field) => req.body?.[field] !== undefined);
+    if (attempted.length > 0) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Chỉ quản trị viên mới được kích hoạt và đặt thời gian hoạt động tài khoản bệnh nhân'
+      );
+    }
+  }
   const updated = await patientService.updatePatientById(req.params.patientId, req.body);
   res.send(updated);
 });
 
 const pausePatientTreatment = catchAsync(async (req, res) => {
+  if (req.user.userType !== 'admin') {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Chỉ quản trị viên mới được tạm dừng điều trị / thời gian hoạt động tài khoản bệnh nhân'
+    );
+  }
   const patient = await patientService.getPatientById(req.params.patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
@@ -88,6 +104,12 @@ const pausePatientTreatment = catchAsync(async (req, res) => {
 });
 
 const resumePatientTreatment = catchAsync(async (req, res) => {
+  if (req.user.userType !== 'admin') {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Chỉ quản trị viên mới được kích hoạt và đặt thời gian hoạt động tài khoản bệnh nhân'
+    );
+  }
   const patient = await patientService.getPatientById(req.params.patientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');

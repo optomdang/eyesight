@@ -261,7 +261,7 @@ describe('User Service', () => {
         },
       };
 
-      await userService.updateUserById(1, updateData);
+      await userService.updateUserById(1, updateData, { actorUserType: 'admin' });
 
       expect(mockPatientUser.save).toHaveBeenCalled();
       expect(patientService.updatePatientById).toHaveBeenCalledWith(
@@ -275,6 +275,27 @@ describe('User Service', () => {
         }),
         expect.any(Object)
       );
+    });
+
+    test('should reject non-admin updating patient activation fields', async () => {
+      const mockPatientUser = { ...mockExistingUser, userType: 'patient' };
+      User.findByPk.mockResolvedValueOnce(mockPatientUser);
+      User.isEmailTaken.mockResolvedValue(false);
+      User.isPhoneNumberTaken.mockResolvedValue(false);
+
+      const updateData = {
+        name: 'Updated Name',
+        patient: {
+          id: 1,
+          activeFrom: '2026-01-01',
+          treatmentStatus: 'active',
+        },
+      };
+
+      await expect(userService.updateUserById(1, updateData, { actorUserType: 'doctor' })).rejects.toThrow(
+        'Chỉ quản trị viên mới được kích hoạt và đặt thời gian hoạt động tài khoản bệnh nhân'
+      );
+      expect(patientService.updatePatientById).not.toHaveBeenCalled();
     });
 
     test('should update doctor data when doctor object provided', async () => {

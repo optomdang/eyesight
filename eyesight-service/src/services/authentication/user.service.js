@@ -39,13 +39,15 @@ const determineRoleId = async (userType, centerId) => {
  * @param {Object} userBody
  * @returns {Promise<User>}
  */
-const createUser = async (userBody) => {
+const createUser = async (userBody, options = {}) => {
   if (await User.isEmailTaken(userBody.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email đã tồn tại');
   }
   if (userBody.phoneNumber && (await User.isPhoneNumberTaken(userBody.phoneNumber))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Số điện thoại đã tồn tại');
   }
+
+  const actorUserType = options.actorUserType;
 
   // Create a copy of userBody to avoid mutating the parameter
   const { doctor, patient, ...userData } = userBody;
@@ -82,6 +84,23 @@ const createUser = async (userBody) => {
       patientBody.centerId = user.centerId;
       patientBody.clinicId = user.defaultClinicId;
       patientBody.updatedBy = userData.updatedBy;
+
+      // Chỉ admin được kích hoạt / đặt thời gian hoạt động khi tạo BN
+      if (actorUserType !== 'admin') {
+        if (
+          patientBody.activeFrom != null ||
+          patientBody.activeTo != null ||
+          (patientBody.treatmentStatus && patientBody.treatmentStatus !== 'not_started')
+        ) {
+          throw new ApiError(
+            httpStatus.FORBIDDEN,
+            'Chỉ quản trị viên mới được kích hoạt và đặt thời gian hoạt động tài khoản bệnh nhân'
+          );
+        }
+        patientBody.activeFrom = null;
+        patientBody.activeTo = null;
+        patientBody.treatmentStatus = 'not_started';
+      }
 
       const createdPatient = await patientService.createPatient(patientBody, transaction);
 
@@ -282,6 +301,19 @@ const updateUserById = async (userId, updateBody, options = {}) => {
       const { treatmentPackageId, ...patientBody } = patient;
       patientBody.userId = user.id;
       patientBody.centerId = user.centerId;
+
+      // Chỉ admin được chỉnh kích hoạt / thời gian hoạt động
+      if (actorUserType !== 'admin') {
+        const activationFields = ['activeFrom', 'activeTo', 'treatmentStatus'];
+        const attempted = activationFields.filter((field) => patientBody[field] !== undefined);
+        if (attempted.length > 0) {
+          throw new ApiError(
+            httpStatus.FORBIDDEN,
+            'Chỉ quản trị viên mới được kích hoạt và đặt thời gian hoạt động tài khoản bệnh nhân'
+          );
+        }
+      }
+
       await patientService.updatePatientById(patient.id, patientBody, transaction);
 
       if (treatmentPackageId !== undefined && treatmentPackageId !== null && treatmentPackageId !== '') {

@@ -11,6 +11,15 @@ vi.mock('src/services/user.service', () => ({
   getDoctors: vi.fn(),
 }));
 
+vi.mock('src/services/treatmentPackage.service', () => ({
+  getTreatmentPackages: vi.fn().mockResolvedValue({ rows: [] }),
+  getPatientActiveTreatmentPackage: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('src/contexts/authGuard/useAuth.tsx', () => ({
+  default: () => ({ user: { userType: 'admin', centerId: 1 } }),
+}));
+
 // Mock translation hook
 vi.mock('src/hooks/useTranslation', () => ({
   useTranslation: () => ({

@@ -190,6 +190,9 @@ const PatientPage = () => {
   // Check user permissions
   const userRights = user?.role?.rights || [];
   const canManagePatients = userRights.includes('managePatients');
+  const isAdmin = user?.userType === 'admin';
+  // Chỉ admin được kích hoạt / tạm dừng và chỉnh thời gian hoạt động tài khoản BN
+  const canActivatePatient = isAdmin && canManagePatients;
 
   const getTreatmentStatusChip = useCallback(
     (patient: Patient) => {
@@ -325,14 +328,14 @@ const PatientPage = () => {
             <IconEye />
           </IconButton>
         </Tooltip>
-        {canManagePatients && rowData.treatmentStatus !== false && (
+        {canActivatePatient && rowData.treatmentStatus !== 'paused' && rowData.treatmentStatus !== false && (
           <Tooltip title={t('patient.pause', 'Tạm dừng')} arrow>
             <IconButton size="small" onClick={() => void handlePausePatient(rowData)}>
               <PauseCircleOutline />
             </IconButton>
           </Tooltip>
         )}
-        {canManagePatients && rowData.treatmentStatus === false && (
+        {canActivatePatient && (rowData.treatmentStatus === 'paused' || rowData.treatmentStatus === false) && (
           <Tooltip title={t('patient.resumeAction', 'Tiếp tục')} arrow>
             <IconButton size="small" onClick={() => void handleResumePatient(rowData)}>
               <PlayCircleOutline />

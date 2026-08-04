@@ -37,6 +37,8 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
   const currentUserType = userType || values.userType;
   const isCreate = !values.id;
   const canEditPackage = isAdmin && !readOnly;
+  // Chỉ admin được kích hoạt / chỉnh thời gian hoạt động tài khoản bệnh nhân
+  const canEditActivation = isAdmin && !readOnly;
   const [treatmentPackages, setTreatmentPackages] = useState<TreatmentPackage[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [activePackageName, setActivePackageName] = useState<string | null>(null);
@@ -185,7 +187,16 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
       <Grid size={{ xs: 12, sm: 6 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
           <Typography variant="body2">
-            {t('patient.treatmentStatus', 'Trạng thái điều trị')}:{' '}
+            <LabelWithHelp
+              help={
+                isAdmin
+                  ? 'Kích hoạt và chỉnh thời gian hoạt động tài khoản bệnh nhân.'
+                  : 'Chỉ quản trị viên mới được kích hoạt và chỉnh thời gian hoạt động tài khoản bệnh nhân.'
+              }
+            >
+              {t('patient.treatmentStatus', 'Trạng thái điều trị')}
+            </LabelWithHelp>
+            :{' '}
             <strong>
               {getDerivedTreatmentLabel(
                 values.patient?.treatmentStatus ?? true,
@@ -195,22 +206,30 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
             </strong>
           </Typography>
 
-          <Controller
-            name="patient.treatmentStatus"
-            control={control}
-            render={({ field }) => (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={(field.value ?? true) === false}
-                    onChange={(e) => field.onChange(!e.target.checked)}
-                    disabled={readOnly}
-                  />
-                }
-                label={t('patient.pauseTreatment', 'Tạm dừng điều trị')}
-              />
-            )}
-          />
+          {canEditActivation ? (
+            <Controller
+              name="patient.treatmentStatus"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={(field.value ?? true) === false}
+                      onChange={(e) => field.onChange(!e.target.checked)}
+                    />
+                  }
+                  label={t('patient.pauseTreatment', 'Tạm dừng điều trị')}
+                />
+              )}
+            />
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              {t(
+                'patient.activationAdminOnly',
+                'Chỉ quản trị viên mới kích hoạt / tạm dừng và đặt thời gian hoạt động.'
+              )}
+            </Typography>
+          )}
         </Box>
       </Grid>
 
@@ -230,8 +249,12 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
           name="patient.activeFrom"
           control={control}
           type="date"
-          label={t('patient.treatmentStartDate', 'Ngày bắt đầu điều trị')}
-          disabled={readOnly}
+          label={
+            canEditActivation
+              ? t('patient.treatmentStartDate', 'Ngày bắt đầu điều trị')
+              : `${t('patient.treatmentStartDate', 'Ngày bắt đầu điều trị')} (chỉ admin)`
+          }
+          disabled={!canEditActivation}
         />
       </Grid>
 
@@ -240,8 +263,12 @@ function PatientFields({ control, values, userType, readOnly = false }: PatientF
           name="patient.activeTo"
           control={control}
           type="date"
-          label={t('patient.treatmentEndDate', 'Ngày kết thúc dự kiến')}
-          disabled={readOnly}
+          label={
+            canEditActivation
+              ? t('patient.treatmentEndDate', 'Ngày kết thúc dự kiến')
+              : `${t('patient.treatmentEndDate', 'Ngày kết thúc dự kiến')} (chỉ admin)`
+          }
+          disabled={!canEditActivation}
         />
       </Grid>
     </>

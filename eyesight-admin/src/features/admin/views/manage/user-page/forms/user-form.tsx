@@ -110,17 +110,19 @@ function UserModal({ open, onClose, rowData, userType, readOnly = false }: UserF
             currentEyesight: values.patient?.currentEyesight,
             severityLevel: values.patient?.severityLevel,
             severityNotes: values.patient?.severityNotes,
-            // Form toggle (boolean) → backend string enum (SOT).
-            treatmentStatus: computeTreatmentStatus({
+          };
+          // Chỉ admin được kích hoạt / chỉnh thời gian hoạt động
+          if (user?.userType === 'admin') {
+            updateData.patient.treatmentStatus = computeTreatmentStatus({
               paused: values.patient?.treatmentStatus === false,
               activeFrom: values.patient?.activeFrom,
               activeTo: values.patient?.activeTo,
-            }),
-            activeFrom: values.patient?.activeFrom,
-            activeTo: values.patient?.activeTo,
-          };
-          if (user?.userType === 'admin' && values.patient?.treatmentPackageId) {
-            updateData.patient.treatmentPackageId = values.patient.treatmentPackageId;
+            });
+            updateData.patient.activeFrom = values.patient?.activeFrom;
+            updateData.patient.activeTo = values.patient?.activeTo;
+            if (values.patient?.treatmentPackageId) {
+              updateData.patient.treatmentPackageId = values.patient.treatmentPackageId;
+            }
           }
         }
 
@@ -151,15 +153,21 @@ function UserModal({ open, onClose, rowData, userType, readOnly = false }: UserF
             severityLevel: values.patient?.severityLevel,
             severityNotes: values.patient?.severityNotes,
             treatmentPackageId: values.patient?.treatmentPackageId,
-            // Form toggle (boolean) → backend string enum (SOT).
-            treatmentStatus: computeTreatmentStatus({
+          };
+          // Chỉ admin được kích hoạt ngay khi tạo; bác sĩ tạo → chờ admin đặt thời gian
+          if (user?.userType === 'admin') {
+            createData.patient.treatmentStatus = computeTreatmentStatus({
               paused: values.patient?.treatmentStatus === false,
               activeFrom: values.patient?.activeFrom,
               activeTo: values.patient?.activeTo,
-            }),
-            activeFrom: values.patient?.activeFrom,
-            activeTo: values.patient?.activeTo,
-          };
+            });
+            createData.patient.activeFrom = values.patient?.activeFrom;
+            createData.patient.activeTo = values.patient?.activeTo;
+          } else {
+            createData.patient.treatmentStatus = 'not_started';
+            createData.patient.activeFrom = null;
+            createData.patient.activeTo = null;
+          }
         }
 
         await userService.createUser(createData);
