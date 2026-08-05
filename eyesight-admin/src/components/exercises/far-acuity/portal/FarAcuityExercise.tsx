@@ -45,6 +45,7 @@ import {
   EXAM_HORIZONTAL_PADDING_PX,
 } from 'src/utils/visionUtils';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
+import { isExerciseSlotEndedError } from 'src/utils/exerciseCompletionErrors';
 import { resolveExerciseStartVisionLevel } from 'src/utils/exerciseDifficultyBaseline';
 import useFreshPatientExamResults from 'src/hooks/useFreshPatientExamResults';
 import {
@@ -188,6 +189,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [completionSlotCounted, setCompletionSlotCounted] = useState(true);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
@@ -655,14 +657,21 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
           currentResultIdRef.current as number,
           metrics
         );
+        setSaveFailed(false);
         return {
           success: true,
           slotCounted: saved?.status === 'completed',
         };
-      } catch {
+      } catch (error) {
+        // Server already closed this slot — retrying can never succeed, so keep the
+        // execution completed and let the patient leave with the completion dialog.
+        if (isExerciseSlotEndedError(error)) {
+          setSaveFailed(false);
+          return { success: true, slotCounted: false };
+        }
         executionRef.current.completed = false;
         setIsActive(true);
-        timeoutTriggeredRef.current = false;
+        setSaveFailed(true);
         showSnackbar('Không thể lưu kết quả bài tập', 'error');
         return { success: false, slotCounted: false };
       }
@@ -676,11 +685,13 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
       return;
     }
     const outcome = await completeExerciseResult({ fromTimeout: true });
+    setTimeRemaining(0);
     if (outcome.success) {
-      setTimeRemaining(0);
       setCompletionSlotCounted(outcome.slotCounted);
       setShowCompletionDialog(true);
     }
+    // On failure the timeout guard stays armed so the countdown never retries in a
+    // loop; the patient retries or leaves via the save-failed banner.
   }, [completeExerciseResult, sandboxMode]);
 
   useEffect(() => {
@@ -732,7 +743,10 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         accuracy: metrics.accuracy,
       });
       showSnackbar('Đã tạm dừng bài tập thành công', 'success');
-    } catch {
+    } catch (error) {
+      // Preserve the server error so callers can tell "slot already closed" from a
+      // transient failure and avoid trapping the patient on the exercise screen.
+      if (isExerciseSlotEndedError(error)) throw error;
       showSnackbar('Không thể tạm dừng bài tập', 'error');
       throw new Error('Pause failed');
     } finally {
@@ -761,6 +775,24 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     }
   }, [completeExerciseResult, timeRemaining]);
 
+  /** Leave the exercise screen without saving — last resort when the server refuses. */
+  const leaveExercise = useCallback(() => {
+    timeoutTriggeredRef.current = true;
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (executionRef.current) executionRef.current.completed = true;
+    setIsActive(false);
+    if (blocker.state === 'blocked') {
+      blocker.proceed();
+    } else if (!sandboxMode) {
+      navigate('/portal/exercises');
+    } else {
+      onSandboxExit?.();
+    }
+  }, [blocker, sandboxMode, navigate, onSandboxExit]);
+
   const handleExitConfirm = useCallback(async () => {
     setShowExitDialog(false);
     try {
@@ -770,20 +802,26 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         inactivityTimerRef.current = null;
       }
       await handlePauseExercise();
-      if (executionRef.current) executionRef.current.completed = true;
-      setIsActive(false);
-      if (blocker.state === 'blocked') {
-        blocker.proceed();
-      } else if (!sandboxMode) {
-        navigate('/portal/exercises');
-      } else {
-        onSandboxExit?.();
+      leaveExercise();
+    } catch (error) {
+      // Slot already closed server-side: pause can never succeed, so never trap the patient.
+      if (isExerciseSlotEndedError(error)) {
+        leaveExercise();
+        return;
       }
-    } catch {
       timeoutTriggeredRef.current = false;
+      setSaveFailed(true);
       if (blocker.state === 'blocked') blocker.reset();
     }
-  }, [handlePauseExercise, blocker, sandboxMode, navigate, onSandboxExit]);
+  }, [handlePauseExercise, leaveExercise, blocker]);
+
+  const handleRetrySave = useCallback(async () => {
+    const outcome = await completeExerciseResult({ fromTimeout: timeRemaining === 0 });
+    if (outcome.success) {
+      setCompletionSlotCounted(outcome.slotCounted);
+      setShowCompletionDialog(true);
+    }
+  }, [completeExerciseResult, timeRemaining]);
 
   const handleCompletionClose = useCallback(() => {
     setShowCompletionDialog(false);
@@ -1080,6 +1118,31 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             </Button>
           </Box>
         </Box>
+
+        {saveFailed && (
+          <Alert
+            severity="warning"
+            sx={{ borderRadius: 0, alignItems: 'center' }}
+            action={
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="warning"
+                  onClick={() => void handleRetrySave()}
+                  disabled={isPausing}
+                >
+                  Thử lưu lại
+                </Button>
+                <Button size="small" variant="outlined" color="inherit" onClick={leaveExercise}>
+                  Thoát
+                </Button>
+              </Box>
+            }
+          >
+            Không lưu được kết quả lên máy chủ. Kiểm tra kết nối rồi thử lưu lại, hoặc thoát ra ngoài.
+          </Alert>
+        )}
 
         {/* Main content: char-type setup or test (exam-style) */}
         {setupPhase === 'charType' ? (

@@ -182,7 +182,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
     const farLevel = Math.max(FAR_LEVEL_MIN, Math.min(acuityLevelMax, options.initialFarLevel ?? 1));
     const contrastLevel = Math.max(
       CONTRAST_LEVEL_MIN,
-      Math.min(CONTRAST_LEVEL_ABSOLUTE_MAX, options.initialContrastLevel ?? 1)
+      Math.min(CONTRAST_LEVEL_MAX, options.initialContrastLevel ?? 1)
     );
     return {
       farLevel,
@@ -270,10 +270,9 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
           if (prevContrastLevel > CONTRAST_LEVEL_MIN) {
             nextContrastLevel = prevContrastLevel - 1;
           } else if (prevFarLevel > FAR_LEVEL_MIN) {
-            // Drop a size AND reset contrast to hardest: patient must now work up
-            // the full contrast ladder at the easier size.
+            // Drop a size and restart contrast at 100% on the easier letter size.
             nextFarLevel = prevFarLevel - 1;
-            nextContrastLevel = CONTRAST_LEVEL_MAX;
+            nextContrastLevel = CONTRAST_LEVEL_MIN;
           }
         }
         lettersChanged = nextContrastLevel !== prevContrastLevel || nextFarLevel !== prevFarLevel;
@@ -328,7 +327,7 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
         );
         const contrastLevel = Math.max(
           CONTRAST_LEVEL_MIN,
-          Math.min(CONTRAST_LEVEL_ABSOLUTE_MAX, opts?.contrastLevel ?? CONTRAST_LEVEL_MIN)
+          Math.min(CONTRAST_LEVEL_MAX, opts?.contrastLevel ?? CONTRAST_LEVEL_MIN)
         );
         return {
           farLevel,
