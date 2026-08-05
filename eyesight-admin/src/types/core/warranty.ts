@@ -16,10 +16,11 @@ export type WarrantyPhaseType = 'initial' | 'reexam' | 'final';
 export type WarrantyPhaseStatus = 'draft' | 'awaiting_guardian' | 'awaiting_doctor' | 'completed';
 
 export interface WarrantySignatureRecord {
-  signatureDataUrl: string;
+  signatureDataUrl?: string | null;
   signerName: string;
   signerRelation?: string | null;
   signedAt: string;
+  signatureHash?: string | null;
 }
 
 export interface WarrantyExamTypeClinical {

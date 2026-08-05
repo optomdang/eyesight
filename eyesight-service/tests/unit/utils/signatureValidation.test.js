@@ -29,7 +29,7 @@ describe('signatureValidation', () => {
     ).toThrow(/đồng ý/i);
   });
 
-  test('validateSignaturePayload returns metadata fields without raw image', () => {
+  test('validateSignaturePayload returns metadata and keeps signature image', () => {
     const result = validateSignaturePayload({
       signatureDataUrl: tinyPng,
       signerName: 'Nguyen Van A',
@@ -39,6 +39,6 @@ describe('signatureValidation', () => {
     expect(result.signerName).toBe('Nguyen Van A');
     expect(result.signerRelation).toBe('Cha/mẹ');
     expect(result.signatureHash).toHaveLength(64);
-    expect(result.signatureDataUrl).toBeUndefined();
+    expect(result.signatureDataUrl).toBe(tinyPng);
   });
 });

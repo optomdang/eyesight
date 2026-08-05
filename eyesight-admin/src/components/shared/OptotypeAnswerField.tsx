@@ -3,9 +3,10 @@
  *
  * Design rules (clinical acuity entry):
  * 1. Native text insertion is always blocked (beforeInput preventDefault).
- * 2. One keystroke → at most one commit + one focus advance (debounce guard).
- * 3. After advance, the next field ignores ALL input briefly (leak lock).
- * 4. onChange never drives state (controlled value only from parent).
+ * 2. keydown + beforeInput for the same gesture collapse to one commit.
+ * 3. After advance, the next field ignores only the leaked previous character briefly.
+ * 4. Fast typing that lands on an already-filled box is forwarded to the next box.
+ * 5. onChange never drives state (controlled value only from parent).
  */
 import React from 'react';
 import CustomTextField from 'src/components/forms/theme-elements/CustomTextField';
@@ -55,17 +56,19 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
   firstInputRef,
   onCommit,
 }) => {
-  const focusNeighbor = (direction: 1 | -1) => {
+  const focusAfter = (localIndex: number) => {
     window.setTimeout(() => {
-      if (direction > 0) {
-        const nextInput = inputRefs.current[batchLocalIndex + 1];
-        if (nextInput) {
-          nextInput.focus();
-          return;
-        }
-        confirmButtonRef?.current?.focus();
+      const nextInput = inputRefs.current[localIndex + 1];
+      if (nextInput) {
+        nextInput.focus();
         return;
       }
+      confirmButtonRef?.current?.focus();
+    }, 0);
+  };
+
+  const focusPrev = () => {
+    window.setTimeout(() => {
       if (batchLocalIndex > 0) {
         inputRefs.current[batchLocalIndex - 1]?.focus();
       }
@@ -74,22 +77,37 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
 
   const commitChar = (raw: string) => {
     if (disabled) return;
-    if (leakGuard.shouldIgnore(absoluteIndex)) return;
 
     const next = toOptotypeInputChar(raw, numbersOnly);
     if (!next) return;
-    if (!leakGuard.tryBeginCommit(absoluteIndex)) return;
 
-    onCommit(absoluteIndex, next);
-    leakGuard.armNextField(absoluteIndex + 1);
-    focusNeighbor(1);
+    // Start from this field; if already filled, prefer the next empty slot.
+    let preferredIndex = absoluteIndex;
+    if (value) {
+      if (!inputRefs.current[batchLocalIndex + 1]) return;
+      preferredIndex = absoluteIndex + 1;
+    }
+
+    if (leakGuard.shouldIgnore(preferredIndex, next)) return;
+
+    const decision = leakGuard.decideCommit(preferredIndex, next);
+    if (decision.action === 'duplicate') return;
+
+    const targetIndex = decision.index;
+    const targetLocal = batchLocalIndex + (targetIndex - absoluteIndex);
+    if (targetLocal < 0 || !inputRefs.current[targetLocal]) return;
+    if (leakGuard.shouldIgnore(targetIndex, next)) return;
+
+    onCommit(targetIndex, next);
+    leakGuard.armNextField(targetIndex + 1, next);
+    focusAfter(targetLocal);
   };
 
   const clearChar = () => {
     if (disabled) return;
     onCommit(absoluteIndex, '');
     if (!value) {
-      focusNeighbor(-1);
+      focusPrev();
     }
   };
 
@@ -127,7 +145,7 @@ const OptotypeAnswerField: React.FC<OptotypeAnswerFieldProps> = ({
         if (e.key === 'Tab' || e.key === 'Enter') return;
 
         // Printable key: handle here on desktop. beforeInput is also prevented so
-        // tryBeginCommit collapses the duplicate gesture into one commit.
+        // decideCommit collapses the duplicate gesture into one commit.
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault();
           e.stopPropagation();

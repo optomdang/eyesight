@@ -44,29 +44,36 @@ describe('createOptotypeFocusLeakGuard', () => {
     vi.restoreAllMocks();
   });
 
-  it('blocks any input on the next field within the suppress window', () => {
+  it('blocks only the leaked character on the next field', () => {
     const guard = createOptotypeFocusLeakGuard(100);
-    guard.armNextField(1);
+    guard.armNextField(1, 'C');
 
-    expect(guard.shouldIgnore(1)).toBe(true);
-    expect(guard.shouldIgnore(0)).toBe(false);
-    expect(guard.shouldIgnore(2)).toBe(false);
+    expect(guard.shouldIgnore(1, 'C')).toBe(true);
+    expect(guard.shouldIgnore(1, 'S')).toBe(false);
+    expect(guard.shouldIgnore(0, 'C')).toBe(false);
   });
 
   it('stops locking after the window elapses', () => {
     const guard = createOptotypeFocusLeakGuard(OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS);
-    guard.armNextField(1);
+    guard.armNextField(1, 'C');
 
     vi.spyOn(performance, 'now').mockReturnValue(1000 + OPTOTYPE_FOCUS_LEAK_SUPPRESS_MS + 1);
-    expect(guard.shouldIgnore(1)).toBe(false);
+    expect(guard.shouldIgnore(1, 'C')).toBe(false);
   });
 
   it('collapses keydown+beforeInput into a single commit', () => {
     const guard = createOptotypeFocusLeakGuard(100, OPTOTYPE_COMMIT_DEBOUNCE_MS);
-    expect(guard.tryBeginCommit(0)).toBe(true);
-    expect(guard.tryBeginCommit(0)).toBe(false);
+    expect(guard.decideCommit(0, 'C')).toEqual({ action: 'accept', index: 0 });
+    expect(guard.decideCommit(0, 'C')).toEqual({ action: 'duplicate' });
 
     vi.spyOn(performance, 'now').mockReturnValue(1000 + OPTOTYPE_COMMIT_DEBOUNCE_MS + 1);
-    expect(guard.tryBeginCommit(0)).toBe(true);
+    expect(guard.decideCommit(0, 'C')).toEqual({ action: 'accept', index: 0 });
+  });
+
+  it('forwards a different fast keystroke to the next box (overflow)', () => {
+    const guard = createOptotypeFocusLeakGuard(100, OPTOTYPE_COMMIT_DEBOUNCE_MS);
+    expect(guard.decideCommit(0, 'C')).toEqual({ action: 'accept', index: 0 });
+    // Second key while still on box 0 — must not be dropped
+    expect(guard.decideCommit(0, 'S')).toEqual({ action: 'overflow', index: 1 });
   });
 });

@@ -160,19 +160,18 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
         }}
       >
         {currentBatchItems.length > 0 && (
-          <Box textAlign="center" position="relative" width="100%">
+          <Box textAlign="center" position="relative" width="100%" sx={{ pt: { xs: 4, sm: 5 } }}>
             <Typography
               variant="body2"
               sx={{
                 position: 'absolute',
-                top: '50%',
-                left: '20px',
-                transform: 'translateY(-50%)',
+                top: { xs: 8, sm: 12 },
+                left: { xs: 8, sm: 20 },
                 color: 'text.primary',
                 fontWeight: 'medium',
                 fontSize: '0.9rem',
-                zIndex: 1000,
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                zIndex: 2,
+                backgroundColor: 'rgba(255, 255, 255, 0.92)',
                 padding: '4px 8px',
                 borderRadius: '4px',
               }}
@@ -184,14 +183,13 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                 variant="body2"
                 sx={{
                   position: 'absolute',
-                  top: '50%',
-                  right: '20px',
-                  transform: 'translateY(-50%)',
+                  top: { xs: 8, sm: 12 },
+                  right: { xs: 8, sm: 20 },
                   color: 'text.primary',
                   fontWeight: 'medium',
                   fontSize: '0.9rem',
-                  zIndex: 1000,
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  zIndex: 2,
+                  backgroundColor: 'rgba(255, 255, 255, 0.92)',
                   padding: '4px 8px',
                   borderRadius: '4px',
                 }}

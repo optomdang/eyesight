@@ -36,6 +36,7 @@ const sanitizeSignatureForResponse = (signature) => {
     signerRelation: signature.signerRelation || null,
     signedAt: signature.signedAt,
     signatureHash: signature.signatureHash || null,
+    signatureDataUrl: signature.signatureDataUrl || null,
   };
 };
 

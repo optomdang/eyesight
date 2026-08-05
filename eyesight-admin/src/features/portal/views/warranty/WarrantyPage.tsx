@@ -13,6 +13,7 @@ import {
 } from 'src/utils/warrantyClinicalData';
 import PolicyViewer from 'src/components/warranty/PolicyViewer';
 import PhaseTimeline from 'src/components/warranty/PhaseTimeline';
+import SignatureDisplay from 'src/components/warranty/SignatureDisplay';
 import PdfDownloadButton from 'src/components/warranty/PdfDownloadButton';
 import DiligenceCalendar from 'src/components/warranty/DiligenceCalendar';
 
@@ -120,13 +121,19 @@ const PortalWarrantyPage: React.FC = () => {
                 </Alert>
               )}
 
-              {selectedPhase?.status === 'awaiting_doctor' && (
+              {selectedPhase?.status === 'awaiting_doctor' && selectedPhase.guardianSignature && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   Bạn đã ký xong giai đoạn{' '}
                   <strong>
                     {getPhaseTypeLabel(selectedPhase.phaseType)} (Lần {selectedPhase.phaseNumber})
                   </strong>
                   . Đang chờ bác sĩ xác nhận.
+                  <Box sx={{ mt: 1.5 }}>
+                    <SignatureDisplay
+                      signature={selectedPhase.guardianSignature}
+                      roleLabel="Chữ ký của bạn"
+                    />
+                  </Box>
                 </Alert>
               )}
 
@@ -136,22 +143,29 @@ const PortalWarrantyPage: React.FC = () => {
                   <strong>
                     {getPhaseTypeLabel(selectedPhase.phaseType)} (Lần {selectedPhase.phaseNumber})
                   </strong>{' '}
-                  đã hoàn tất — ký bởi {selectedPhase.guardianSignature.signerName}
-                  {selectedPhase.guardianSignature.signerRelation
-                    ? ` (${selectedPhase.guardianSignature.signerRelation})`
-                    : ''}{' '}
-                  lúc{' '}
-                  {new Date(selectedPhase.guardianSignature.signedAt).toLocaleString('vi-VN')}.
-                  {selectedPhase.status === 'completed' && (
-                    <Box sx={{ mt: 1 }}>
-                      <PdfDownloadButton
-                        agreementId={agreement.id}
-                        phaseId={selectedPhase.id}
-                        filename={`warranty-phase-${selectedPhase.phaseNumber}.pdf`}
-                        label="Tải PDF giai đoạn này"
-                      />
-                    </Box>
-                  )}
+                  đã hoàn tất.
+                  <Box sx={{ mt: 1.5 }}>
+                    <SignatureDisplay
+                      signature={selectedPhase.guardianSignature}
+                      roleLabel="Phụ huynh"
+                    />
+                    {selectedPhase.doctorSignature && (
+                      <Box sx={{ mt: 1 }}>
+                        <SignatureDisplay
+                          signature={selectedPhase.doctorSignature}
+                          roleLabel="Bác sĩ"
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <PdfDownloadButton
+                      agreementId={agreement.id}
+                      phaseId={selectedPhase.id}
+                      filename={`warranty-phase-${selectedPhase.phaseNumber}.pdf`}
+                      label="Tải PDF giai đoạn này"
+                    />
+                  </Box>
                 </Alert>
               )}
 

@@ -65,11 +65,12 @@ const validateSignaturePayload = (body = {}) => {
     byteLength,
     mimeType,
     signatureHash,
+    signatureDataUrl: body.signatureDataUrl,
   };
 };
 
 /**
- * Build stored signature metadata (no raw image bytes).
+ * Build stored signature record including PNG/JPEG/WebP data URL for display/PDF.
  */
 const buildSignatureRecord = (validated, user = null, requestContext = {}) => ({
   signerName: validated.signerName,
@@ -77,6 +78,7 @@ const buildSignatureRecord = (validated, user = null, requestContext = {}) => ({
   signatureHash: validated.signatureHash,
   byteLength: validated.byteLength,
   mimeType: validated.mimeType,
+  signatureDataUrl: validated.signatureDataUrl,
   signedAt: new Date().toISOString(),
   signedByUserId: user?.id || null,
   ipAddress: requestContext.ipAddress || null,

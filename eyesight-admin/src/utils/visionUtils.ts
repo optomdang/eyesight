@@ -1370,16 +1370,20 @@ export const generateRandomText = (
   charCount: number,
   char: 'E' | 'C' | 'A' | 'N' | 'S'
 ): TestItem => {
-  const pool = CHAR_POOL_MAP[char] || CHAR_POOL_MAP['A'];
+  const pool = Array.from(new Set(CHAR_POOL_MAP[char] || CHAR_POOL_MAP['A']));
   const randomItems: TestItem = [];
-
-  let lastChar: string | null = null;
+  let unusedChars = [...pool];
 
   for (let i = 0; i < charCount; i++) {
-    let availableChars = pool;
+    const lastChar = randomItems.at(-1)?.display;
+    let availableChars = unusedChars.filter((candidate) => candidate !== lastChar);
 
-    if (lastChar !== null && pool.length > 1) {
-      availableChars = pool.filter((c) => c !== lastChar);
+    // A/N pools contain enough values for the standard five-character row, so
+    // every displayed letter/number is unique. E/C/S only have four directions;
+    // after using all four, begin a new cycle without repeating adjacently.
+    if (availableChars.length === 0) {
+      unusedChars = [...pool];
+      availableChars = unusedChars.filter((candidate) => candidate !== lastChar);
     }
 
     const randomChar = availableChars[Math.floor(Math.random() * availableChars.length)];
@@ -1387,8 +1391,7 @@ export const generateRandomText = (
       char: char, // Store the character type for font rendering
       display: randomChar, // Store the direction code for comparison and display
     });
-
-    lastChar = randomChar;
+    unusedChars = unusedChars.filter((candidate) => candidate !== randomChar);
   }
 
   return randomItems;

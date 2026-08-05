@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useFarAcuityEngine, FAR_LEVEL_MAX, CONTRAST_LEVEL_MAX, CONTRAST_LEVEL_MIN } from '../useFarAcuityEngine';
+import {
+  useFarAcuityEngine,
+  generateFarAcuityLetters,
+  FAR_LEVEL_MAX,
+  CONTRAST_LEVEL_MAX,
+  CONTRAST_LEVEL_MIN,
+} from '../useFarAcuityEngine';
 import { contrastVisionLevels, farVisionLevels } from 'src/utils/constant';
 
 vi.mock('src/utils/visionUtils', () => {
@@ -32,6 +38,28 @@ function fill(result: { current: ReturnType<typeof useFarAcuityEngine> }, correc
 }
 
 describe('useFarAcuityEngine', () => {
+  describe('VAC row generation', () => {
+    it.each(['A', 'N'] as const)('shows each %s optotype only once per row', (charType) => {
+      for (let run = 0; run < 20; run += 1) {
+        const displays = generateFarAcuityLetters(charType).map((item) => item.display);
+        expect(new Set(displays).size).toBe(displays.length);
+      }
+    });
+
+    it.each(['E', 'C', 'S'] as const)(
+      'uses all four %s directions before repeating and never repeats adjacently',
+      (charType) => {
+        for (let run = 0; run < 20; run += 1) {
+          const displays = generateFarAcuityLetters(charType).map((item) => item.display);
+          expect(new Set(displays.slice(0, 4)).size).toBe(4);
+          displays.slice(1).forEach((display, index) => {
+            expect(display).not.toBe(displays[index]);
+          });
+        }
+      }
+    );
+  });
+
   describe('initialisation', () => {
     it('starts at provided farLevel and contrastLevel=1', () => {
       const { result } = renderHook(() => useFarAcuityEngine({ initialFarLevel: 10 }));

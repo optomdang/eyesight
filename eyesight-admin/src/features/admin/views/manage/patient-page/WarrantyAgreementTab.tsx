@@ -45,6 +45,7 @@ import {
 } from 'src/utils/warrantyClinicalData';
 import PolicyViewer from 'src/components/warranty/PolicyViewer';
 import PhaseTimeline from 'src/components/warranty/PhaseTimeline';
+import SignatureDisplay from 'src/components/warranty/SignatureDisplay';
 import PdfDownloadButton from 'src/components/warranty/PdfDownloadButton';
 import ClinicalDataForm from 'src/components/warranty/ClinicalDataForm';
 import DoctorSignForm from 'src/components/warranty/DoctorSignForm';
@@ -507,6 +508,14 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                   <Alert severity="warning" sx={{ mt: 2 }}>
                     Phụ huynh đã ký — dữ liệu lâm sàng đã được khóa. Vui lòng kiểm tra và ký xác
                     nhận bên dưới, hoặc mở link ký trên điện thoại để ký cảm ứng.
+                    {selectedPhase.guardianSignature && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <SignatureDisplay
+                          signature={selectedPhase.guardianSignature}
+                          roleLabel="Phụ huynh"
+                        />
+                      </Box>
+                    )}
                     <Box sx={{ mt: 1 }}>
                       <Button
                         size="small"
@@ -525,6 +534,22 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                 {isPhaseImmutable && (
                   <Alert severity="success" sx={{ mt: 2 }}>
                     Giai đoạn đã hoàn tất — không thể chỉnh sửa.
+                    {(selectedPhase.guardianSignature || selectedPhase.doctorSignature) && (
+                      <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+                        {selectedPhase.guardianSignature && (
+                          <SignatureDisplay
+                            signature={selectedPhase.guardianSignature}
+                            roleLabel="Phụ huynh"
+                          />
+                        )}
+                        {selectedPhase.doctorSignature && (
+                          <SignatureDisplay
+                            signature={selectedPhase.doctorSignature}
+                            roleLabel="Bác sĩ"
+                          />
+                        )}
+                      </Stack>
+                    )}
                   </Alert>
                 )}
 
@@ -538,11 +563,13 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                   />
                 )}
 
-                {selectedPhase.doctorSignature && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Đã ký bởi {selectedPhase.doctorSignature.signerName} lúc{' '}
-                    {new Date(selectedPhase.doctorSignature.signedAt).toLocaleString('vi-VN')}
-                  </Typography>
+                {!isPhaseImmutable && selectedPhase.doctorSignature && (
+                  <Box sx={{ mt: 2 }}>
+                    <SignatureDisplay
+                      signature={selectedPhase.doctorSignature}
+                      roleLabel="Bác sĩ"
+                    />
+                  </Box>
                 )}
               </Paper>
             ) : (

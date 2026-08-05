@@ -938,6 +938,29 @@ describe('Exam Utilities', () => {
       }
     });
 
+    it.each(['A', 'N'] as const)(
+      'should show each %s optotype only once in a standard exam row',
+      (charType) => {
+        for (let i = 0; i < 20; i++) {
+          const displays = generateRandomText(5, charType).map((item) => item.display);
+          expect(new Set(displays).size).toBe(displays.length);
+        }
+      }
+    );
+
+    it.each(['E', 'C', 'S'] as const)(
+      'should use all four %s directions before repeating',
+      (charType) => {
+        for (let i = 0; i < 20; i++) {
+          const displays = generateRandomText(5, charType).map((item) => item.display);
+          expect(new Set(displays.slice(0, 4)).size).toBe(4);
+          displays.slice(1).forEach((display, index) => {
+            expect(display).not.toBe(displays[index]);
+          });
+        }
+      }
+    );
+
     it('should set correct char type', () => {
       const result = generateRandomText(3, 'E');
 

@@ -29,6 +29,7 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import DownloadIcon from '@mui/icons-material/Download';
 import SignaturePad, { type SignaturePadHandle } from 'src/components/shared/SignaturePad';
+import SignatureDisplay from 'src/components/warranty/SignatureDisplay';
 import {
   WARRANTY_POLICY_SECTIONS,
   WARRANTY_POLICY_TAGLINE,
@@ -302,18 +303,14 @@ const WarrantySignPage: React.FC = () => {
           Biên bản đã hoàn tất
         </Typography>
         {guardian && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-            Phụ huynh: {guardian.signerName}
-            {guardian.signerRelation
-              ? ` (${RELATION_LABELS[guardian.signerRelation] || guardian.signerRelation})`
-              : ''}{' '}
-            — {new Date(guardian.signedAt).toLocaleString('vi-VN')}
-          </Typography>
+          <Box sx={{ mb: 2, textAlign: 'left', display: 'inline-block', width: '100%', maxWidth: 360 }}>
+            <SignatureDisplay signature={guardian} roleLabel="Phụ huynh" />
+          </Box>
         )}
         {doctor && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Bác sĩ: {doctor.signerName} — {new Date(doctor.signedAt).toLocaleString('vi-VN')}
-          </Typography>
+          <Box sx={{ mb: 3, textAlign: 'left', display: 'inline-block', width: '100%', maxWidth: 360 }}>
+            <SignatureDisplay signature={doctor} roleLabel="Bác sĩ" />
+          </Box>
         )}
         {!guardian && !doctor && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -424,16 +421,10 @@ const WarrantySignPage: React.FC = () => {
 
         {isDoctorSign && guardianSig && (
           <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'success.lighter' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
               Phụ huynh đã ký
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {guardianSig.signerName}
-              {guardianSig.signerRelation
-                ? ` (${RELATION_LABELS[guardianSig.signerRelation] || guardianSig.signerRelation})`
-                : ''}{' '}
-              — {new Date(guardianSig.signedAt).toLocaleString('vi-VN')}
-            </Typography>
+            <SignatureDisplay signature={guardianSig} roleLabel="Phụ huynh" />
           </Paper>
         )}
 

@@ -91,7 +91,7 @@ const ARTICLES = [
     paragraphs: [
       'Thỏa thuận được thực hiện qua các giai đoạn: ký ban đầu, tái khám (nếu có), kết thúc gói.',
       'Mỗi giai đoạn yêu cầu chữ ký Người giám hộ/Người đại diện và xác nhận của Bác sĩ/Chuyên gia phụ trách.',
-      'Chữ ký điện tử được ghi nhận kèm thời gian, mã băm và thông tin người ký; hệ thống không lưu trữ ảnh chữ ký gốc.',
+      'Chữ ký điện tử được ghi nhận kèm hình ảnh chữ ký, thời gian, mã băm và thông tin người ký để hiển thị trên hồ sơ và PDF.',
       'Tài liệu hoàn tất được lưu dưới dạng snapshot và mã băm để phục vụ đối chiếu.',
     ],
   },

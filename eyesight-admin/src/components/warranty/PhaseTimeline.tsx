@@ -6,6 +6,7 @@ import {
   getWarrantyStatusLabel,
   getWarrantyStatusColor,
 } from 'src/utils/warrantyClinicalData';
+import SignatureDisplay from './SignatureDisplay';
 
 export interface PhaseTimelineProps {
   phases: WarrantyPhase[];
@@ -62,24 +63,25 @@ const PhaseTimeline: React.FC<PhaseTimelineProps> = ({
               {getPhaseTypeLabel(phase.phaseType)} (Lần {phase.phaseNumber})
             </StepLabel>
             <StepContent>
-              <Stack spacing={0.5}>
+              <Stack spacing={1}>
                 {phase.completedAt && (
                   <Typography variant="caption" color="text.secondary">
                     Hoàn tất: {new Date(phase.completedAt).toLocaleString('vi-VN')}
                   </Typography>
                 )}
                 {phase.guardianSignature && (
-                  <Typography variant="caption" color="text.secondary">
-                    Phụ huynh: {phase.guardianSignature.signerName}
-                    {phase.guardianSignature.signerRelation
-                      ? ` (${phase.guardianSignature.signerRelation})`
-                      : ''}
-                  </Typography>
+                  <SignatureDisplay
+                    signature={phase.guardianSignature}
+                    roleLabel="Phụ huynh"
+                    compact
+                  />
                 )}
                 {phase.doctorSignature && (
-                  <Typography variant="caption" color="text.secondary">
-                    Bác sĩ: {phase.doctorSignature.signerName}
-                  </Typography>
+                  <SignatureDisplay
+                    signature={phase.doctorSignature}
+                    roleLabel="Bác sĩ"
+                    compact
+                  />
                 )}
               </Stack>
             </StepContent>

@@ -21,8 +21,12 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { farVisionLevels, nearVisionLevels, contrastVisionLevels } from 'src/utils/constant';
-import { generateRandomText } from 'src/utils/visionUtils';
+import {
+  CHAR_POOL_MAP,
+  farVisionLevels,
+  nearVisionLevels,
+  contrastVisionLevels,
+} from 'src/utils/constant';
 import { evaluateAnswer } from 'src/utils/examUtils';
 
 export const FAR_ACUITY_CHAR_COUNT = 5;
@@ -100,8 +104,40 @@ export interface FarAcuityEngineReturn {
   failTarget: number;
 }
 
+/**
+ * Generate one VAC row without repeats while the optotype pool permits it.
+ * Letter/number pools have at least five values, so every item in their row is unique.
+ * E/C/S have only four directions; after all four are used, the fifth starts a new
+ * cycle and is guaranteed to differ from its immediate neighbour.
+ */
+export function generateFarAcuityLetters(
+  charType: FarAcuityCharType,
+  count = FAR_ACUITY_CHAR_COUNT,
+  random: () => number = Math.random
+): FarAcuityLetter[] {
+  const pool = Array.from(new Set(CHAR_POOL_MAP[charType] ?? CHAR_POOL_MAP.A));
+  const result: FarAcuityLetter[] = [];
+  let unused = [...pool];
+
+  while (result.length < count && pool.length > 0) {
+    const previous = result.at(-1)?.display;
+    let candidates = unused.filter((item) => item !== previous);
+
+    if (candidates.length === 0) {
+      unused = [...pool];
+      candidates = unused.filter((item) => item !== previous);
+    }
+
+    const selected = candidates[Math.floor(random() * candidates.length)] ?? candidates[0];
+    result.push({ char: charType, display: selected });
+    unused = unused.filter((item) => item !== selected);
+  }
+
+  return result;
+}
+
 function generateLetters(charType: FarAcuityCharType): FarAcuityLetter[] {
-  return generateRandomText(FAR_ACUITY_CHAR_COUNT, charType) as FarAcuityLetter[];
+  return generateFarAcuityLetters(charType);
 }
 
 export type FarAcuityVisionType = 'far' | 'near';
