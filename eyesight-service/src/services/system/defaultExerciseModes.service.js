@@ -78,6 +78,14 @@ const ensureDefaultCenterExercises = async (centerId, updatedBy, transaction = n
     }
 
     if (exercise) {
+      // Rename legacy catalog label BTL → VAC (do not overwrite custom names).
+      if (def.code === 'far-acuity' && exercise.name === 'Bài tập với BTL') {
+        // eslint-disable-next-line no-await-in-loop
+        await exercise.update(
+          { name: def.name, updatedBy: updatedBy || exercise.updatedBy },
+          { transaction }
+        );
+      }
       byCatalogCode[def.code] = exercise;
     }
   }

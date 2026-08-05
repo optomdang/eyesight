@@ -1,5 +1,5 @@
 /**
- * Resolve the best charType to use for far-acuity (BTL) exercise setup.
+ * Resolve the best charType to use for far-acuity (VAC) exercise setup.
  *
  * Priority (user requirement):
  *   1. Char type from the patient's most recent completed exam (matching visionType first)
@@ -113,7 +113,7 @@ export interface ResolvedFarAcuityCharType {
 }
 
 /**
- * Resolve default charType for BTL / far-acuity setup:
+ * Resolve default charType for VAC / far-acuity setup:
  * exam (matching vision) → last exercise → 'E'.
  */
 export async function resolveDefaultFarAcuityCharType(

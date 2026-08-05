@@ -75,7 +75,7 @@ const DEFAULT_CENTER_EXERCISES = [
   },
   {
     code: 'far-acuity',
-    name: 'Bài tập với BTL',
+    name: 'Bài tập với VAC',
     exerciseType: 'far-acuity',
     description: 'Bài tập thị lực / tương phản (ODETS) — mặc định hệ thống',
   },
