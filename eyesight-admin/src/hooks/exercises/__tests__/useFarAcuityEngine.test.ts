@@ -148,8 +148,8 @@ describe('useFarAcuityEngine', () => {
   });
 
   describe('pass at maximum contrast level', () => {
-    it('pass at contrastLevel=12 (logCS 1.65): farLevel+1, contrastLevel reset to 1', () => {
-      expect(contrastVisionLevels[CONTRAST_LEVEL_MAX - 1].score).toBe('1.65');
+    it('pass at logCS 1.80: farLevel+1, contrastLevel reset to 1', () => {
+      expect(contrastVisionLevels[CONTRAST_LEVEL_MAX - 1].score).toBe('1.80');
 
       const { result } = renderHook(() =>
         useFarAcuityEngine({ initialFarLevel: 10, initialContrastLevel: CONTRAST_LEVEL_MAX })
@@ -159,9 +159,26 @@ describe('useFarAcuityEngine', () => {
 
       expect(result.current.state.farLevel).toBe(11);
       expect(result.current.state.contrastLevel).toBe(1);
+      expect(result.current.state.passStreak).toBe(0);
     });
 
-    it('pass at max contrast AND farLevel=20: stays at maximum', () => {
+    it('an incorrect round drops contrast, so the ladder must be climbed unbroken', () => {
+      const { result } = renderHook(() =>
+        useFarAcuityEngine({ initialFarLevel: 10, initialContrastLevel: CONTRAST_LEVEL_MAX - 1 })
+      );
+
+      fill(result, 2); // fail → contrast steps back down
+      act(() => { result.current.submitRound(); });
+      expect(result.current.state.contrastLevel).toBe(CONTRAST_LEVEL_MAX - 2);
+      expect(result.current.state.passStreak).toBe(0);
+
+      fill(result, 4); // pass → back up one step, still short of the target
+      act(() => { result.current.submitRound(); });
+      expect(result.current.state.contrastLevel).toBe(CONTRAST_LEVEL_MAX - 1);
+      expect(result.current.state.farLevel).toBe(10);
+    });
+
+    it('pass at max contrast AND maximum far level: stays at maximum', () => {
       const { result } = renderHook(() =>
         useFarAcuityEngine({ initialFarLevel: 20, initialContrastLevel: CONTRAST_LEVEL_MAX })
       );
@@ -172,7 +189,7 @@ describe('useFarAcuityEngine', () => {
       expect(result.current.state.contrastLevel).toBe(CONTRAST_LEVEL_MAX);
     });
 
-    it('clamps initialContrastLevel above max to logCS 1.65', () => {
+    it('clamps initialContrastLevel above max to logCS 1.80', () => {
       const { result } = renderHook(() =>
         useFarAcuityEngine({ initialFarLevel: 10, initialContrastLevel: 16 })
       );
@@ -203,10 +220,10 @@ describe('useFarAcuityEngine', () => {
       const { result } = renderHook(() =>
         useFarAcuityEngine({ initialFarLevel: 10, initialContrastLevel: CONTRAST_LEVEL_MAX - 1 })
       );
-      fill(result, 4); // pass → contrastLevel 11→12
+      fill(result, 4); // pass → contrast reaches the logCS 1.80 target
       act(() => { result.current.submitRound(); });
 
-      fill(result, 4); // pass at 12 → farLevel 10→11, contrast reset to 1
+      fill(result, 4); // pass at target → farLevel 10→11, contrast reset to 1
       act(() => { result.current.submitRound(); });
 
       expect(result.current.state.peakFarLevel).toBe(11);

@@ -6,10 +6,10 @@
  * ## 'contrast' (Thị lực tương phản)
  *   Axes: farLevel (1–20) × contrastLevel (1–16, higher = harder/more faded)
  *   Pass, contrastLevel < CONTRAST_LEVEL_MAX  → contrastLevel += 1
- *   Pass, contrastLevel ≥ max, farLevel < max  → farLevel += 1, contrastLevel = 1
+ *   Pass at CONTRAST_LEVEL_MAX (logCS 1.80)  → farLevel += 1, contrastLevel = 1
  *   Pass at maximum difficulty → stay
  *   Fail, contrastLevel > 1   → contrastLevel -= 1
- *   Fail, contrastLevel === 1, farLevel > 1  → farLevel -= 1, contrastLevel = CONTRAST_LEVEL_MAX
+ *   Fail, contrastLevel === 1, farLevel > 1  → farLevel -= 1, contrastLevel = 1
  *   Fail at minimum difficulty → stay
  *
  * ## 'acuity' (Thị lực xa / Thị lực gần)
@@ -35,8 +35,8 @@ export const FAR_LEVEL_MAX = farVisionLevels.length;
 export const CONTRAST_LEVEL_MIN = 1;
 /** Absolute max contrast step (full clinical ladder including designated starts like logCS 1.80). */
 export const CONTRAST_LEVEL_ABSOLUTE_MAX = contrastVisionLevels.length;
-/** Adaptive training ceiling (logCS 1.65); pass at/above this advances letter size. */
-export const FAR_ACUITY_MAX_LOG_CS = 1.65;
+/** Adaptive training ceiling; size can advance only after reaching and passing logCS 1.80. */
+export const FAR_ACUITY_MAX_LOG_CS = 1.8;
 export const CONTRAST_LEVEL_MAX =
   contrastVisionLevels.find((l) => parseFloat(l.score) === FAR_ACUITY_MAX_LOG_CS)?.level ??
   CONTRAST_LEVEL_ABSOLUTE_MAX;
@@ -68,7 +68,7 @@ export interface FarAcuityEngineState {
   farLevel: number;
   contrastLevel: number;
   letters: FarAcuityLetter[];
-  /** Consecutive correct rounds at the current level (acuity mode: drives level advance). */
+  /** Consecutive correct rounds (drives size advancement in both training modes). */
   passStreak: number;
   /** Consecutive fail rounds at the current level (acuity mode: drives level drop). */
   failStreak: number;
@@ -98,7 +98,7 @@ export interface FarAcuityEngineReturn {
   allAnswered: boolean;
   /** Active training mode (contrast or acuity). */
   trainingMode: 'contrast' | 'acuity';
-  /** Number of consecutive correct answers needed to advance level in acuity mode. */
+  /** Number of consecutive correct rounds needed before advancing to a smaller size. */
   streakTarget: number;
   /** Number of consecutive fail rounds at a size before dropping back (acuity mode). */
   failTarget: number;
@@ -255,11 +255,14 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
         }
         lettersChanged = true; // always fresh letters for variety
       } else {
-        // ── Contrast mode: adaptive contrast + size staircase ──
+        // ── Contrast mode: adaptive contrast staircase gates the size axis ──
+        // Every wrong answer steps contrast back down, so climbing the ladder to
+        // logCS 1.80 already requires an unbroken run of correct rounds.
         if (passed) {
+          nextFailStreak = 0;
+          nextPassStreak = prev.passStreak + 1;
           if (prevContrastLevel < CONTRAST_LEVEL_MAX) {
             nextContrastLevel = prevContrastLevel + 1;
-            nextPassStreak = prev.passStreak + 1;
           } else if (prevFarLevel < acuityLevelMaxRef.current) {
             nextFarLevel = prevFarLevel + 1;
             nextContrastLevel = CONTRAST_LEVEL_MIN;
@@ -275,7 +278,8 @@ export function useFarAcuityEngine(options: UseFarAcuityEngineOptions = {}): Far
             nextContrastLevel = CONTRAST_LEVEL_MIN;
           }
         }
-        lettersChanged = nextContrastLevel !== prevContrastLevel || nextFarLevel !== prevFarLevel;
+        // Always provide a fresh row, including while waiting at logCS 1.80.
+        lettersChanged = true;
       }
 
       const newLetters = lettersChanged

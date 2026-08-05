@@ -52,6 +52,7 @@ import {
   useFarAcuityEngine,
   getAcuityLevelInfo,
   getContrastLevelInfo,
+  CONTRAST_LEVEL_MAX,
   FAR_ACUITY_CHAR_COUNT,
   type FarAcuityVisionType,
 } from 'src/hooks/exercises/useFarAcuityEngine';
@@ -939,6 +940,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     state.farLevel
   );
   const contrastInfo = getContrastLevelInfo(state.contrastLevel);
+  const contrastTargetScore = getContrastLevelInfo(CONTRAST_LEVEL_MAX).score;
   const eyeLabel = eye === 'left' ? 'Mắt trái' : eye === 'right' ? 'Mắt phải' : 'Hai mắt';
 
   return (
@@ -1020,13 +1022,48 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             <Typography variant="caption" color="text.secondary">Thị lực</Typography>
           </Box>
 
-          {/* logCS (contrast mode) or streak progress bar (acuity mode) */}
+          {/* Contrast ladder progress toward the logCS target that unlocks a smaller size */}
           {trainingMode === 'contrast' ? (
-            <Box textAlign="center">
-              <Typography variant="h6" fontWeight="bold">
-                {contrastInfo.score}
+            <Box sx={{ textAlign: 'center', minWidth: 110 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'center',
+                  gap: 0.75,
+                  mb: 0.25,
+                }}
+              >
+                <Typography variant="body2" fontWeight="bold">
+                  {contrastInfo.score}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                  / {contrastTargetScore} logCS
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  width: 110,
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: 'grey.200',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  sx={{
+                    height: '100%',
+                    borderRadius: 4,
+                    width: `${(state.contrastLevel / CONTRAST_LEVEL_MAX) * 100}%`,
+                    bgcolor:
+                      state.contrastLevel >= CONTRAST_LEVEL_MAX ? 'success.main' : 'primary.main',
+                    transition: 'width 0.3s ease, background-color 0.2s ease',
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                Tiến độ tương phản
               </Typography>
-              <Typography variant="caption" color="text.secondary">logCS</Typography>
             </Box>
           ) : (
             <Box sx={{ textAlign: 'center', minWidth: 110 }}>
