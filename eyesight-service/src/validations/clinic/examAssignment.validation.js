@@ -72,6 +72,14 @@ const deleteExamAssignment = {
   }),
 };
 
+const resetExamAssignmentForRetake = {
+  params: Joi.object().keys({
+    patientId: Joi.number().integer().positive().required(),
+    configId: Joi.number().integer().positive().required(),
+  }),
+  body: Joi.object().max(0),
+};
+
 const deleteExamAssignments = {
   body: Joi.array().items(Joi.number()),
 };
@@ -82,5 +90,6 @@ module.exports = {
   getExamAssignment,
   updateExamAssignment,
   deleteExamAssignment,
+  resetExamAssignmentForRetake,
   deleteExamAssignments,
 };

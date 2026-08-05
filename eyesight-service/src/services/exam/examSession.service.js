@@ -3,9 +3,12 @@ const httpStatus = require('http-status');
 const ApiError = require('../../utils/ApiError');
 const logger = require('../../config/logger');
 const { getCurrentCycleDateRange } = require('../../utils/common');
-const { ExamSession, ExamResult } = require('../../models');
-const { _sequelize } = require('../../config/db');
+const { ExamSession, ExamResult, ExamMetric, Patient } = require('../../models');
+const { sequelize } = require('../../config/db');
 const examNotificationService = require('./examNotification.service');
+const auditLogService = require('../system/auditLog.service');
+const { recalculatePatientComplianceByType } = require('../clinic/compliance.service');
+const { eyeObj, isFull } = require('../../utils/examResultsBackfill');
 const {
   standardQuery,
   standardCreate,
@@ -131,6 +134,126 @@ const deleteExamSessionById = async (sessionId) => {
 };
 
 /**
+ * Reset a completed session so the patient can take the current-cycle exam again.
+ * The result and metrics from this cycle are removed from normal clinical history,
+ * while the session itself is reopened for a clean start.
+ */
+const resetExamSessionForRetake = async (sessionId, actor = {}) => {
+  const session = await getExamSessionById(sessionId);
+  if (!session) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Phiên kiểm tra không tồn tại');
+  }
+  if (session.status !== 'completed') {
+    throw new ApiError(httpStatus.CONFLICT, 'Chỉ có thể làm lại bài kiểm tra đã hoàn thành');
+  }
+
+  const resetResult = await sequelize.transaction(async (transaction) => {
+    const activeResults = await ExamResult.findAll({
+      where: { examSessionId: session.id, deleted: false },
+      transaction,
+    });
+    const resultIds = activeResults.map((result) => result.id);
+
+    if (resultIds.length > 0) {
+      await ExamMetric.destroy({
+        where: { examResultId: { [Op.in]: resultIds } },
+        transaction,
+      });
+      await ExamResult.update(
+        {
+          deleted: true,
+          deletedAt: new Date(),
+          updatedBy: actor.userId || null,
+        },
+        {
+          where: { id: { [Op.in]: resultIds } },
+          transaction,
+          hooks: false,
+        }
+      );
+    }
+
+    await ExamSession.update(
+      {
+        status: 'incomplete',
+        startedAt: null,
+        endedAt: null,
+        completedAt: null,
+        deviceInfo: null,
+        updatedBy: actor.userId || null,
+      },
+      { where: { id: session.id }, transaction }
+    );
+
+    // Roll the denormalized patient cache back to the latest remaining result.
+    const remainingResults = await ExamResult.findAll({
+      where: {
+        patientId: session.patientId,
+        examType: session.examType,
+        status: 'completed',
+        deleted: false,
+      },
+      order: [
+        ['completedAt', 'ASC'],
+        ['createdAt', 'ASC'],
+      ],
+      transaction,
+    });
+    const completedResults = remainingResults.map((result) => result.get({ plain: true })).filter(isFull);
+    const patient = await Patient.findByPk(session.patientId, { transaction });
+    if (patient) {
+      const examResults = { ...(patient.examResults || {}) };
+      if (completedResults.length === 0) {
+        delete examResults[session.examType];
+      } else {
+        const first = completedResults[0];
+        const latest = completedResults[completedResults.length - 1];
+        examResults[session.examType] = {
+          initialResult: eyeObj(first),
+          currentResult: eyeObj(latest),
+          lastExamDate: latest.completedAt || latest.createdAt || null,
+        };
+      }
+      await patient.update({ examResults }, { transaction });
+    }
+
+    return {
+      sessionId: session.id,
+      patientId: session.patientId,
+      examType: session.examType,
+      removedResultIds: resultIds,
+    };
+  });
+
+  try {
+    await recalculatePatientComplianceByType(session.patientId, session.examType);
+  } catch (error) {
+    logger.error('Failed to recalculate compliance after exam retake reset', {
+      sessionId: session.id,
+      patientId: session.patientId,
+      examType: session.examType,
+      error: error.message,
+    });
+  }
+  await auditLogService.logEntityAuditEvent({
+    action: 'examSession.resetForRetake',
+    entityType: 'examSession',
+    entityId: session.id,
+    centerId: session.centerId,
+    actorUserId: actor.userId || null,
+    actorUserType: actor.userType || null,
+    requestContext: actor.requestContext || {},
+    metadata: {
+      patientId: session.patientId,
+      examType: session.examType,
+      removedResultIds: resetResult.removedResultIds,
+    },
+  });
+
+  return getExamSessionById(session.id);
+};
+
+/**
  * Get patient history exam sessions (completed and expired in-progress sessions)
  * @param {number} patientId - The patient ID
  * @param {Object} options - Query options
@@ -191,5 +314,6 @@ module.exports = {
   getCurrentActiveSession,
   updateExamSessionById,
   deleteExamSessionById,
+  resetExamSessionForRetake,
   getPatientHistorySessions,
 };

@@ -147,6 +147,14 @@ router
     examAssignmentController.deleteExamAssignment
   );
 
+router
+  .route('/:patientId/exam-configs/:configId/reset')
+  .post(
+    auth(allRights.manageExamSessions.code),
+    validate(examAssignmentValidation.resetExamAssignmentForRetake),
+    examAssignmentController.resetExamAssignmentForRetake
+  );
+
 // Nested resource: Patient exam sessions
 router
   .route('/:patientId/exam-sessions')

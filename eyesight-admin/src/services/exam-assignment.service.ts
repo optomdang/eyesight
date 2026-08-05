@@ -13,6 +13,7 @@ import { buildUrl } from 'src/utils/query-builder';
 import { PaginatedResponse } from 'src/types/core';
 import type {
   ExamAssignment,
+  ExamSession,
   ExamAssignmentQueryParams,
   CreateExamAssignmentRequest,
   UpdateExamAssignmentRequest,
@@ -84,6 +85,16 @@ export const toggleExamAssignment = (
   examId: number
 ): Promise<ExamAssignment> => {
   return patchData<ExamAssignment>(`/patients/${patientId}/exam-configs/${examId}/toggle`, {});
+};
+
+export const resetExamAssignmentForRetake = (
+  patientId: number,
+  examId: number
+): Promise<ExamSession> => {
+  return postData<ExamSession>(
+    `/patients/${patientId}/exam-configs/${examId}/reset`,
+    {}
+  );
 };
 
 // Note: Frontend handles bulk operations by calling individual APIs in parallel

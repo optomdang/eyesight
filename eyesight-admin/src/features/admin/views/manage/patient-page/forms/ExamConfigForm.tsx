@@ -16,7 +16,7 @@ import {
   Autocomplete,
   MenuItem,
 } from '@mui/material';
-import { ExpandMore } from '@mui/icons-material';
+import { ExpandMore, Replay } from '@mui/icons-material';
 import { useForm, Path } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import CustomSelect from 'src/components/forms/theme-elements/CustomSelect';
@@ -24,6 +24,7 @@ import {
   getExamAssignmentsByPatient,
   createExamAssignment,
   updateExamAssignment,
+  resetExamAssignmentForRetake,
 } from 'src/services/exam-assignment.service';
 import { SNACKBAR_SEVERITY } from 'src/utils/constant.ts';
 import useSnackbar from 'src/contexts/UseSnackbar.ts';
@@ -40,6 +41,7 @@ import {
 } from 'src/validations';
 import type { NotificationTemplate } from 'src/types/core/notification';
 import { fetchPatientWithCausesCheck } from 'src/utils/patientClinicalPrerequisites';
+import { useConfirm } from 'src/hooks/useConfirm';
 
 interface ExamAssignmentFormProps {
   patient: Patient;
@@ -69,9 +71,11 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
   const [loading, setLoading] = useState(false);
   const [existingConfigs, setExistingConfigs] = useState<ExamAssignment[]>([]);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
+  const [resettingConfigId, setResettingConfigId] = useState<number | null>(null);
 
   const { showSnackbar } = useSnackbar();
   const { t } = useTranslation();
+  const { confirm } = useConfirm();
 
   // Load notification templates
   useEffect(() => {
@@ -238,6 +242,46 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
     return false;
   };
 
+  const handleRetake = async (config: ExamAssignment, examName: string) => {
+    const confirmed = await confirm({
+      title: t('patient.examConfig.retakeConfirmTitle', 'Xác nhận làm lại bài kiểm tra'),
+      message: t(
+        'patient.examConfig.retakeConfirmMessage',
+        `Kết quả hiện tại của bài “${examName}” sẽ bị xóa và bệnh nhân phải thực hiện lại từ đầu. Bạn có chắc chắn muốn tiếp tục?`
+      ),
+      confirmText: t('patient.examConfig.retakeConfirm', 'Cho phép làm lại'),
+      cancelText: t('common.cancel', 'Hủy'),
+      confirmColor: 'warning',
+    });
+    if (!confirmed || !patient.id) return;
+
+    setResettingConfigId(config.id);
+    try {
+      const session = await resetExamAssignmentForRetake(patient.id, config.id);
+      setExistingConfigs((current) =>
+        current.map((item) => (item.id === config.id ? { ...item, currentSession: session } : item))
+      );
+      showSnackbar(
+        t(
+          'patient.examConfig.retakeSuccess',
+          'Đã mở lại bài kiểm tra. Bệnh nhân có thể thực hiện lại từ đầu.'
+        ),
+        SNACKBAR_SEVERITY.SUCCESS
+      );
+      onSuccess();
+    } catch (error) {
+      showSnackbar(
+        getErrorMessage(
+          error,
+          t('patient.examConfig.retakeError', 'Không thể mở lại bài kiểm tra')
+        ),
+        SNACKBAR_SEVERITY.ERROR
+      );
+    } finally {
+      setResettingConfigId(null);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmitHandler)}>
       <Box sx={{ mb: 3 }}>
@@ -255,6 +299,9 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
       {examTypes.map((examType, index) => {
         const configKey = examType.key as keyof ExamAssignmentFormData;
         const configValue = values[configKey];
+        const existingConfig = existingConfigs.find((config) => config.examType === examType.key);
+        const canRetake =
+          configValue.isEnabled && existingConfig?.currentSession?.status === 'completed';
 
         return (
           <Accordion key={examType.key} defaultExpanded={index === 0} sx={{ mb: 2 }}>
@@ -469,83 +516,93 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
                   </Grid>
                 </Grid>
 
-                {/* Save Button for Individual Config */}
+                {/* Individual config actions */}
                 <Grid size={12}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        const configData = values[examType.key as keyof ExamAssignmentFormData];
-                        const existingConfig = existingConfigs.find(
-                          (c) => c.examType === examType.key
-                        );
+                  <Box sx={{ mt: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          const configData = values[examType.key as keyof ExamAssignmentFormData];
 
-                        const createPayload = {
-                          patientId: patient.id!,
-                          examType: examType.key as 'far' | 'near' | 'contrast' | 'stereopsis',
-                          frequency: configData.frequency,
-                          isEnabled: configData.isEnabled,
-                          notificationSettings: {
-                            enabled: configData.notificationSettings.enabled,
-                            templateId: configData.notificationSettings.templateId,
-                            beforeDays: configData.notificationSettings.beforeDays,
-                            time: configData.notificationSettings.time,
-                            methods: configData.notificationSettings.methods as (
-                              | 'email'
-                              | 'zalo'
-                              | 'sms'
-                            )[],
-                          },
-                        };
+                          const createPayload = {
+                            patientId: patient.id!,
+                            examType: examType.key as 'far' | 'near' | 'contrast' | 'stereopsis',
+                            frequency: configData.frequency,
+                            isEnabled: configData.isEnabled,
+                            notificationSettings: {
+                              enabled: configData.notificationSettings.enabled,
+                              templateId: configData.notificationSettings.templateId,
+                              beforeDays: configData.notificationSettings.beforeDays,
+                              time: configData.notificationSettings.time,
+                              methods: configData.notificationSettings.methods as (
+                                | 'email'
+                                | 'zalo'
+                                | 'sms'
+                              )[],
+                            },
+                          };
 
-                        const updatePayload = {
-                          examType: examType.key as 'far' | 'near' | 'contrast' | 'stereopsis',
-                          frequency: configData.frequency,
-                          isEnabled: configData.isEnabled,
-                          notificationSettings: {
-                            enabled: configData.notificationSettings.enabled,
-                            templateId: configData.notificationSettings.templateId,
-                            beforeDays: configData.notificationSettings.beforeDays,
-                            time: configData.notificationSettings.time,
-                            methods: configData.notificationSettings.methods as (
-                              | 'email'
-                              | 'zalo'
-                              | 'sms'
-                            )[],
-                          },
-                          patientId: patient.id!,
-                        };
+                          const updatePayload = {
+                            examType: examType.key as 'far' | 'near' | 'contrast' | 'stereopsis',
+                            frequency: configData.frequency,
+                            isEnabled: configData.isEnabled,
+                            notificationSettings: {
+                              enabled: configData.notificationSettings.enabled,
+                              templateId: configData.notificationSettings.templateId,
+                              beforeDays: configData.notificationSettings.beforeDays,
+                              time: configData.notificationSettings.time,
+                              methods: configData.notificationSettings.methods as (
+                                | 'email'
+                                | 'zalo'
+                                | 'sms'
+                              )[],
+                            },
+                            patientId: patient.id!,
+                          };
 
-                        if (existingConfig) {
-                          await updateExamAssignment(patient.id!, existingConfig.id, updatePayload);
-                        } else {
-                          await createExamAssignment(patient.id!, createPayload);
+                          if (existingConfig) {
+                            await updateExamAssignment(patient.id!, existingConfig.id, updatePayload);
+                          } else {
+                            await createExamAssignment(patient.id!, createPayload);
+                          }
+
+                          showSnackbar(
+                            t('patient.examConfig.saveSuccess', 'Cập nhật cấu hình thành công'),
+                            SNACKBAR_SEVERITY.SUCCESS
+                          );
+                          onSuccess();
+                        } catch (error: any) {
+                          showSnackbar(
+                            getErrorMessage(
+                              error,
+                              t('patient.examConfig.saveError', 'Có lỗi xảy ra khi lưu cấu hình')
+                            ),
+                            SNACKBAR_SEVERITY.ERROR
+                          );
+                        } finally {
+                          setLoading(false);
                         }
-
-                        showSnackbar(
-                          t('patient.examConfig.saveSuccess', 'Cập nhật cấu hình thành công'),
-                          SNACKBAR_SEVERITY.SUCCESS
-                        );
-                        onSuccess();
-                      } catch (error: any) {
-                        showSnackbar(
-                          getErrorMessage(
-                            error,
-                            t('patient.examConfig.saveError', 'Có lỗi xảy ra khi lưu cấu hình')
-                          ),
-                          SNACKBAR_SEVERITY.ERROR
-                        );
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading || isSubmitting}
-                    sx={{ mt: 2 }}
-                  >
-                    {t('common.save', 'Lưu')}
-                  </Button>
+                      }}
+                      disabled={loading || isSubmitting}
+                    >
+                      {t('common.save', 'Lưu')}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      size="small"
+                      startIcon={<Replay />}
+                      disabled={!canRetake || resettingConfigId === existingConfig?.id}
+                      onClick={() => existingConfig && void handleRetake(existingConfig, examType.name)}
+                    >
+                      {resettingConfigId === existingConfig?.id
+                        ? t('patient.examConfig.retaking', 'Đang mở lại...')
+                        : t('patient.examConfig.retake', 'Làm lại bài kiểm tra')}
+                    </Button>
+                  </Box>
                 </Grid>
               </Grid>
             </AccordionDetails>

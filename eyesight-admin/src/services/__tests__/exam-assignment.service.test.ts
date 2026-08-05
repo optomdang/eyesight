@@ -34,6 +34,7 @@ import {
   getExamAssignmentsByPatient,
   getExamAssignmentByType,
   toggleExamAssignment,
+  resetExamAssignmentForRetake,
 } from '../exam-assignment.service';
 import { getData, getDataTable, postData, patchData, deleteData } from 'src/utils/request';
 
@@ -118,6 +119,18 @@ describe('Exam Assignment Service', () => {
         await deleteExamAssignment(1, 10);
 
         expect(deleteData).toHaveBeenCalledWith('/patients/1/exam-configs/10');
+      });
+    });
+
+    describe('resetExamAssignmentForRetake', () => {
+      it('should call the patient config reset endpoint', async () => {
+        const mockSession = { id: 22, status: 'incomplete', examType: 'far' };
+        vi.mocked(postData).mockResolvedValue(mockSession);
+
+        const result = await resetExamAssignmentForRetake(1, 10);
+
+        expect(postData).toHaveBeenCalledWith('/patients/1/exam-configs/10/reset', {});
+        expect(result).toEqual(mockSession);
       });
     });
   });

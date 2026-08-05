@@ -6,10 +6,14 @@
 // Mock dependencies first
 jest.mock('../../../src/config/db', () => ({
   sequelize: {
-    transaction: jest.fn(() => ({
-      commit: jest.fn(),
-      rollback: jest.fn(),
-    })),
+    transaction: jest.fn((callback) =>
+      typeof callback === 'function'
+        ? callback({})
+        : {
+            commit: jest.fn(),
+            rollback: jest.fn(),
+          }
+    ),
   },
   _sequelize: {
     transaction: jest.fn(),
@@ -23,13 +27,31 @@ jest.mock('../../../src/models', () => ({
     findAndCountAll: jest.fn(),
     create: jest.fn(),
     isDuplicateCode: jest.fn(),
+    update: jest.fn(),
   },
-  ExamResult: {},
+  ExamResult: {
+    findAll: jest.fn(),
+    update: jest.fn(),
+  },
+  ExamMetric: {
+    destroy: jest.fn(),
+  },
+  Patient: {
+    findByPk: jest.fn(),
+  },
 }));
 
 jest.mock('../../../src/services/exam/examNotification.service', () => ({
   sendExamStartNotification: jest.fn(),
   sendExamCompleteNotification: jest.fn(),
+}));
+
+jest.mock('../../../src/services/system/auditLog.service', () => ({
+  logEntityAuditEvent: jest.fn(),
+}));
+
+jest.mock('../../../src/services/clinic/compliance.service', () => ({
+  recalculatePatientComplianceByType: jest.fn(),
 }));
 
 jest.mock('../../../src/utils/patterns', () => ({
@@ -54,7 +76,9 @@ jest.mock('../../../src/utils/common', () => ({
   })),
 }));
 
-const { ExamSession } = require('../../../src/models');
+const { ExamSession, ExamResult, ExamMetric, Patient } = require('../../../src/models');
+const auditLogService = require('../../../src/services/system/auditLog.service');
+const { recalculatePatientComplianceByType } = require('../../../src/services/clinic/compliance.service');
 const { standardQuery, standardCreate, standardSoftDelete, standardGetById } = require('../../../src/utils/patterns');
 const examSessionService = require('../../../src/services/exam/examSession.service');
 
@@ -217,6 +241,94 @@ describe('ExamSession Service', () => {
       await examSessionService.deleteExamSessionById(1);
 
       expect(standardSoftDelete).toHaveBeenCalledWith(ExamSession, 1, 'Phiên kiểm tra');
+    });
+  });
+
+  describe('resetExamSessionForRetake', () => {
+    test('soft deletes current results, clears metrics, and reopens the session', async () => {
+      const session = {
+        id: 11,
+        patientId: 7,
+        examType: 'far',
+        centerId: 2,
+        status: 'completed',
+      };
+      const patient = {
+        examResults: {
+          far: {
+            initialResult: { leftEye: 5, rightEye: 5, bothEye: null },
+            currentResult: { leftEye: 8, rightEye: 8, bothEye: null },
+          },
+        },
+        update: jest.fn(),
+      };
+      standardGetById.mockResolvedValue(session);
+      ExamResult.findAll.mockResolvedValueOnce([{ id: 101 }]).mockResolvedValueOnce([
+        {
+          get: () => ({
+            id: 99,
+            examType: 'far',
+            status: 'completed',
+            leftEyeLevel: 5,
+            rightEyeLevel: 6,
+            completedAt: new Date('2026-07-01'),
+          }),
+        },
+      ]);
+      Patient.findByPk.mockResolvedValue(patient);
+
+      await examSessionService.resetExamSessionForRetake(11, {
+        userId: 3,
+        userType: 'doctor',
+      });
+
+      expect(ExamMetric.destroy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { examResultId: expect.any(Object) } })
+      );
+      expect(ExamResult.update).toHaveBeenCalledWith(
+        expect.objectContaining({ deleted: true, updatedBy: 3 }),
+        expect.objectContaining({ hooks: false })
+      );
+      expect(ExamSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'incomplete',
+          startedAt: null,
+          endedAt: null,
+          completedAt: null,
+        }),
+        expect.any(Object)
+      );
+      expect(patient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          examResults: expect.objectContaining({
+            far: expect.objectContaining({
+              currentResult: { leftEye: 5, rightEye: 6, bothEye: null },
+            }),
+          }),
+        }),
+        expect.any(Object)
+      );
+      expect(recalculatePatientComplianceByType).toHaveBeenCalledWith(7, 'far');
+      expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'examSession.resetForRetake',
+          actorUserId: 3,
+        })
+      );
+    });
+
+    test('rejects a session that is not completed', async () => {
+      standardGetById.mockResolvedValue({
+        id: 11,
+        patientId: 7,
+        examType: 'far',
+        status: 'incomplete',
+      });
+
+      await expect(examSessionService.resetExamSessionForRetake(11)).rejects.toThrow(
+        'Chỉ có thể làm lại bài kiểm tra đã hoàn thành'
+      );
+      expect(ExamResult.update).not.toHaveBeenCalled();
     });
   });
 

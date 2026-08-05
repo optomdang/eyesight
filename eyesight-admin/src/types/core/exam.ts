@@ -58,6 +58,8 @@ export interface ExamAssignment {
     methods: ('email' | 'zalo' | 'sms')[];
   };
   centerId: number;
+  /** Current calendar-cycle session, included by the patient exam-config endpoint. */
+  currentSession?: ExamSession | null;
   patient?: {
     id: number;
     code: string;

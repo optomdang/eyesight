@@ -3,6 +3,7 @@ const pick = require('../../utils/pick');
 const ApiError = require('../../utils/ApiError');
 const catchAsync = require('../../utils/catchAsync');
 const examAssignmentService = require('../../services/clinic/examAssignment.service');
+const examSessionService = require('../../services/exam/examSession.service');
 
 const filterKeys = ['patientId', 'examType', 'isEnabled', 'centerId'];
 
@@ -44,6 +45,19 @@ const getExamAssignmentAssignments = catchAsync(async (req, res) => {
   }
 
   const result = await examAssignmentService.queryExamConfigs(filter, options);
+  result.rows = await Promise.all(
+    result.rows.map(async (assignment) => {
+      const currentSession = await examSessionService.getCurrentActiveSession(
+        assignment.patientId,
+        assignment.examType,
+        assignment.frequency
+      );
+      return {
+        ...assignment.get({ plain: true }),
+        currentSession,
+      };
+    })
+  );
   res.send(result);
 });
 
@@ -119,6 +133,46 @@ const toggleExamAssignment = catchAsync(async (req, res) => {
   res.send(assignment);
 });
 
+/**
+ * Reopen the current-cycle completed exam and remove its result so the patient
+ * can perform the configured test again from the beginning.
+ */
+const resetExamAssignmentForRetake = catchAsync(async (req, res) => {
+  const patientId = Number(req.params.patientId);
+  const assignment = await examAssignmentService.getExamConfigById(req.params.configId);
+
+  if (assignment.patientId !== patientId) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Cấu hình bài kiểm tra không thuộc bệnh nhân này');
+  }
+  if (assignment.centerId !== req.user.centerId) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Bạn không có quyền làm lại bài kiểm tra này');
+  }
+  if (!assignment.isEnabled) {
+    throw new ApiError(httpStatus.CONFLICT, 'Cần kích hoạt bài kiểm tra trước khi cho phép làm lại');
+  }
+
+  const session = await examSessionService.getCurrentActiveSession(
+    assignment.patientId,
+    assignment.examType,
+    assignment.frequency
+  );
+  if (!session) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy phiên kiểm tra trong chu kỳ hiện tại');
+  }
+
+  const resetSession = await examSessionService.resetExamSessionForRetake(session.id, {
+    userId: req.user.id,
+    userType: req.user.userType,
+    requestContext: {
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      requestMethod: req.method,
+      requestPath: req.originalUrl,
+    },
+  });
+  res.send(resetSession);
+});
+
 module.exports = {
   createExamAssignment,
   getExamAssignments,
@@ -127,4 +181,5 @@ module.exports = {
   updateExamAssignment,
   deleteExamAssignment,
   toggleExamAssignment,
+  resetExamAssignmentForRetake,
 };
