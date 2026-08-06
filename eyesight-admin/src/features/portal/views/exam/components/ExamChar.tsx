@@ -6,6 +6,7 @@ import { useExamContext } from 'src/contexts/ExamContext';
 import { clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { getLastScreenConfig, DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
 import { ensureOptotypeFontsLoaded } from 'src/utils/optotypeFonts';
+import { resolveOptotypeCellPadPx } from 'src/utils/optotypeCellPad';
 
 interface ExamCharProps {
   char: 'E' | 'C' | 'A' | 'N' | 'S' | 'I' | string;
@@ -32,6 +33,7 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
     hasFallback = true;
   }
 
+  const cellPadPx = resolveOptotypeCellPadPx(fontSizePx);
   const fontFamily = FONT_MAP[char as keyof typeof FONT_MAP] || 'OptomDangLatinChart';
 
   const [containerHeight, setContainerHeight] = useState<string>('100%');
@@ -62,11 +64,17 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
     <Box
       data-testid="exam-char"
       data-char={display}
+      data-font-size-px={Math.round(fontSizePx)}
+      data-cell-pad-px={cellPadPx}
       sx={{
         height: containerHeight,
-        fontSize: `${fontSizePx}px`,
-        width: `${fontSizePx}px`,
+        // Clinical size is fontSize only. Avoid a tight fixed em-box width —
+        // curved glyphs (O/C/U/D) ink past the em square and get hard-clipped.
         minWidth: `${fontSizePx}px`,
+        width: 'auto',
+        px: `${cellPadPx}px`,
+        boxSizing: 'content-box',
+        fontSize: `${fontSizePx}px`,
         flex: '0 0 auto',
         display: 'flex',
         alignItems: 'center',
@@ -74,11 +82,13 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
         fontFamily: `"${fontFamily}"`,
         fontSynthesis: 'none',
         color: 'black',
-        // Clip glyph sidebearing overflow so neighbors never paint into this cell.
-        overflow: 'hidden',
+        overflow: 'visible',
+        contain: 'none',
         lineHeight: 1,
         textAlign: 'center',
         marginRight: spacing ? `${spacing}px` : 0,
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
         ...style,
       }}
     >
@@ -88,7 +98,6 @@ const ExamChar: React.FC<ExamCharProps> = ({ char, display, size, style, spacing
         component="span"
         sx={{
           display: 'block',
-          width: '100%',
           textAlign: 'center',
           lineHeight: 1,
         }}

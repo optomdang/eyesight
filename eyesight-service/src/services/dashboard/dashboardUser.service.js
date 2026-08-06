@@ -452,7 +452,7 @@ const getLeaderboard = async (centerId, doctorId = null) => {
 
   const patients = await Patient.findAll({
     where: patientWhere,
-    attributes: ['id', 'code', 'examResults'],
+    attributes: ['id', 'code', 'examResults', 'diligenceDayOverrides'],
     include: [{ model: User, as: 'user', attributes: ['name'] }],
   });
 
@@ -575,6 +575,7 @@ const getLeaderboard = async (centerId, doctorId = null) => {
         exerciseAssignments: exAssignmentsByPatient[p.id] || [],
         exerciseSessions: exSessionsByPatient[p.id] || [],
         exerciseResultsBySessionId: exResultsBySessionId,
+        diligenceDayOverrides: p.diligenceDayOverrides || null,
       })
     );
 
@@ -622,6 +623,7 @@ const getPatientOverallCompletionPct = async (patientId) => {
     exerciseResults,
     exerciseAssignments,
     examAssignments,
+    patientRow,
   ] = await Promise.all([
     ExamSession.findAll({
       where: { patientId: id, deleted: false },
@@ -693,6 +695,11 @@ const getPatientOverallCompletionPct = async (patientId) => {
       attributes: ['id', 'patientId', 'examType', 'frequency', 'createdAt'],
       raw: true,
     }),
+    Patient.findOne({
+      where: { id, deleted: false },
+      attributes: ['id', 'diligenceDayOverrides'],
+      raw: true,
+    }),
   ]);
 
   const examResultBySessionId = {};
@@ -729,6 +736,7 @@ const getPatientOverallCompletionPct = async (patientId) => {
       exerciseAssignments: mappedAssignments,
       exerciseSessions,
       exerciseResultsBySessionId,
+      diligenceDayOverrides: patientRow?.diligenceDayOverrides || null,
     })
   );
 };

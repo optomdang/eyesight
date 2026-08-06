@@ -7,6 +7,7 @@ import { CHAR_POOL_MAP, FONT_MAP } from 'src/utils/constant.ts';
 import { getCharSpacing, clinicalMmToLayoutPx } from 'src/utils/visionUtils';
 import { EXAM_CHAR_PADDING_PX } from 'src/services/exam-state';
 import { resolveOpaqueContrastColors } from 'src/utils/clinicalContrastColor';
+import { resolveOptotypeCellPadPx } from 'src/utils/optotypeCellPad';
 import OptotypeAnswerField, {
   useOptotypeAnswerLeakGuard,
 } from 'src/components/shared/OptotypeAnswerField';
@@ -36,7 +37,12 @@ const TestStep = () => {
   const { t } = useTranslation();
 
   const fontSizePx = clinicalMmToLayoutPx(fontSize, screenInfo);
-  const spacing = getCharSpacing(fontSizePx, currentBatchItems.length);
+  const cellPadPx = resolveOptotypeCellPadPx(fontSizePx);
+  // Keep ISO 1× letter-height gap between glyphs after per-cell horizontal pad.
+  const spacing = Math.max(
+    0,
+    getCharSpacing(fontSizePx, currentBatchItems.length) - cellPadPx * 2
+  );
 
   const contrastColors =
     testMode === 'contrast'
@@ -95,12 +101,13 @@ const TestStep = () => {
           alignItems: 'center',
           justifyContent: 'center',
           bgcolor: contrastColors?.backgroundColor ?? 'background.paper',
-          overflowX: 'hidden',
+          // Do not clip optotype side strokes (O/C/U arcs need room past the em-box).
+          overflowX: 'visible',
           overflowY: 'auto',
         }}
       >
         {currentBatchItems.length > 0 && (
-          <Box textAlign="center" position="relative">
+          <Box textAlign="center" position="relative" sx={{ overflow: 'visible' }}>
             <Typography
               variant="body2"
               sx={{
@@ -146,6 +153,7 @@ const TestStep = () => {
                 px: `${EXAM_CHAR_PADDING_PX}px`,
                 boxSizing: 'border-box',
                 gap: `${spacing}px`,
+                overflow: 'visible',
               }}
             >
               {currentBatchItems.map((item: any, index: number) => (

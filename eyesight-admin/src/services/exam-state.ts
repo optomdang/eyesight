@@ -18,7 +18,7 @@ import {
   calculateNearFontSize,
   calculatePPI,
   buildExamDisplayStrategy,
-  resolveContrastFontFarN,
+  resolveContrastExamFontFarN,
   type ScreenInfo,
 } from 'src/utils/visionUtils';
 import {
@@ -32,6 +32,7 @@ import { farVisionLevels, nearVisionLevels, contrastVisionLevels } from 'src/uti
 import useAuth from 'src/contexts/authGuard/useAuth';
 import { DEFAULT_SCREEN_CONFIG } from 'src/services/deviceProfile.service';
 import { getPreferredScreenInfo } from 'src/services/screenCalibration.service';
+import useFreshPatientExamResults from 'src/hooks/useFreshPatientExamResults';
 
 /**
  * Horizontal padding (px) reserved on each side of the char display area.
@@ -52,6 +53,9 @@ export const useExamState = (
   sessionId?: number // NEW: Optional sessionId parameter
 ) => {
   const { user } = useAuth();
+  // Auth `patient.examResults` can lag behind today's far acuity; contrast sizing
+  // and setup UI need the latest GET /me/info payload.
+  const { examResults: freshExamResults } = useFreshPatientExamResults();
   const [distance, setDistance] = useState(() => defaultExamDistance(initialExamType));
   const [charType, setCharType] = useState<'E' | 'C' | 'A' | 'N' | 'S'>('A');
   // Prefer calibrated screen info, then last manual config, then built-in default.
@@ -93,8 +97,9 @@ export const useExamState = (
 
   // Auto-start level calculation
   const getAutoStartLevel = useCallback((targetEye?: 'right' | 'left' | 'both') => {
-    const patientExamResults = (user?.patient as { examResults?: Record<string, any> } | undefined)
-      ?.examResults;
+    const patientExamResults =
+      (freshExamResults as Record<string, any> | null | undefined) ??
+      (user?.patient as { examResults?: Record<string, any> } | undefined)?.examResults;
 
     if (!patientExamResults?.[initialExamType]?.currentResult) {
       return 0;
@@ -121,13 +126,15 @@ export const useExamState = (
     if (currentResult.leftEye)  { const i = toIndex(currentResult.leftEye);  if (i > maxLevel) maxLevel = i; }
     if (currentResult.bothEye)  { const i = toIndex(currentResult.bothEye);  if (i > maxLevel) maxLevel = i; }
     return maxLevel;
-  }, [user, initialExamType]);
+  }, [user, freshExamResults, initialExamType]);
 
   /** Far level (1-based) for contrast letter size — per eye or worst eye before test starts. */
   const getPatientFarLevelForContrast = useCallback(
     (eye: 'right' | 'left' | 'both'): number | null => {
-      const farResult = (user?.patient as { examResults?: Record<string, any> } | undefined)
-        ?.examResults?.far?.currentResult;
+      const farResult =
+        (freshExamResults as Record<string, any> | null | undefined)?.far?.currentResult ??
+        (user?.patient as { examResults?: Record<string, any> } | undefined)?.examResults?.far
+          ?.currentResult;
       if (!farResult) return null;
 
       const parseLevel = (val: unknown): number | null => {
@@ -144,7 +151,7 @@ export const useExamState = (
       if (levels.length === 0) return null;
       return Math.min(...levels);
     },
-    [user]
+    [user, freshExamResults]
   );
 
   const getContrastFontEye = (): 'right' | 'left' | 'both' => {
@@ -169,8 +176,10 @@ export const useExamState = (
     const line = lineOverride ?? currentLine;
 
     if (mode === 'contrast') {
+      // Exam: one Snellen step worse than latest far VA, floored at 20/60.
+      // Exercises keep resolveContrastFontFarN (20/100 floor) separately.
       const farLevel = getPatientFarLevelForContrast(getContrastFontEye());
-      const n = resolveContrastFontFarN(farLevel);
+      const n = resolveContrastExamFontFarN(farLevel);
       return calculateFarFontSize(n, parsedDistance);
     } else if (mode === 'near') {
       if (!nearVisionLevels[line]) {
@@ -237,6 +246,7 @@ export const useExamState = (
       screenInfo.screenHeight,
       step,
       user?.patient,
+      freshExamResults,
     ]
   );
   // Batches recompute per currentLine so each level uses its own font-size-based batch split.

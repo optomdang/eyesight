@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import OptotypeChar, {
-  OPTOTYPE_CELL_PAD_PX,
+  OPTOTYPE_CELL_PAD_MIN_PX,
+  resolveOptotypeCellPadPx,
   resolveOptotypeFontSizePx,
 } from '../OptotypeChar';
 import type { ScreenInfo } from 'src/utils/visionUtils';
@@ -23,13 +24,20 @@ describe('OptotypeChar (VAC exercise)', () => {
     expect(px).toBeGreaterThan(0);
   });
 
-  it('keeps clinical font size while padding the cell to avoid stroke clipping', () => {
+  it('pads cells enough for curved strokes without changing clinical font size', () => {
     const fontSizePx = resolveOptotypeFontSizePx(8.73, screen156);
+    const cellPadPx = resolveOptotypeCellPadPx(fontSizePx);
     const { getByTestId } = render(
-      <OptotypeChar char="H" display="H" sizeMm={8.73} screenInfo={screen156} />
+      <OptotypeChar char="O" display="O" sizeMm={8.73} screenInfo={screen156} />
     );
     const el = getByTestId('optotype-char');
     expect(el.getAttribute('data-font-size-px')).toBe(String(fontSizePx));
-    expect(OPTOTYPE_CELL_PAD_PX).toBeGreaterThan(0);
+    expect(el.getAttribute('data-cell-pad-px')).toBe(String(cellPadPx));
+    expect(cellPadPx).toBeGreaterThanOrEqual(OPTOTYPE_CELL_PAD_MIN_PX);
+  });
+
+  it('scales cell pad with larger clinical font sizes', () => {
+    expect(resolveOptotypeCellPadPx(50)).toBeGreaterThanOrEqual(OPTOTYPE_CELL_PAD_MIN_PX);
+    expect(resolveOptotypeCellPadPx(200)).toBeGreaterThan(resolveOptotypeCellPadPx(50));
   });
 });

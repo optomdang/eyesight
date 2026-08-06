@@ -404,6 +404,24 @@ const findExamSessionInCycleLegacy = (examSessions, examType, cycleStart, cycleE
     (s) => s.examType === examType && isInCycle(s.scheduledDate, cycleStart, cycleEnd)
   );
 
+/**
+ * True when a diligence-day override marks any calendar day in the cycle as complete.
+ * Overridden days contribute 100% to overall completion (instead of actual/0).
+ */
+const isCycleDiligenceOverrideComplete = (cycleStart, cycleEnd, diligenceDayOverrides) => {
+  if (!diligenceDayOverrides || typeof diligenceDayOverrides !== 'object') return false;
+  const cursor = moment(cycleStart).startOf('day');
+  const end = moment(cycleEnd).startOf('day');
+  let guard = 0;
+  while (cursor.isSameOrBefore(end, 'day') && guard < 400) {
+    const key = cursor.format('YYYY-MM-DD');
+    if (diligenceDayOverrides[key]?.status === 'complete') return true;
+    cursor.add(1, 'day');
+    guard += 1;
+  }
+  return false;
+};
+
 /** Legacy: chỉ các session/lượt đã có trong DB (không tính chu kỳ bỏ lỡ). */
 const computePatientCompletionPctLegacy = ({
   examSessions,
@@ -428,6 +446,8 @@ const computePatientCompletionPctLegacy = ({
 
 /**
  * TB % hoàn thành (#8) — gồm chu kỳ không làm (0%).
+ * Ngày bác sĩ/admin duyệt hoàn thành (diligenceDayOverrides) tính 100% cho chu kỳ đó;
+ * các ngày khác giữ % thực tế.
  */
 const computePatientCompletionPct = ({
   examAssignments = [],
@@ -436,6 +456,7 @@ const computePatientCompletionPct = ({
   exerciseAssignments = [],
   exerciseSessions = [],
   exerciseResultsBySessionId = {},
+  diligenceDayOverrides = null,
   now = new Date(),
 }) => {
   const useCycleModel = exerciseAssignments.length > 0 || examAssignments.length > 0;
@@ -458,6 +479,10 @@ const computePatientCompletionPct = ({
     const typeSessions = examSessions.filter((s) => s.examType === config.examType);
 
     cycles.forEach(({ start, end }) => {
+      if (isCycleDiligenceOverrideComplete(start, end, diligenceDayOverrides)) {
+        unitPcts.push(100);
+        return;
+      }
       const session = findExamSessionInCycleLegacy(typeSessions, config.examType, start, end);
       if (!session) {
         unitPcts.push(0);
@@ -481,6 +506,14 @@ const computePatientCompletionPct = ({
     );
 
     cycles.forEach(({ start, end }) => {
+      if (isCycleDiligenceOverrideComplete(start, end, diligenceDayOverrides)) {
+        const session = findExerciseSessionInCycle(assignmentSessions, assignment.id, start, end);
+        const slotCount = session
+          ? Math.max(0, parseInt(session.executionCount, 10) || defaultExecutionCount)
+          : defaultExecutionCount;
+        for (let i = 0; i < slotCount; i += 1) unitPcts.push(100);
+        return;
+      }
       const session = findExerciseSessionInCycle(assignmentSessions, assignment.id, start, end);
       if (!session) {
         for (let i = 0; i < defaultExecutionCount; i += 1) unitPcts.push(0);
@@ -580,4 +613,5 @@ module.exports = {
   computeSessionFocusScore,
   resolveInactivityCountOnComplete,
   focusScoreFromCounts,
+  isCycleDiligenceOverrideComplete,
 };

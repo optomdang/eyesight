@@ -60,6 +60,8 @@ import {
   calculateVisualSettings,
   resolveContrastFontFarN,
   CONTRAST_BASELINE_FAR_N,
+  resolveContrastExamFontFarN,
+  CONTRAST_EXAM_BASELINE_FAR_N,
   generateRandomText,
   generateRandomStereopsisTest,
   getStereopsisImagePath,
@@ -258,7 +260,7 @@ describe('LAYER 1 — ISO 8596 mm ground truth (no screen, no DPR)', () => {
     });
   });
 
-  describe('resolveContrastFontFarN — contrast exam letter size vs far acuity', () => {
+  describe('resolveContrastFontFarN — contrast exercise letter size vs far acuity', () => {
     it('defaults to 20/100 baseline when no far level', () => {
       expect(resolveContrastFontFarN(null)).toBe(CONTRAST_BASELINE_FAR_N);
       expect(CONTRAST_BASELINE_FAR_N).toBe(30);
@@ -270,6 +272,28 @@ describe('LAYER 1 — ISO 8596 mm ground truth (no screen, no DPR)', () => {
 
     it('uses far acuity when worse than 20/100 (20/160)', () => {
       expect(resolveContrastFontFarN(5)).toBe(48); // level 5 = 20/160, n=48
+    });
+  });
+
+  describe('resolveContrastExamFontFarN — contrast exam: +1 worse step, floor 20/60', () => {
+    it('defaults to 20/60 floor when no far level', () => {
+      expect(CONTRAST_EXAM_BASELINE_FAR_N).toBe(18);
+      expect(resolveContrastExamFontFarN(null)).toBe(18);
+    });
+
+    it('uses one Snellen step worse than achieved far acuity (20/125 → 20/160)', () => {
+      // level 6 = 20/125 → level 5 = 20/160, n=48
+      expect(resolveContrastExamFontFarN(6)).toBe(48);
+    });
+
+    it('floors at 20/60 when one-step-worse would be smaller (20/40 → 20/50 → floor)', () => {
+      // level 11 = 20/40 → level 10 = 20/50, n=15 < 18 → floor 18
+      expect(resolveContrastExamFontFarN(11)).toBe(18);
+    });
+
+    it('stays at largest row when already at level 1', () => {
+      // level 1 = 20/400 → cannot go worse → n=120
+      expect(resolveContrastExamFontFarN(1)).toBe(120);
     });
   });
 

@@ -18,7 +18,7 @@ import type { ExamCharType } from 'src/utils/resolvePatientExamCharType';
 import OptotypeAnswerField, {
   useOptotypeAnswerLeakGuard,
 } from 'src/components/shared/OptotypeAnswerField';
-import OptotypeChar from './OptotypeChar';
+import OptotypeChar, { resolveOptotypeCellPadPx } from './OptotypeChar';
 
 const EXAM_CHAR_PADDING_PX = EXAM_HORIZONTAL_PADDING_PX;
 
@@ -105,7 +105,12 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
   const currentBatchItems = letters.slice(batchStart, batchStart + batchSize);
 
   const fontSizePx = clinicalMmToLayoutPx(fontSizeMm, screenInfo);
-  const spacing = getCharSpacing(fontSizePx, currentBatchItems.length);
+  // Keep ISO ink-to-ink gap (= letter height) after each cell grows by side pad.
+  const cellPadPx = resolveOptotypeCellPadPx(fontSizePx);
+  const spacing = Math.max(
+    0,
+    getCharSpacing(fontSizePx, currentBatchItems.length) - cellPadPx * 2
+  );
 
   const answeredCount = letters.filter((l) => l.answer !== undefined && l.answer !== '').length;
 
@@ -154,13 +159,18 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           bgcolor: backgroundColor,
-          overflowX: 'hidden',
-          overflowY: 'auto',
+          // Do not clip optotype side strokes (O/C arcs need room past the em-box).
+          overflow: 'visible',
           position: 'relative',
         }}
       >
         {currentBatchItems.length > 0 && (
-          <Box textAlign="center" position="relative" width="100%" sx={{ pt: { xs: 4, sm: 5 } }}>
+          <Box
+            textAlign="center"
+            position="relative"
+            width="100%"
+            sx={{ pt: { xs: 4, sm: 5 }, overflow: 'visible' }}
+          >
             <Typography
               variant="body2"
               sx={{
@@ -206,6 +216,7 @@ const FarAcuityTestStep: React.FC<FarAcuityTestStepProps> = ({
                 gap: `${spacing}px`,
                 px: `${EXAM_CHAR_PADDING_PX}px`,
                 boxSizing: 'border-box',
+                overflow: 'visible',
               }}
             >
               {currentBatchItems.map((item, index) => {

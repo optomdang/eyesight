@@ -1507,11 +1507,11 @@ export const generateRandomStereopsisTest = (level: number, count: number = 2): 
   }));
 };
 
-/** Suprathreshold baseline for contrast tests: 20/100 (n = 30). */
+/** Suprathreshold baseline for contrast *exercises* (games tiles): 20/100 (n = 30). */
 export const CONTRAST_BASELINE_FAR_N = 30;
 
 /**
- * Far-vision n for contrast letter size: at least 20/100, or larger if far acuity is worse.
+ * Far-vision n for contrast *exercise* letter size: at least 20/100, or larger if far acuity is worse.
  * @param patientFarLevel1Based — 1-based far level (1 = 20/400 … 20 = 20/5)
  */
 export const resolveContrastFontFarN = (patientFarLevel1Based?: number | null): number => {
@@ -1521,6 +1521,32 @@ export const resolveContrastFontFarN = (patientFarLevel1Based?: number | null): 
   const patientN = farVisionLevels[patientFarLevel1Based - 1]?.n;
   if (patientN == null) return CONTRAST_BASELINE_FAR_N;
   return Math.max(CONTRAST_BASELINE_FAR_N, patientN);
+};
+
+/**
+ * Contrast *exam* letter-size floor: Snellen 20/60 (n = denom × 0.3).
+ * Replaces the exercise baseline of 20/100 — letters never smaller than 20/60.
+ */
+export const CONTRAST_EXAM_BASELINE_SNELLEN = '20/60';
+export const CONTRAST_EXAM_BASELINE_FAR_N = 60 * 0.3; // 18
+
+/**
+ * Far-vision n for the portal contrast exam (not VAC / 2048 exercises).
+ * Uses the latest far acuity, one Snellen step worse (larger), then floors at 20/60.
+ * Example: far 20/125 (level 6) → display 20/160 (level 5).
+ * @param patientFarLevel1Based — 1-based far level (1 = 20/400 … 20 = 20/5)
+ */
+export const resolveContrastExamFontFarN = (
+  patientFarLevel1Based?: number | null
+): number => {
+  if (patientFarLevel1Based == null || patientFarLevel1Based < 1) {
+    return CONTRAST_EXAM_BASELINE_FAR_N;
+  }
+  // One step worse on the ladder (lower level index = larger optotype).
+  const worseLevel = Math.max(1, patientFarLevel1Based - 1);
+  const worseN = farVisionLevels[worseLevel - 1]?.n;
+  if (worseN == null) return CONTRAST_EXAM_BASELINE_FAR_N;
+  return Math.max(CONTRAST_EXAM_BASELINE_FAR_N, worseN);
 };
 
 // ==================== CONSOLIDATED VISION CALCULATION ====================

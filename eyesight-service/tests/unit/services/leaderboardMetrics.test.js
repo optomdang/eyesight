@@ -91,6 +91,64 @@ describe('leaderboardMetrics', () => {
       // 9 ngày × 2 lượt = 18 đơn vị; chỉ 2 lượt 100% hôm nay → 200/18 ≈ 11.11
       expect(pct).toBeCloseTo(11.11, 1);
     });
+
+    it('ngày duyệt override = 100% trong tổng; ngày khác giữ thực tế', () => {
+      const assignedAt = new Date('2026-06-22T08:00:00+07:00');
+      const now = new Date('2026-06-30T12:00:00+07:00');
+      // Không có session ngày 30 nhưng có override complete → 2 lượt × 100%
+      const pct = computePatientCompletionPct({
+        exerciseAssignments: [
+          {
+            id: 27,
+            assignedAt,
+            frequency: 'daily',
+            executionCount: 2,
+          },
+        ],
+        exerciseSessions: [],
+        exerciseResultsBySessionId: {},
+        diligenceDayOverrides: {
+          '2026-06-30': { status: 'complete' },
+        },
+        now,
+      });
+      // 9×2 = 18; chỉ ngày 30 override 100% → 200/18 ≈ 11.11 (các ngày trước vẫn 0)
+      expect(pct).toBeCloseTo(11.11, 1);
+    });
+
+    it('override không làm thay đổi ngày khác đã có % thực tế', () => {
+      const assignedAt = new Date('2026-06-29T08:00:00+07:00');
+      const now = new Date('2026-06-30T12:00:00+07:00');
+      const pct = computePatientCompletionPct({
+        exerciseAssignments: [
+          {
+            id: 1,
+            assignedAt,
+            frequency: 'daily',
+            executionCount: 1,
+          },
+        ],
+        exerciseSessions: [
+          {
+            id: 10,
+            exerciseAssignmentId: 1,
+            executionCount: 1,
+            executionDuration: 10,
+            startedAt: new Date('2026-06-29T00:00:00+07:00'),
+          },
+        ],
+        exerciseResultsBySessionId: {
+          // 5/10 phút = 50% thực tế ngày 29
+          10: [{ status: 'completed', duration: 300 }],
+        },
+        diligenceDayOverrides: {
+          '2026-06-30': { status: 'complete' },
+        },
+        now,
+      });
+      // Ngày 29 = 50%, ngày 30 override = 100% → TB = 75
+      expect(pct).toBeCloseTo(75, 1);
+    });
   });
 
   describe('computeCenterExerciseStats', () => {
