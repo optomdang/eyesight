@@ -79,10 +79,13 @@ const ensureDefaultCenterExercises = async (centerId, updatedBy, transaction = n
 
     if (exercise) {
       // Rename legacy catalog label BTL → VAC (do not overwrite custom names).
-      if (def.code === 'far-acuity' && exercise.name === 'Bài tập với BTL') {
+      if (def.code === 'far-acuity' && String(exercise.name || '').includes('BTL')) {
         // eslint-disable-next-line no-await-in-loop
         await exercise.update(
-          { name: def.name, updatedBy: updatedBy || exercise.updatedBy },
+          {
+            name: String(exercise.name).replaceAll('BTL', 'VAC'),
+            updatedBy: updatedBy || exercise.updatedBy,
+          },
           { transaction }
         );
       }
@@ -99,6 +102,27 @@ const ensureDefaultCenterExercises = async (centerId, updatedBy, transaction = n
  */
 const ensureDefaultExerciseModes = async (centerId, updatedBy, transaction = null) => {
   const exercisesByCode = await ensureDefaultCenterExercises(centerId, updatedBy, transaction);
+
+  // Patient/admin configs created under the old BTL label
+  const staleBtlConfigs = await ExerciseConfig.findAll({
+    where: {
+      centerId,
+      deleted: false,
+      name: { [Op.like]: '%BTL%' },
+    },
+    transaction,
+  });
+  for (const cfg of staleBtlConfigs) {
+    // eslint-disable-next-line no-await-in-loop
+    await cfg.update(
+      {
+        name: String(cfg.name).replaceAll('BTL', 'VAC'),
+        updatedBy: updatedBy || cfg.updatedBy,
+      },
+      { transaction }
+    );
+  }
+
   let created = 0;
   let skipped = 0;
 

@@ -11,6 +11,7 @@ import {
   createNestedColumn,
 } from 'src/utils/tableColumnUtils';
 import type { PatientExerciseResult } from 'src/types/admin/patient-detail';
+import { normalizeVacExerciseLabel } from 'src/utils/exerciseLabels';
 
 interface PatientExerciseResultsTableProps {
   patient: Patient;
@@ -23,7 +24,7 @@ const PatientExerciseResultsTable: React.FC<PatientExerciseResultsTableProps> = 
     createNestedColumn('exercise.name', 'Bài tập', 'N/A', {
       customBodyRender: (value: string) => (
         <Typography variant="body2" fontWeight="medium">
-          {value}
+          {value ? normalizeVacExerciseLabel(value) : 'N/A'}
         </Typography>
       ),
     }),

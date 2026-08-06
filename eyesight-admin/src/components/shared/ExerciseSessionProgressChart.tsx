@@ -46,6 +46,9 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import { formatVisionLevel } from 'src/utils/visionUtils';
+import { normalizeVacExerciseLabel } from 'src/utils/exerciseLabels';
+
+export { normalizeVacExerciseLabel };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +78,11 @@ interface RawSession {
       visionType?: string | null;
       eye?: string | null;
       frequency?: string | null;
+      exercise?: {
+        id?: number;
+        name?: string | null;
+        exerciseType?: string | null;
+      } | null;
     } | null;
   } | null;
 }
@@ -166,6 +174,36 @@ const formatEyeLabel = (eye?: string | null): string => {
   if (eye === 'left') return 'Mắt trái';
   if (eye === 'both') return 'Cả hai mắt';
   return '';
+};
+
+/**
+ * Chart subtitle for one assignment: prefer Exercise catalog name, then config name,
+ * then eye — never fall back to bare "Bài tập {assignmentId}" when a real name exists.
+ */
+export const resolveExerciseSessionChartTitle = (input: {
+  assignmentId: number;
+  trainingEye?: string | null;
+  config?: RawSession['exerciseAssignment'] extends infer A
+    ? A extends { exerciseConfig?: infer C }
+      ? C
+      : null
+    : null;
+}): string => {
+  const config = input.config ?? null;
+  const eyeLabel = formatEyeLabel(input.trainingEye ?? config?.eye ?? null);
+  const exerciseName = normalizeVacExerciseLabel(config?.exercise?.name?.trim() || '');
+  const configName = normalizeVacExerciseLabel(config?.name?.trim() || '');
+
+  let base = '';
+  if (exerciseName && configName && configName !== exerciseName && !configName.startsWith(exerciseName)) {
+    base = `${exerciseName} — ${configName}`;
+  } else {
+    base = exerciseName || configName;
+  }
+
+  return normalizeVacExerciseLabel(
+    [base, eyeLabel].filter(Boolean).join(' — ') || `Bài tập ${input.assignmentId}`
+  );
 };
 
 /** Nhãn trục X thích nghi theo chu kỳ: monthly+ → MM/YYYY; còn lại → DD/MM/YYYY. */
@@ -361,11 +399,11 @@ const ExerciseSessionProgressChart: React.FC<ExerciseSessionProgressChartProps> 
         const frequency = config?.frequency;
 
         if (!map.has(id)) {
-          const eyeLabel = formatEyeLabel(
-            s.exerciseAssignment?.trainingEye ?? config?.eye
-          );
-          const displayName =
-            [config?.name, eyeLabel].filter(Boolean).join(' — ') || `Bài tập ${id}`;
+          const displayName = resolveExerciseSessionChartTitle({
+            assignmentId: id,
+            trainingEye: s.exerciseAssignment?.trainingEye,
+            config: config ?? null,
+          });
           map.set(id, {
             assignmentId: id,
             name: displayName,

@@ -50,7 +50,7 @@ describe('exerciseSession.service — getPatientExerciseSessions', () => {
     expect(passedOptions).toEqual(options);
   });
 
-  test('includes exerciseConfig with visionType/name/eye/frequency for chart display', async () => {
+  test('includes exerciseConfig + nested exercise.name for chart titles', async () => {
     await sessionService.getPatientExerciseSessions({}, {});
 
     const include = getInclude();
@@ -59,7 +59,13 @@ describe('exerciseSession.service — getPatientExerciseSessions', () => {
 
     const configInc = assignmentInc.include.find((i) => i.as === 'exerciseConfig');
     expect(configInc).toBeTruthy();
-    expect(configInc.attributes).toEqual(expect.arrayContaining(['name', 'visionType', 'eye', 'frequency']));
+    expect(configInc.attributes).toEqual(
+      expect.arrayContaining(['name', 'visionType', 'eye', 'frequency', 'exerciseId'])
+    );
+
+    const exerciseInc = configInc.include?.find((i) => i.as === 'exercise');
+    expect(exerciseInc).toBeTruthy();
+    expect(exerciseInc.attributes).toEqual(expect.arrayContaining(['id', 'name', 'exerciseType']));
   });
 
   test('does NOT include ExerciseResult — chart reads aggregates from the session', async () => {

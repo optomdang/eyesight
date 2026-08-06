@@ -638,6 +638,12 @@ const queryExerciseResults = async (originalFilter, options) => {
 
   const queryOptions = buildQuery('exerciseResultList', limit, offset, order, [
     {
+      model: Exercise,
+      as: 'exercise',
+      attributes: ['id', 'name', 'code', 'exerciseType'],
+      required: false,
+    },
+    {
       model: ExerciseAssignment,
       as: 'assignment',
       attributes: ['visionLevel'],

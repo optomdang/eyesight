@@ -415,7 +415,14 @@ const getPatientExerciseSessions = async (filter = {}, options = {}) => {
         {
           model: ExerciseConfig,
           as: 'exerciseConfig',
-          attributes: ['id', 'name', 'visionType', 'eye', 'frequency'],
+          attributes: ['id', 'name', 'visionType', 'eye', 'frequency', 'exerciseId'],
+          include: [
+            {
+              model: Exercise,
+              as: 'exercise',
+              attributes: ['id', 'name', 'exerciseType'],
+            },
+          ],
         },
       ],
     },

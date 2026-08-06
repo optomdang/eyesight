@@ -137,12 +137,54 @@ describe('ExerciseSessionProgressChart — small multiples & states', () => {
             visionType: 'near',
             eye: 'both',
             frequency: 'daily',
+            exercise: { id: 10, name: '2048' },
           },
         },
       }),
     ]);
-    expect(screen.getByText('2048 – N — Mắt phải')).toBeInTheDocument();
+    expect(screen.getByText('2048 — Mắt phải')).toBeInTheDocument();
     expect(screen.queryByText(/Cả hai mắt/)).not.toBeInTheDocument();
+  });
+
+  it('dùng tên Exercise khi config.name thiếu — không hiện Bài tập {id}', () => {
+    renderChart([
+      makeSession({
+        exerciseAssignmentId: 2,
+        exerciseAssignment: {
+          trainingEye: null,
+          exerciseConfig: {
+            id: 1,
+            name: null,
+            visionType: 'far',
+            eye: 'left',
+            frequency: 'daily',
+            exercise: { id: 5, name: 'VAC — Thị lực xa' },
+          },
+        },
+      }),
+    ]);
+    expect(screen.getByText('VAC — Thị lực xa — Mắt trái')).toBeInTheDocument();
+    expect(screen.queryByText('Bài tập 2')).not.toBeInTheDocument();
+  });
+
+  it('ưu tiên tên Exercise khi chỉ có exercise.name', () => {
+    renderChart([
+      makeSession({
+        exerciseAssignmentId: 3,
+        exerciseAssignment: {
+          exerciseConfig: {
+            id: 2,
+            name: '',
+            visionType: 'far',
+            eye: null,
+            frequency: 'daily',
+            exercise: { id: 7, name: 'Phi hành gia thị giác' },
+          },
+        },
+      }),
+    ]);
+    expect(screen.getByText('Phi hành gia thị giác')).toBeInTheDocument();
+    expect(screen.queryByText('Bài tập 3')).not.toBeInTheDocument();
   });
 
   it('gom nhiều session cùng assignment vào 1 biểu đồ, sắp theo thời gian', () => {
@@ -160,6 +202,26 @@ describe('ExerciseSessionProgressChart — small multiples & states', () => {
     renderChart([makeSession({ completedAt: null })]);
     expect(screen.queryByTestId('composed-chart')).toBeNull();
     expect(screen.getByText('Chưa có dữ liệu phiên bài tập.')).toBeInTheDocument();
+  });
+
+  it('đổi nhãn BTL → VAC trên tiêu đề biểu đồ', () => {
+    renderChart([
+      makeSession({
+        exerciseAssignment: {
+          trainingEye: 'right',
+          exerciseConfig: {
+            id: 1,
+            name: 'Bài tập với BTL – PT26071221Q',
+            visionType: 'far',
+            eye: 'right',
+            frequency: 'daily',
+            exercise: { id: 5, name: 'Bài tập với BTL' },
+          },
+        },
+      }),
+    ]);
+    expect(screen.getByText('Bài tập với VAC — Mắt phải')).toBeInTheDocument();
+    expect(screen.queryByText(/BTL/)).not.toBeInTheDocument();
   });
 
   it('empty input → thông báo trống', () => {
