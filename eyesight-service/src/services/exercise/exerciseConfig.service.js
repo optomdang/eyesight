@@ -6,6 +6,151 @@ const { buildPagination, sanitizePagination, buildSortBy } = require('../../util
 const auditLogService = require('../system/auditLog.service');
 const { syncSessionsForExerciseConfig } = require('./assignmentSessionSync.service');
 
+/** Fields that affect how patients train — changing these on a shared template must not rewrite existing assignments. */
+const RUNTIME_CONFIG_FIELDS = [
+  'duration',
+  'executionCount',
+  'frequency',
+  'distance',
+  'eye',
+  'vtSettings',
+  'colorScheme',
+  'dichoptic',
+  'inactivityThreshold',
+  'fontSize',
+  'contrast',
+  'visionType',
+  'visionLevel',
+  'levelOverride',
+  'difficultyBaselineSource',
+  'notificationSettings',
+];
+
+const cloneJson = (value) => {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+};
+
+const configFieldValuesEqual = (currentValue, nextValue) => {
+  if (currentValue == null && nextValue == null) return true;
+  if (
+    (typeof currentValue === 'object' && currentValue !== null) ||
+    (typeof nextValue === 'object' && nextValue !== null)
+  ) {
+    return JSON.stringify(currentValue ?? null) === JSON.stringify(nextValue ?? null);
+  }
+  const currentNum = parseFloat(currentValue);
+  const nextNum = parseFloat(nextValue);
+  if (Number.isFinite(currentNum) && Number.isFinite(nextNum) && String(currentValue).trim() !== '' && String(nextValue).trim() !== '') {
+    // Treat "15.00" and 15 as equal for duration / numeric fields
+    if (String(currentValue).match(/^-?\d+(\.\d+)?$/) && String(nextValue).match(/^-?\d+(\.\d+)?$/)) {
+      return currentNum === nextNum;
+    }
+  }
+  return currentValue === nextValue;
+};
+
+const runtimeFieldsChanged = (config, updateBody) =>
+  RUNTIME_CONFIG_FIELDS.some((field) => {
+    if (!Object.prototype.hasOwnProperty.call(updateBody, field)) return false;
+    return !configFieldValuesEqual(config[field], updateBody[field]);
+  });
+
+/**
+ * Copy current template values into a doctor snapshot so existing assignees keep pre-edit settings.
+ * Snapshot is configType doctor → hidden from admin "Hệ thống" list.
+ */
+const buildAssignedSnapshotPayload = (config, actorUserId) => {
+  const plain = typeof config.get === 'function' ? config.get({ plain: true }) : { ...config };
+  const baseName = plain.name || 'Chế độ tập';
+  return {
+    exerciseId: plain.exerciseId,
+    configType: 'doctor',
+    name: `${baseName} — đã giao`,
+    eye: plain.eye,
+    distance: plain.distance,
+    duration: plain.duration,
+    frequency: plain.frequency,
+    executionCount: plain.executionCount,
+    fontSize: plain.fontSize,
+    contrast: plain.contrast,
+    colorScheme: cloneJson(plain.colorScheme),
+    visionType: plain.visionType || 'far',
+    levelOverride: Boolean(plain.levelOverride),
+    visionLevel: plain.levelOverride ? plain.visionLevel : null,
+    configReferentId: plain.id,
+    inactivityThreshold: plain.inactivityThreshold,
+    difficultyBaselineSource: plain.difficultyBaselineSource || 'current_exam',
+    vtSettings: cloneJson(plain.vtSettings),
+    dichoptic: cloneJson(plain.dichoptic),
+    notificationSettings: cloneJson(plain.notificationSettings),
+    centerId: plain.centerId,
+    createdBy: actorUserId ?? plain.createdBy ?? null,
+    updatedBy: actorUserId ?? plain.updatedBy ?? null,
+  };
+};
+
+/**
+ * When editing an admin/system template that still has active assignments, freeze those
+ * patients on a snapshot of the current values, then allow the template itself to change
+ * for future assigns only.
+ *
+ * @returns {Promise<{ snapshotConfigId: number, detachedAssignmentCount: number }|null>}
+ */
+const detachActiveAssignmentsToSnapshot = async (config, actorUserId) => {
+  const activeAssignments = await ExerciseAssignment.findAll({
+    where: {
+      exerciseConfigId: config.id,
+      status: 'active',
+    },
+    attributes: ['id'],
+  });
+
+  if (activeAssignments.length === 0) {
+    return null;
+  }
+
+  let snapshotPayload = buildAssignedSnapshotPayload(config, actorUserId);
+  const nameTaken = await ExerciseConfig.isDuplicateName(
+    snapshotPayload.exerciseId,
+    snapshotPayload.name,
+    snapshotPayload.centerId
+  );
+  if (nameTaken) {
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    snapshotPayload = {
+      ...snapshotPayload,
+      name: `${config.name || 'Chế độ tập'} — đã giao ${stamp}`,
+    };
+  }
+
+  const snapshot = await ExerciseConfig.create(snapshotPayload);
+  const assignmentIds = activeAssignments.map((row) => row.id);
+  await ExerciseAssignment.update(
+    { exerciseConfigId: snapshot.id },
+    { where: { id: assignmentIds } }
+  );
+
+  await auditLogService.logEntityAuditEvent({
+    action: 'exerciseConfig.freezeAssignedSnapshot',
+    entityType: 'exerciseConfig',
+    entityId: snapshot.id,
+    centerId: config.centerId,
+    actorUserId: actorUserId || null,
+    metadata: {
+      templateConfigId: config.id,
+      snapshotConfigId: snapshot.id,
+      detachedAssignmentCount: assignmentIds.length,
+      detachedAssignmentIds: assignmentIds,
+    },
+  });
+
+  return {
+    snapshotConfigId: snapshot.id,
+    detachedAssignmentCount: assignmentIds.length,
+  };
+};
+
 /**
  * Validate visionType for config creation (no level validation needed)
  * @param {Object} configData - Configuration data to validate
@@ -340,10 +485,19 @@ const updateExerciseConfigById = async (configId, updateBody) => {
     ('executionCount' in updateBody &&
       parseInt(updateBody.executionCount, 10) !== parseInt(config.executionCount, 10));
 
+  // Admin/system templates: freeze existing assignees on a snapshot before changing runtime fields,
+  // so edits only apply to future assigns (or re-assigns) of this template.
+  let freezeMeta = null;
+  if (isAdminManagedConfigType(config.configType) && runtimeFieldsChanged(config, updateBody)) {
+    freezeMeta = await detachActiveAssignmentsToSnapshot(config, updateBody.updatedBy || null);
+  }
+
   Object.assign(config, updateBody);
   await config.save();
 
-  if (timingFieldsChanged) {
+  // Do not sync sessions on the template after a freeze — assignees moved to the snapshot
+  // with the previous duration/executionCount. Doctor configs (and unused templates) still sync.
+  if (timingFieldsChanged && !freezeMeta) {
     await syncSessionsForExerciseConfig(config.id);
   }
 
@@ -356,6 +510,9 @@ const updateExerciseConfigById = async (configId, updateBody) => {
     metadata: {
       exerciseId: config.exerciseId,
       updatedFields: Object.keys(updateBody || {}),
+      frozenOnTemplateEdit: Boolean(freezeMeta),
+      detachedAssignmentCount: freezeMeta?.detachedAssignmentCount ?? 0,
+      snapshotConfigId: freezeMeta?.snapshotConfigId ?? null,
     },
   });
 

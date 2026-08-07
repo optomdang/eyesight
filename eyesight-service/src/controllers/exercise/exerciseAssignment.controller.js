@@ -10,12 +10,14 @@ const { exerciseAssignmentService } = require('../../services');
  */
 const assignConfigToPatients = catchAsync(async (req, res) => {
   const { configId } = req.params;
-  const { patientIds, notes, visionLevel, levelOverride, trainingEye, priority } = req.body;
+  const { patientIds, notes, visionLevel, levelOverride, trainingEye, priority, sync } = req.body;
   const { user } = req;
 
   if (!Array.isArray(patientIds)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'PatientIds array is required');
   }
+
+  const syncMode = Boolean(sync);
 
   const assignmentData = {
     assignedBy: user.id,
@@ -30,11 +32,14 @@ const assignConfigToPatients = catchAsync(async (req, res) => {
     configId,
     patientIds,
     assignmentData,
-    user.centerId
+    user.centerId,
+    { sync: syncMode }
   );
 
   res.status(httpStatus.CREATED).json({
-    message: `Exercise config assignments synced for ${patientIds.length} patients`,
+    message: syncMode
+      ? `Exercise config assignments synced for ${patientIds.length} patients`
+      : `Exercise config assigned to ${assignments.length} patient(s)`,
     data: assignments,
   });
 });

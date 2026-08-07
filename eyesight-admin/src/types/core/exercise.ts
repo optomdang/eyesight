@@ -574,11 +574,16 @@ export interface UpdateAssignmentDto {
 export interface AssignmentData {
   patientIds: number[];
   notes?: string;
-  templateId: number | null;
+  templateId?: number | null;
   // Patient-specific vision configuration overrides
   visionLevel?: number; // Override for patient-specific vision level
   levelOverride?: boolean; // Whether to use custom level for this patient
   trainingEye?: TrainingEye | null; // Per-patient training eye (right/left/both)
+  /**
+   * When true, patientIds is the exclusive membership list (bulk-assign UI).
+   * Default / omitted = additive: only add selected patients, never remove others.
+   */
+  sync?: boolean;
 }
 
 /**

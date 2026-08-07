@@ -178,20 +178,29 @@ const assignTemplateToPatient = catchAsync(async (req, res) => {
  */
 const assignConfigToPatients = catchAsync(async (req, res) => {
   const { configId } = req.params;
-  const { patientIds, notes, visionLevel, levelOverride, trainingEye } = req.body;
+  const { patientIds, notes, visionLevel, levelOverride, trainingEye, sync } = req.body;
   const assignedBy = req.user.id; // Get current user ID
+  const syncMode = Boolean(sync);
 
-  const assignments = await exerciseAssignmentService.assignConfigToPatients(configId, patientIds, {
-    notes,
-    assignedBy,
-    priority: req.body.priority || 'normal',
-    visionLevel,
-    levelOverride,
-    trainingEye,
-  });
+  const assignments = await exerciseAssignmentService.assignConfigToPatients(
+    configId,
+    patientIds,
+    {
+      notes,
+      assignedBy,
+      priority: req.body.priority || 'normal',
+      visionLevel,
+      levelOverride,
+      trainingEye,
+    },
+    req.user.centerId,
+    { sync: syncMode }
+  );
 
   res.status(httpStatus.CREATED).send({
-    message: `Configuration assigned to ${assignments.length} patients successfully`,
+    message: syncMode
+      ? `Configuration synced for ${patientIds.length} patients successfully`
+      : `Configuration assigned to ${assignments.length} patients successfully`,
     assignments,
   });
 });

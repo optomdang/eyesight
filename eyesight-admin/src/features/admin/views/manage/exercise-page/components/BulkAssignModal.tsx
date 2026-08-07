@@ -247,6 +247,8 @@ const BulkAssignModal: React.FC<BulkAssignModalProps> = ({ open, onClose, config
         templateId: selectedTemplateId,
         visionLevel: levelOverride ? visionLevel : undefined,
         levelOverride,
+        // Bulk UI treats selection as the full membership list (may unassign deselected).
+        sync: true,
       });
 
       showSnackbar(

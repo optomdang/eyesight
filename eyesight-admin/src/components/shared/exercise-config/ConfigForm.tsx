@@ -13,6 +13,7 @@ import {
   MenuItem,
   InputLabel,
   Typography,
+  Alert,
 } from '@mui/material';
 import { Visibility } from '@mui/icons-material';
 import useSnackbar from 'src/contexts/UseSnackbar';
@@ -325,6 +326,16 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({
         <DialogTitle>{getTitle()}</DialogTitle>
         <DialogContent dividers>
           <Box>
+            {configData?.id &&
+              (configData.configType === 'admin' || configData.configType === 'system') &&
+              !readOnly && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {t(
+                    'config.systemTemplateEditHint',
+                    'Thay đổi chỉ áp dụng cho lần gán sau; bệnh nhân đã gán giữ cấu hình cũ.'
+                  )}
+                </Alert>
+              )}
             {/* 1. Exercise Selection - Always show on top */}
             <Grid container spacing={2}>
               <Grid size={12}>

@@ -380,6 +380,8 @@ const assignConfigToPatients = {
     // Patient-specific vision configuration overrides
     visionLevel: Joi.number().integer().min(1).max(20).optional(),
     levelOverride: Joi.boolean().optional(),
+    // true = exclusive membership sync (bulk UI). Default false = additive only.
+    sync: Joi.boolean().optional(),
   }),
 };
 

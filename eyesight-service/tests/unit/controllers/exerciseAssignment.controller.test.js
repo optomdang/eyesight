@@ -45,7 +45,8 @@ describe('exerciseAssignment.controller — assignConfigToPatients', () => {
         visionLevel: 5,
         levelOverride: true,
       }),
-      1
+      1,
+      { sync: false }
     );
   });
 
@@ -63,7 +64,27 @@ describe('exerciseAssignment.controller — assignConfigToPatients', () => {
       10,
       [3],
       expect.objectContaining({ trainingEye: null }),
-      1
+      1,
+      { sync: false }
+    );
+  });
+
+  test('forwards sync=true for bulk membership replace', async () => {
+    const req = {
+      params: { configId: 10 },
+      body: { patientIds: [3, 4], sync: true },
+      user: { id: 99, centerId: 1 },
+    };
+    const res = buildRes();
+
+    await exerciseAssignmentController.assignConfigToPatients(req, res, jest.fn());
+
+    expect(exerciseAssignmentService.assignConfigToPatients).toHaveBeenCalledWith(
+      10,
+      [3, 4],
+      expect.any(Object),
+      1,
+      { sync: true }
     );
   });
 });

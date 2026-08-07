@@ -14,6 +14,8 @@ const assignConfig = {
     visionLevel: Joi.number().integer().min(1).max(20).optional().allow(null),
     levelOverride: Joi.boolean().optional().allow(null),
     trainingEye: Joi.string().valid('right', 'left', 'both').optional().allow(null),
+    // true = exclusive membership sync (bulk UI). Default false = additive only.
+    sync: Joi.boolean().optional(),
   }),
 };
 

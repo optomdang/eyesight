@@ -41,6 +41,11 @@ jest.mock('../../../src/services/exercise/assignmentSessionSync.service', () => 
   syncAssignmentSessionSnapshots: jest.fn().mockResolvedValue({ updated: 0 }),
 }));
 
+jest.mock('../../../src/services/exercise/treatmentPackage.service', () => ({
+  isExerciseConfigAccessibleForPatient: jest.fn().mockResolvedValue(true),
+  filterAssignmentsByTreatmentPackage: jest.fn(async (_patientId, assignments) => assignments),
+}));
+
 jest.mock('../../../src/utils/sessionProvisionUtils', () => ({
   provisionExerciseSessions: jest.fn(),
 }));
@@ -131,6 +136,63 @@ describe('Exercise Assignment Service', () => {
 
       expect(result).toEqual([]);
       expect(ExerciseAssignment.bulkCreate).not.toHaveBeenCalled();
+      expect(ExerciseAssignment.destroy).not.toHaveBeenCalled();
+    });
+
+    test('additive (default) keeps other patients when assigning one more', async () => {
+      ExerciseConfig.findByPk.mockResolvedValue({ id: 10, centerId: 5, visionType: 'far' });
+      Patient.findAll.mockResolvedValue([{ id: 2, deleted: false }]);
+      ExerciseAssignment.findAll.mockResolvedValue([
+        { id: 20, patientId: 1, exerciseConfigId: 10, centerId: 5 },
+      ]);
+      ExerciseAssignment.bulkCreate.mockResolvedValue([{ id: 21, patientId: 2, exerciseConfigId: 10 }]);
+      ExerciseAssignment.findByPk.mockResolvedValue({ id: 21, patientId: 2, exerciseConfig: { id: 10 } });
+
+      const result = await exerciseAssignmentService.assignConfigToPatients(10, [2], { assignedBy: 99 });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(result).toEqual([{ id: 21, patientId: 2, exerciseConfigId: 10 }]);
+      expect(ExerciseAssignment.destroy).not.toHaveBeenCalled();
+      expect(ExerciseAssignment.bulkCreate).toHaveBeenCalledWith(
+        [expect.objectContaining({ patientId: 2, exerciseConfigId: 10 })],
+        expect.objectContaining({ returning: true })
+      );
+      expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ sync: false, removedCount: 0, createdCount: 1 }),
+        })
+      );
+    });
+
+    test('sync mode removes patients not in the submitted list', async () => {
+      ExerciseConfig.findByPk.mockResolvedValue({ id: 10, centerId: 5, visionType: 'far' });
+      Patient.findAll.mockResolvedValue([{ id: 2, deleted: false }]);
+      ExerciseAssignment.findAll.mockResolvedValue([
+        { id: 20, patientId: 1, exerciseConfigId: 10, centerId: 5 },
+      ]);
+      ExerciseAssignment.bulkCreate.mockResolvedValue([{ id: 21, patientId: 2, exerciseConfigId: 10 }]);
+      ExerciseAssignment.findByPk.mockResolvedValue({ id: 21, patientId: 2, exerciseConfig: { id: 10 } });
+
+      await exerciseAssignmentService.assignConfigToPatients(10, [2], { assignedBy: 99 }, undefined, {
+        sync: true,
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(ExerciseAssignment.destroy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: [20] },
+        })
+      );
+      expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            sync: true,
+            removedCount: 1,
+            removedPatientIds: [1],
+            createdCount: 1,
+          }),
+        })
+      );
     });
 
     test('should validate vision level against config vision type', async () => {

@@ -72,7 +72,26 @@ const calculateCompliancePercentage = (
 /**
  * Assign exercise config to multiple patients
  */
-const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentData, centerId) => {
+/**
+ * Assign an exercise config to patients.
+ *
+ * @param {number} exerciseConfigId
+ * @param {number[]} patientIds
+ * @param {Object} assignmentData
+ * @param {number} [centerId]
+ * @param {{ sync?: boolean }} [options]
+ *   - sync=false (default): **additive** — only create missing assignments; never remove others.
+ *     Use when assigning from a single-patient page.
+ *   - sync=true: treat patientIds as the exclusive membership list (create missing + destroy
+ *     assignments for patients not in the list). Use for bulk-assign UI only.
+ */
+const assignConfigToPatients = async (
+  exerciseConfigId,
+  patientIds,
+  assignmentData,
+  centerId,
+  { sync = false } = {}
+) => {
   // Verify config exists and belongs to center
   const config = await ExerciseConfig.findByPk(exerciseConfigId);
 
@@ -85,6 +104,7 @@ const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentDa
   }
 
   const uniquePatientIds = [...new Set((patientIds || []).map(Number).filter(Boolean))];
+  const syncMode = Boolean(sync);
 
   // Verify all selected patients exist and belong to center
   if (uniquePatientIds.length > 0) {
@@ -136,7 +156,10 @@ const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentDa
     existingAssignments.map((assignment) => [assignment.patientId, assignment])
   );
   const patientIdsToCreate = uniquePatientIds.filter((patientId) => !existingAssignmentsByPatientId.has(patientId));
-  const assignmentsToRemove = existingAssignments.filter((assignment) => !uniquePatientIds.includes(assignment.patientId));
+  // Only bulk-assign (sync) may remove patients who are not in the submitted list.
+  const assignmentsToRemove = syncMode
+    ? existingAssignments.filter((assignment) => !uniquePatientIds.includes(assignment.patientId))
+    : [];
 
   for (const patientId of patientIdsToCreate) {
     const allowed = await treatmentPackageService.isExerciseConfigAccessibleForPatient(
@@ -222,6 +245,7 @@ const assignConfigToPatients = async (exerciseConfigId, patientIds, assignmentDa
       createdCount: assignments.length,
       removedCount: assignmentsToRemove.length,
       totalSelected: uniquePatientIds.length,
+      sync: syncMode,
       visionLevel: assignmentData.visionLevel ?? null,
       levelOverride: Boolean(assignmentData.levelOverride),
     },

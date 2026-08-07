@@ -21,18 +21,33 @@ jest.mock('../../../src/models', () => ({
     findAndCountAll: jest.fn(),
     create: jest.fn(),
     destroy: jest.fn(),
+    isDuplicateName: jest.fn().mockResolvedValue(false),
   },
   Exercise: {},
   ExerciseAssignment: {
     findByPk: jest.fn(),
     findOne: jest.fn(),
+    findAll: jest.fn(),
     findAndCountAll: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
   },
+  User: {},
+  Configuration: {},
+}));
+
+jest.mock('../../../src/services/system/auditLog.service', () => ({
+  logEntityAuditEvent: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../../src/services/exercise/assignmentSessionSync.service', () => ({
+  syncSessionsForExerciseConfig: jest.fn().mockResolvedValue({ assignments: 0, sessionsUpdated: 0 }),
 }));
 
 const { ExerciseConfig, ExerciseAssignment } = require('../../../src/models');
 const exerciseConfigService = require('../../../src/services/exercise/exerciseConfig.service');
+const auditLogService = require('../../../src/services/system/auditLog.service');
+const { syncSessionsForExerciseConfig } = require('../../../src/services/exercise/assignmentSessionSync.service');
 
 describe('ExerciseConfig Service', () => {
   beforeEach(() => {
@@ -338,6 +353,127 @@ describe('ExerciseConfig Service', () => {
 
       expect(cfg.save).toHaveBeenCalled();
       expect(result.inactivityThreshold).toBe(45);
+    });
+
+    test('freezes active assignees onto a doctor snapshot before changing admin template duration', async () => {
+      const cfg = {
+        id: 25,
+        name: 'Gabor - N',
+        configType: 'admin',
+        exerciseId: 9,
+        centerId: 2,
+        duration: '15.00',
+        executionCount: 2,
+        visionType: 'near',
+        levelOverride: false,
+        get: jest.fn(function getPlain() {
+          return {
+            id: 25,
+            name: 'Gabor - N',
+            configType: 'admin',
+            exerciseId: 9,
+            centerId: 2,
+            duration: '15.00',
+            executionCount: 2,
+            visionType: 'near',
+            levelOverride: false,
+            eye: 'both',
+            frequency: 'daily',
+            distance: '0.50',
+          };
+        }),
+        save: jest.fn(),
+      };
+      ExerciseConfig.findByPk.mockResolvedValue(cfg);
+      ExerciseAssignment.findAll.mockResolvedValue([{ id: 4 }, { id: 99 }]);
+      ExerciseConfig.isDuplicateName.mockResolvedValue(false);
+      ExerciseConfig.create.mockResolvedValue({ id: 1001, name: 'Gabor - N — đã giao' });
+      ExerciseAssignment.update.mockResolvedValue([2]);
+
+      const result = await exerciseConfigService.updateExerciseConfigById(25, {
+        duration: 5,
+        updatedBy: 1,
+      });
+
+      expect(ExerciseConfig.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configType: 'doctor',
+          configReferentId: 25,
+          name: 'Gabor - N — đã giao',
+          duration: '15.00',
+          executionCount: 2,
+          createdBy: 1,
+          updatedBy: 1,
+        })
+      );
+      expect(ExerciseAssignment.update).toHaveBeenCalledWith(
+        { exerciseConfigId: 1001 },
+        { where: { id: [4, 99] } }
+      );
+      expect(cfg.duration).toBe(5);
+      expect(cfg.save).toHaveBeenCalled();
+      expect(syncSessionsForExerciseConfig).not.toHaveBeenCalled();
+      expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'exerciseConfig.update',
+          metadata: expect.objectContaining({
+            frozenOnTemplateEdit: true,
+            detachedAssignmentCount: 2,
+            snapshotConfigId: 1001,
+          }),
+        })
+      );
+      expect(result).toBe(cfg);
+    });
+
+    test('does not create snapshot when admin template has no active assignments', async () => {
+      const cfg = {
+        id: 25,
+        name: 'Gabor - N',
+        configType: 'admin',
+        duration: '15.00',
+        executionCount: 2,
+        visionType: 'near',
+        save: jest.fn(),
+      };
+      ExerciseConfig.findByPk.mockResolvedValue(cfg);
+      ExerciseAssignment.findAll.mockResolvedValue([]);
+
+      await exerciseConfigService.updateExerciseConfigById(25, { duration: 5, updatedBy: 1 });
+
+      expect(ExerciseConfig.create).not.toHaveBeenCalled();
+      expect(ExerciseAssignment.update).not.toHaveBeenCalled();
+      expect(cfg.duration).toBe(5);
+      expect(syncSessionsForExerciseConfig).toHaveBeenCalledWith(25);
+      expect(auditLogService.logEntityAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            frozenOnTemplateEdit: false,
+            detachedAssignmentCount: 0,
+            snapshotConfigId: null,
+          }),
+        })
+      );
+    });
+
+    test('name-only update on admin template does not fork existing assignees', async () => {
+      const cfg = {
+        id: 25,
+        name: 'Gabor - N',
+        configType: 'admin',
+        duration: '15.00',
+        executionCount: 2,
+        visionType: 'near',
+        save: jest.fn(),
+      };
+      ExerciseConfig.findByPk.mockResolvedValue(cfg);
+
+      await exerciseConfigService.updateExerciseConfigById(25, { name: 'Gabor - N (renamed)', updatedBy: 1 });
+
+      expect(ExerciseAssignment.findAll).not.toHaveBeenCalled();
+      expect(ExerciseConfig.create).not.toHaveBeenCalled();
+      expect(syncSessionsForExerciseConfig).not.toHaveBeenCalled();
+      expect(cfg.name).toBe('Gabor - N (renamed)');
     });
   });
 
