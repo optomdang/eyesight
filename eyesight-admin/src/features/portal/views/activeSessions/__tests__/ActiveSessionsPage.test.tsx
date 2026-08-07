@@ -105,7 +105,7 @@ describe('ActiveSessionsPage', () => {
   });
 
   describe('Cột Trạng thái', () => {
-    it('hiển thị "Đã hoàn thành" khi currentSession.status === completed', () => {
+    it('hiển thị "Đã hoàn thành" khi đủ lượt đạt chuẩn theo config', () => {
       renderPage([
         makeAssignment({
           currentSession: {
@@ -123,6 +123,35 @@ describe('ActiveSessionsPage', () => {
         }),
       ]);
       expect(screen.getByText('Đã hoàn thành')).toBeInTheDocument();
+    });
+
+    it('hiển thị "Chưa hoàn thành" khi session.status completed nhưng chưa đủ lượt theo config', () => {
+      renderPage([
+        makeAssignment({
+          exerciseConfig: {
+            exerciseId: 1,
+            frequency: 'daily',
+            executionCount: 4,
+            eye: 'both',
+            exercise: { id: 1, name: 'Vernier', code: 'vt-vernier', exerciseType: 'vt' },
+          },
+          currentSession: {
+            id: 10,
+            status: 'completed',
+            executionsCompleted: 2,
+            validExecutions: 2,
+            executionCount: 2,
+            validityPercentage: 100,
+            totalScore: 200,
+            averageScore: 100,
+            bestScore: 100,
+            createdAt: '',
+            updatedAt: '',
+          },
+        }),
+      ]);
+      expect(screen.getAllByText('Chưa hoàn thành').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Đã hoàn thành')).not.toBeInTheDocument();
     });
 
     it('hiển thị "Chưa hoàn thành" khi currentSession.status === incomplete', () => {
@@ -198,6 +227,35 @@ describe('ActiveSessionsPage', () => {
       ]);
       const btn = screen.getByRole('button', { name: /Thực hiện/i });
       expect(btn).toBeDisabled();
+    });
+
+    it('enabled khi session.status completed nhưng chưa đủ lượt theo config', () => {
+      renderPage([
+        makeAssignment({
+          exerciseConfig: {
+            exerciseId: 1,
+            frequency: 'daily',
+            executionCount: 4,
+            eye: 'both',
+            exercise: { id: 1, name: 'Vernier', code: 'vt-vernier', exerciseType: 'vt' },
+          },
+          currentSession: {
+            id: 10,
+            status: 'completed',
+            executionsCompleted: 2,
+            validExecutions: 2,
+            executionCount: 2,
+            validityPercentage: 100,
+            totalScore: 200,
+            averageScore: 100,
+            bestScore: 100,
+            createdAt: '',
+            updatedAt: '',
+          },
+        }),
+      ]);
+      const btn = screen.getByRole('button', { name: /Thực hiện/i });
+      expect(btn).not.toBeDisabled();
     });
 
     it('enabled khi session là incomplete', () => {

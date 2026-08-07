@@ -5,7 +5,15 @@ jest.mock('../../../src/models', () => ({
   },
   ExerciseSession: {
     findAll: jest.fn(),
+    findOne: jest.fn(),
   },
+}));
+
+jest.mock('../../../src/utils/common', () => ({
+  getCurrentCycleDateRange: jest.fn(() => ({
+    start: new Date('2026-08-07T00:00:00.000+07:00'),
+    end: new Date('2026-08-07T23:59:59.999+07:00'),
+  })),
 }));
 
 jest.mock('../../../src/services/exercise/exerciseResult.service', () => ({
@@ -16,6 +24,9 @@ const { ExerciseAssignment, ExerciseSession } = require('../../../src/models');
 const { updateSessionStats } = require('../../../src/services/exercise/exerciseResult.service');
 const {
   snapshotsDiffer,
+  isSessionFullyComplete,
+  reconcileCurrentCycleSession,
+  reconcileSessionWithConfigRequirement,
   syncAssignmentSessionSnapshots,
   syncSessionSnapshotFromAssignment,
   syncSessionsForExerciseConfig,
@@ -105,6 +116,81 @@ describe('assignmentSessionSync.service', () => {
         executionCount: 2,
       });
       expect(updateSessionStats).toHaveBeenCalledWith(80);
+    });
+  });
+
+  describe('isSessionFullyComplete', () => {
+    test('requires validExecutions to meet config executionCount', () => {
+      expect(
+        isSessionFullyComplete(
+          { validExecutions: 2, executionCount: 2, status: 'completed' },
+          { executionCount: 4 }
+        )
+      ).toBe(false);
+      expect(
+        isSessionFullyComplete(
+          { validExecutions: 4, executionCount: 4, status: 'completed' },
+          { executionCount: 4 }
+        )
+      ).toBe(true);
+    });
+  });
+
+  describe('reconcileSessionWithConfigRequirement', () => {
+    test('reopens completed session when config now requires more executions', async () => {
+      const session = {
+        id: 240,
+        status: 'completed',
+        validExecutions: 2,
+        executionsCompleted: 2,
+        executionCount: 2,
+        executionDuration: '5.00',
+        completedAt: new Date(),
+        endedAt: new Date(),
+        update: jest.fn().mockResolvedValue(),
+      };
+      const assignment = {
+        exerciseConfig: { duration: '5.00', executionCount: 4, frequency: 'daily' },
+      };
+
+      const changed = await reconcileSessionWithConfigRequirement(session, assignment);
+
+      expect(changed).toBe(true);
+      expect(session.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executionCount: 4,
+          status: 'incomplete',
+          completedAt: null,
+          endedAt: null,
+        })
+      );
+      expect(updateSessionStats).toHaveBeenCalledWith(240);
+    });
+  });
+
+  describe('reconcileCurrentCycleSession', () => {
+    test('reconciles only the current cycle session for the assignment', async () => {
+      ExerciseAssignment.findByPk.mockResolvedValue({
+        id: 5,
+        exerciseConfig: { duration: '5.00', executionCount: 4, frequency: 'daily' },
+      });
+      const session = {
+        id: 240,
+        status: 'completed',
+        validExecutions: 2,
+        executionsCompleted: 2,
+        executionCount: 2,
+        executionDuration: '5.00',
+        completedAt: new Date(),
+        endedAt: new Date(),
+        update: jest.fn().mockResolvedValue(),
+      };
+      ExerciseSession.findOne.mockResolvedValue(session);
+
+      const result = await reconcileCurrentCycleSession(5);
+
+      expect(result).toEqual({ reconciled: true });
+      expect(ExerciseSession.findOne).toHaveBeenCalled();
     });
   });
 

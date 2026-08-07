@@ -15,7 +15,7 @@ const { getCurrentCycleDateRange } = require('../../utils/common');
 const { provisionExerciseSessions } = require('../../utils/sessionProvisionUtils');
 const auditLogService = require('../system/auditLog.service');
 const treatmentPackageService = require('./treatmentPackage.service');
-const { syncAssignmentSessionSnapshots } = require('./assignmentSessionSync.service');
+const { syncAssignmentSessionSnapshots, reconcileCurrentCycleSession } = require('./assignmentSessionSync.service');
 
 /**
  * Calculate compliance percentage for an assignment.
@@ -352,6 +352,8 @@ const getPatientAssignments = async (filter = {}, options = {}) => {
       const frequency = assignment.exerciseConfig?.frequency || 'daily';
       // eslint-disable-next-line no-await-in-loop
       await syncAssignmentSessionSnapshots(assignment.id);
+      // eslint-disable-next-line no-await-in-loop
+      await reconcileCurrentCycleSession(assignment.id);
       // eslint-disable-next-line no-await-in-loop
       await provisionExerciseSessions(assignment);
 

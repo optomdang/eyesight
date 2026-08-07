@@ -192,19 +192,17 @@ const getSessionProgress = async (assignmentId, date = new Date()) => {
   }
 
   const requiredExecutions = assignment.exerciseConfig?.executionCount || 1;
-  const canStart = todaySession.status !== 'completed' && todaySession.executionsCompleted < requiredExecutions;
+  const validExecutions = todaySession.validExecutions || 0;
+  const isSessionComplete =
+    validExecutions >= requiredExecutions &&
+    validExecutions === (todaySession.executionsCompleted || 0) &&
+    validExecutions > 0;
+  const canStart = !isSessionComplete;
 
-  // Calculate validity percentage
   const validityPercentage =
     todaySession.executionsCompleted > 0
       ? Math.round((todaySession.validExecutions / todaySession.executionsCompleted) * 100)
       : 0;
-
-  // Check session completion based on 3 rules
-  const isSessionComplete =
-    todaySession.executionsCompleted >= requiredExecutions &&
-    todaySession.validExecutions === todaySession.executionsCompleted &&
-    todaySession.executionsCompleted > 0;
 
   return {
     assignmentId,

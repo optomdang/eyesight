@@ -21,6 +21,17 @@ const SESSION_COMPLETION_COLUMN_HELP =
   'Một lượt đạt chuẩn khi tập ≥ 80% thời gian giao cho lượt đó. ' +
   'Dừng sớm hơn vẫn được lưu nhưng chưa tính vào số lượt đạt chuẩn.';
 
+const resolveRequiredExecutions = (assignment: PortalExerciseAssignment): number =>
+  assignment.exerciseConfig?.executionCount ?? assignment.currentSession?.executionCount ?? 1;
+
+const isCurrentSessionFullyComplete = (assignment: PortalExerciseAssignment): boolean => {
+  const session = assignment.currentSession;
+  if (!session) return false;
+  const required = resolveRequiredExecutions(assignment);
+  const valid = session.validExecutions ?? 0;
+  return valid >= required && valid > 0;
+};
+
 const ActiveSessionsPage: React.FC = () => {
   const navigate = useNavigate();
   const { dataRes, tableState, onTableChange, loading } = useDataTable<PortalExerciseAssignment>();
@@ -31,7 +42,7 @@ const ActiveSessionsPage: React.FC = () => {
     if (!session) {
       return <Chip label="Chưa hoàn thành" color="warning" size="small" />;
     }
-    if (session.status === 'completed') {
+    if (isCurrentSessionFullyComplete(assignment)) {
       return <Chip label="Đã hoàn thành" color="success" size="small" />;
     }
     return <Chip label="Chưa hoàn thành" color="warning" size="small" />;
@@ -145,7 +156,7 @@ const ActiveSessionsPage: React.FC = () => {
         customBodyRender: (_: any, tableMeta: any) => {
           const assignment = dataRes?.rows?.[tableMeta.rowIndex] as PortalExerciseAssignment;
           const passed = assignment?.currentSession?.validExecutions ?? 0;
-          const required = assignment?.exerciseConfig?.executionCount ?? 1;
+          const required = resolveRequiredExecutions(assignment);
           return (
             <Typography variant="body2">
               {passed}/{required} lần
@@ -162,7 +173,7 @@ const ActiveSessionsPage: React.FC = () => {
         sort: false,
         customBodyRender: (_: any, tableMeta: any) => {
           const assignment = dataRes?.rows?.[tableMeta.rowIndex] as PortalExerciseAssignment;
-          const sessionCompleted = assignment?.currentSession?.status === 'completed';
+          const sessionCompleted = isCurrentSessionFullyComplete(assignment);
           const hasActiveSession = assignment?.currentSession && !sessionCompleted;
 
           return (
