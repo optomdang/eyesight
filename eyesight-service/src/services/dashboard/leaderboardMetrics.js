@@ -90,24 +90,46 @@ const isExerciseSlotEnded = (result) => {
   return result.status === 'incomplete' && (result.duration ?? 0) > 0;
 };
 
+/**
+ * % từng lượt trong một phiên, theo đúng số lần được giao (executionCount).
+ *
+ * Quy tắc: lấy tối đa N lượt đã kết thúc có % thời gian cao nhất
+ * (BN làm thử rồi làm lại đủ → tính các lần tốt nhất, không tính lần dở đầu).
+ * Thiếu lượt thì pad 0.
+ */
+const scoreEndedExerciseResult = (result, sessionDurationMin) => {
+  const slotMin = parseFloat(result?.exerciseConfig?.duration) || sessionDurationMin || 0;
+  return {
+    result,
+    pct: exerciseSlotCompletionPct(result.duration, slotMin),
+    durationSec: Math.max(0, result.duration || 0),
+    slotMin,
+  };
+};
+
+const pickTopExerciseSlotScores = (session, results, slotCount) => {
+  const assigned = Math.max(0, parseInt(slotCount, 10) || 0);
+  if (assigned === 0) return [];
+
+  const durationMin = parseFloat(session?.executionDuration) || 0;
+  const scored = (results || [])
+    .filter((r) => isExerciseSlotEnded(r))
+    .map((r) => scoreEndedExerciseResult(r, durationMin))
+    .sort((a, b) => b.pct - a.pct || b.durationSec - a.durationSec);
+
+  const top = scored.slice(0, assigned);
+  while (top.length < assigned) {
+    top.push({ result: null, pct: 0, durationSec: 0, slotMin: durationMin });
+  }
+  return top;
+};
+
 const exerciseSessionSlotPcts = (session, exerciseResultsBySessionId) => {
   const assigned = Math.max(0, parseInt(session?.executionCount, 10) || 0);
   if (assigned === 0) return [];
 
-  const durationMin = parseFloat(session?.executionDuration) || 0;
   const results = exerciseResultsBySessionId[session.id] || [];
-  const pcts = [];
-
-  for (let i = 0; i < assigned; i += 1) {
-    const r = results[i];
-    if (!isExerciseSlotEnded(r)) pcts.push(0);
-    else {
-      const slotMin =
-        parseFloat(r?.exerciseConfig?.duration) || durationMin;
-      pcts.push(exerciseSlotCompletionPct(r.duration, slotMin));
-    }
-  }
-  return pcts;
+  return pickTopExerciseSlotScores(session, results, assigned).map((row) => row.pct);
 };
 
 const findExerciseSessionInCycle = (exerciseSessions, assignmentId, cycleStart, cycleEnd) =>
@@ -203,17 +225,19 @@ const computeCenterExerciseStats = ({
       if (!session) return;
 
       const results = exerciseResultsBySessionId[session.id] || [];
-      for (let i = 0; i < cycleExecCount; i += 1) {
-        const r = results[i];
-        if (r?.status === 'completed') {
+      const topSlots = pickTopExerciseSlotScores(session, results, cycleExecCount);
+      topSlots.forEach((slot) => {
+        const r = slot.result;
+        if (!r) return;
+        const dur = slot.durationSec;
+        totalActualSeconds += dur;
+        byType[type].actualSeconds += dur;
+        if (r.status === 'completed' || isExerciseSlotFullyComplete(dur, slot.slotMin)) {
           totalCompletedSlots += 1;
           byType[type].completed += 1;
           byPatient[pid].completed += 1;
-          const dur = r.duration || 0;
-          totalActualSeconds += dur;
-          byType[type].actualSeconds += dur;
         }
-      }
+      });
     });
   });
 
@@ -604,6 +628,8 @@ module.exports = {
   exerciseSlotCompletionPct,
   isExerciseSlotEnded,
   isExerciseSlotFullyComplete,
+  exerciseSessionSlotPcts,
+  pickTopExerciseSlotScores,
   computePatientCompletionPct,
   computeCenterExerciseStats,
   computeCenterExamComplianceRate,

@@ -1,6 +1,7 @@
 const {
   examSessionCompletionPct,
   exerciseSlotCompletionPct,
+  exerciseSessionSlotPcts,
   computePatientCompletionPct,
   computeCenterExerciseStats,
   computeCenterExamComplianceRate,
@@ -38,6 +39,51 @@ describe('leaderboardMetrics', () => {
       expect(isExerciseSlotFullyComplete(240, 5)).toBe(true);
       expect(isExerciseSlotFullyComplete(239, 5)).toBe(false);
       expect(COMPLETION_TIME_THRESHOLD_PCT).toBe(80);
+    });
+  });
+
+  describe('exerciseSessionSlotPcts', () => {
+    it('chỉ có 2 lần dở: vẫn tính % thời gian theo 2 lần đó', () => {
+      // Yêu cầu 2×10 phút; làm 1 phút + 30s
+      const pcts = exerciseSessionSlotPcts(
+        { id: 1, executionCount: 2, executionDuration: 10 },
+        {
+          1: [
+            { status: 'incomplete', duration: 60 },
+            { status: 'incomplete', duration: 30 },
+          ],
+        }
+      );
+      expect(pcts[0]).toBeCloseTo(10, 5); // 60/600
+      expect(pcts[1]).toBeCloseTo(5, 5); // 30/600
+    });
+
+    it('có lần làm lại: lấy N lần % thời gian cao nhất', () => {
+      // 2 lần dở rồi 10 phút + 7 phút → lấy 100% và 70%
+      const pcts = exerciseSessionSlotPcts(
+        { id: 1, executionCount: 2, executionDuration: 10 },
+        {
+          1: [
+            { status: 'incomplete', duration: 60 },
+            { status: 'incomplete', duration: 30 },
+            { status: 'completed', duration: 600 },
+            { status: 'completed', duration: 420 },
+          ],
+        }
+      );
+      expect(pcts).toHaveLength(2);
+      expect(pcts[0]).toBe(100);
+      expect(pcts[1]).toBe(70);
+    });
+
+    it('thiếu lượt thì pad 0', () => {
+      const pcts = exerciseSessionSlotPcts(
+        { id: 1, executionCount: 2, executionDuration: 10 },
+        {
+          1: [{ status: 'completed', duration: 600 }],
+        }
+      );
+      expect(pcts).toEqual([100, 0]);
     });
   });
 
