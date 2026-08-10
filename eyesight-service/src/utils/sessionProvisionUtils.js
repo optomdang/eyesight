@@ -8,6 +8,7 @@ const { Op } = require('sequelize');
 const logger = require('../config/logger');
 const { Patient, ExamAssignment, ExerciseAssignment, ExamSession, ExerciseSession } = require('../models');
 const { isInTreatmentWindow } = require('./treatmentUtils');
+const { getCurrentCycleDateRange } = require('./common');
 
 /**
  * Check if patient is eligible for session provisioning
@@ -28,20 +29,17 @@ const shouldProvisionForPatient = async (patientId) => {
 };
 
 /**
- * Check if patient already has sessions created for today
+ * Check if patient already has sessions created for today (Vietnam calendar day)
  * Used to prevent duplicate session creation
  * @param {number} patientId
  * @returns {Promise<boolean>}
  */
 const hasSessionsToday = async (patientId) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const { start: today, end: todayEnd } = getCurrentCycleDateRange('daily', new Date());
 
   const examWhere = {
     patientId,
-    scheduledDate: { [Op.gte]: today, [Op.lt]: tomorrow },
+    scheduledDate: { [Op.gte]: today, [Op.lte]: todayEnd },
   };
 
   if (ExamSession.rawAttributes?.deleted) {
@@ -50,7 +48,7 @@ const hasSessionsToday = async (patientId) => {
 
   const exerciseWhere = {
     patientId,
-    startedAt: { [Op.gte]: today, [Op.lt]: tomorrow },
+    startedAt: { [Op.gte]: today, [Op.lte]: todayEnd },
   };
 
   if (ExerciseSession.rawAttributes?.deleted) {

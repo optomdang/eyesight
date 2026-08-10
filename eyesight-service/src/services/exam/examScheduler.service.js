@@ -137,19 +137,22 @@ const createScheduledExamSessions = async () => {
 };
 
 /**
- * Start exam session scheduler - runs daily at midnight local time
+ * Start exam session scheduler - runs daily at midnight Vietnam time
  * Matches Exercise scheduler for consistent session creation
  */
 const startExamScheduler = () => {
-  // Run daily at 00:00 local time (server timezone UTC+7)
-  cron.schedule('0 0 * * *', async () => {
-    await executeAndLogJob('exam.createSessions', async () => {
-      logger.info('Running scheduled exam session creation at midnight local time...');
-      return await createScheduledExamSessions();
-    });
-  });
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      await executeAndLogJob('exam.createSessions', async () => {
+        logger.info('Running scheduled exam session creation at midnight Asia/Ho_Chi_Minh...');
+        return await createScheduledExamSessions();
+      });
+    },
+    { timezone: 'Asia/Ho_Chi_Minh' }
+  );
 
-  logger.info('Exam scheduler started - runs daily at 00:00 local time');
+  logger.info('Exam scheduler started - runs daily at 00:00 Asia/Ho_Chi_Minh');
 };
 
 module.exports = {

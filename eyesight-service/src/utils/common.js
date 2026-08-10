@@ -261,16 +261,17 @@ const calculateNextDueDate = (lastDate, frequency) => {
 /**
  * Get the start/end boundaries of the current calendar cycle for a frequency.
  *
- * This is used for session scheduling and "current session" selection.
- * - daily:   today 00:00:00 → today 23:59:59
- * - weekly:  Monday 00:00:00 → Sunday 23:59:59 (ISO-like)
- * - monthly: 1st 00:00:00 → last day 23:59:59
- * - quarterly: first day of quarter → last day of quarter
- * - yearly:  Jan 1st → Dec 31st
+ * Business day is always Vietnam time (UTC+7), independent of server TZ.
+ * - daily:   today 00:00:00 → today 23:59:59 (VN)
+ * - weekly:  Monday 00:00:00 → Sunday 23:59:59 (ISO-like, VN)
+ * - monthly: 1st 00:00:00 → last day 23:59:59 (VN)
+ * - quarterly: first day of quarter → last day of quarter (VN)
+ * - yearly:  Jan 1st → Dec 31st (VN)
  */
+const VN_UTC_OFFSET_MINUTES = 7 * 60;
+
 const getCurrentCycleDateRange = (frequency, now = new Date()) => {
-  // Use moment() to work with local time
-  const start = moment(now).startOf('day');
+  const start = moment(now).utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day');
 
   // Adjust to cycle start based on frequency
   if (frequency === 'weekly') {
@@ -314,4 +315,5 @@ module.exports = {
   frequencyToText,
   calculateNextDueDate,
   getCurrentCycleDateRange,
+  VN_UTC_OFFSET_MINUTES,
 };

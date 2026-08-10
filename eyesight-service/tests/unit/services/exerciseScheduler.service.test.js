@@ -134,11 +134,15 @@ describe('Exercise Scheduler Service', () => {
   });
 
   describe('scheduleSessionCreation', () => {
-    test('should setup cron job for midnight session creation', () => {
+    test('should setup cron job for midnight session creation in Vietnam timezone', () => {
       exerciseSchedulerService.scheduleSessionCreation();
 
-      expect(cron.schedule).toHaveBeenCalledWith('0 0 * * *', expect.any(Function));
-      expect(logger.info).toHaveBeenCalledWith('📅 Session creation scheduler started - runs daily at midnight (0:00)');
+      expect(cron.schedule).toHaveBeenCalledWith('0 0 * * *', expect.any(Function), {
+        timezone: 'Asia/Ho_Chi_Minh',
+      });
+      expect(logger.info).toHaveBeenCalledWith(
+        'Session creation scheduler started - runs daily at midnight Asia/Ho_Chi_Minh (0:00)'
+      );
     });
   });
 

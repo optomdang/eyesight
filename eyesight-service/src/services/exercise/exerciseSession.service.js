@@ -15,7 +15,7 @@ const {
   computeSessionFocusScore,
 } = require('../dashboard/leaderboardMetrics');
 const { standardQuery } = require('../../utils/patterns');
-const { generateCode } = require('../../utils/common');
+const { generateCode, getCurrentCycleDateRange } = require('../../utils/common');
 const exerciseAssignmentService = require('./exerciseAssignment.service');
 
 /**
@@ -113,9 +113,8 @@ const startExerciseSession = async (assignmentId, userId, deviceInfo = {}) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Bài tập được giao không đang hoạt động');
   }
 
-  // Check if already has session today (1 session per day max)
-  const today = moment().startOf('day').toDate();
-  const todayEnd = moment().endOf('day').toDate();
+  // Check if already has session today (1 session per day max) — VN calendar day
+  const { start: today, end: todayEnd } = getCurrentCycleDateRange('daily', new Date());
 
   const todaySessions = await ExerciseSession.count({
     where: {
@@ -162,8 +161,7 @@ const startExerciseSession = async (assignmentId, userId, deviceInfo = {}) => {
  * Get session progress for assignment (executions within today's session)
  */
 const getSessionProgress = async (assignmentId, date = new Date()) => {
-  const startOfDay = moment(date).startOf('day').toDate();
-  const endOfDay = moment(date).endOf('day').toDate();
+  const { start: startOfDay, end: endOfDay } = getCurrentCycleDateRange('daily', date);
 
   const assignment = await exerciseAssignmentService.getAssignmentById(assignmentId);
   if (!assignment) return null;

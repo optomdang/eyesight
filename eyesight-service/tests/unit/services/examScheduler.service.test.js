@@ -173,11 +173,13 @@ describe('Exam Scheduler Service', () => {
   });
 
   describe('startExamScheduler', () => {
-    test('should start exam scheduler successfully', () => {
+    test('should start exam scheduler at midnight Vietnam timezone', () => {
       examSchedulerService.startExamScheduler();
 
-      expect(cron.schedule).toHaveBeenCalledWith('0 0 * * *', expect.any(Function));
-      expect(logger.info).toHaveBeenCalledWith('📅 Exam scheduler started - runs daily at 00:00 local time');
+      expect(cron.schedule).toHaveBeenCalledWith('0 0 * * *', expect.any(Function), {
+        timezone: 'Asia/Ho_Chi_Minh',
+      });
+      expect(logger.info).toHaveBeenCalledWith('Exam scheduler started - runs daily at 00:00 Asia/Ho_Chi_Minh');
     });
   });
 });

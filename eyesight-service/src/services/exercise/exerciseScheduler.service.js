@@ -14,22 +14,28 @@ const { executeAndLogJob } = require('../system/scheduleHistory.service');
 const { closeStaleIncompleteResults } = require('./exerciseStaleResult.service');
 const { syncSessionSnapshotFromAssignment } = require('./assignmentSessionSync.service');
 
+const VN_CRON_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
 /**
- * Close incomplete results that crossed the day boundary - runs daily at 00:05
+ * Close incomplete results that crossed the day boundary - runs daily at 00:05 VN
  * Business rule: a paused result that crosses midnight is auto-closed with its saved metrics
  * (treated the same as pressing "Kết thúc").
  */
 const scheduleStaleResultCleanup = () => {
-  cron.schedule('5 0 * * *', async () => {
-    await executeAndLogJob('exercise.staleResult.autoClose', async () => {
-      logger.info('Starting stale incomplete result auto-close job');
-      const result = await closeStaleIncompleteResults();
-      logger.info('Stale result cleanup finished', result);
-      return result;
-    });
-  });
+  cron.schedule(
+    '5 0 * * *',
+    async () => {
+      await executeAndLogJob('exercise.staleResult.autoClose', async () => {
+        logger.info('Starting stale incomplete result auto-close job');
+        const result = await closeStaleIncompleteResults();
+        logger.info('Stale result cleanup finished', result);
+        return result;
+      });
+    },
+    { timezone: VN_CRON_TIMEZONE }
+  );
 
-  logger.info('Stale result cleanup scheduler started - runs daily at 00:05');
+  logger.info('Stale result cleanup scheduler started - runs daily at 00:05 Asia/Ho_Chi_Minh');
 };
 
 /**
@@ -74,29 +80,33 @@ const scheduleComplianceCheck = () => {
  * Generates end-of-day summary reports
  */
 const scheduleDailyComplianceSummary = () => {
-  // Run every day at 23:00 local time
-  cron.schedule('0 23 * * *', async () => {
-    try {
-      logger.info('Generating daily compliance summary');
+  // Run every day at 23:00 Vietnam time
+  cron.schedule(
+    '0 23 * * *',
+    async () => {
+      try {
+        logger.info('Generating daily compliance summary');
 
-      const summary = await exerciseComplianceService.getComplianceSummary();
-      const overdueAssignments = await exerciseComplianceService.getOverdueAssignments();
+        const summary = await exerciseComplianceService.getComplianceSummary();
+        const overdueAssignments = await exerciseComplianceService.getOverdueAssignments();
 
-      logger.info('Daily compliance summary', {
-        totalAssignments: summary.totalAssignments,
-        complianceRate: summary.complianceRate,
-        overdueCount: overdueAssignments.length,
-        breakdown: summary.complianceBreakdown,
-      });
-    } catch (error) {
-      logger.error('Failed to generate daily compliance summary', {
-        error: error.message,
-        stack: error.stack,
-      });
-    }
-  });
+        logger.info('Daily compliance summary', {
+          totalAssignments: summary.totalAssignments,
+          complianceRate: summary.complianceRate,
+          overdueCount: overdueAssignments.length,
+          breakdown: summary.complianceBreakdown,
+        });
+      } catch (error) {
+        logger.error('Failed to generate daily compliance summary', {
+          error: error.message,
+          stack: error.stack,
+        });
+      }
+    },
+    { timezone: VN_CRON_TIMEZONE }
+  );
 
-  logger.info('Daily compliance summary scheduler started - runs at 8:00 AM');
+  logger.info('Daily compliance summary scheduler started - runs at 23:00 Asia/Ho_Chi_Minh');
 };
 
 /**
@@ -218,21 +228,24 @@ const createSessionIfNotExists = async (assignment, sessionDate) => {
 };
 
 /**
- * Schedule session creation - runs daily at midnight local time
- * Creates sessions with local timezone for consistent frontend display
+ * Schedule session creation - runs daily at midnight Vietnam time
+ * Creates sessions with VN day anchors so portal shows a fresh day from 00:00.
  */
 const scheduleSessionCreation = () => {
-  // Run at 00:00 local time (server timezone UTC+7)
-  cron.schedule('0 0 * * *', async () => {
-    await executeAndLogJob('exercise.createSessions', async () => {
-      logger.info('Starting daily session creation at midnight local time...');
-      const result = await createScheduledSessions();
-      logger.info('Daily session creation completed', result);
-      return result;
-    });
-  });
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      await executeAndLogJob('exercise.createSessions', async () => {
+        logger.info('Starting daily session creation at midnight Asia/Ho_Chi_Minh...');
+        const result = await createScheduledSessions();
+        logger.info('Daily session creation completed', result);
+        return result;
+      });
+    },
+    { timezone: VN_CRON_TIMEZONE }
+  );
 
-  logger.info('Session creation scheduler started - runs daily at midnight (0:00)');
+  logger.info('Session creation scheduler started - runs daily at midnight Asia/Ho_Chi_Minh (0:00)');
 };
 
 /**
