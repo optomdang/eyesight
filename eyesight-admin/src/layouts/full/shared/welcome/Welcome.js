@@ -39,7 +39,7 @@ const Welcome = () => {
           variant="filled"
           sx={{ width: '100%', color: 'white' }}
         >
-          <AlertTitle>Welcome To D-VisiUp</AlertTitle>
+          <AlertTitle>Welcome To D-VisUp</AlertTitle>
           Easy to customize the Template!!!
         </Alert>
       </Snackbar>
