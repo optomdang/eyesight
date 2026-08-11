@@ -1,3 +1,4 @@
+const moment = require('moment');
 const {
   examSessionCompletionPct,
   exerciseSlotCompletionPct,
@@ -9,6 +10,7 @@ const {
   computeSessionFocusScore,
   resolveInactivityCountOnComplete,
   isExerciseSlotFullyComplete,
+  getCycleRanges,
   COMPLETION_TIME_THRESHOLD_PCT,
 } = require('../../../src/services/dashboard/leaderboardMetrics');
 
@@ -84,6 +86,20 @@ describe('leaderboardMetrics', () => {
         }
       );
       expect(pcts).toEqual([100, 0]);
+    });
+  });
+
+  describe('getCycleRanges', () => {
+    it('không thêm ngày VN tiếp theo khi đồng hồ server là UTC', () => {
+      const from = new Date('2026-08-05T00:00:00+07:00');
+      // 15:06 VN = 08:06 UTC — Render production
+      const nowOnRenderUtc = new Date('2026-08-11T08:06:00.000Z');
+      const days = getCycleRanges('daily', from, nowOnRenderUtc).map((r) =>
+        moment(r.start).utcOffset(7).format('YYYY-MM-DD')
+      );
+      expect(days[0]).toBe('2026-08-05');
+      expect(days[days.length - 1]).toBe('2026-08-11');
+      expect(days).not.toContain('2026-08-12');
     });
   });
 

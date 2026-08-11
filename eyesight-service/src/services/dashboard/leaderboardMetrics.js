@@ -10,7 +10,9 @@
  */
 
 const moment = require('moment');
-const { getCurrentCycleDateRange } = require('../../utils/common');
+const { getCurrentCycleDateRange, VN_UTC_OFFSET_MINUTES } = require('../../utils/common');
+
+const vnMoment = (value) => moment(value).utcOffset(VN_UTC_OFFSET_MINUTES);
 
 /** Ngưỡng thời gian coi lượt tập là "hoàn thành" (dùng cho session stats, không ép cột BXH = 100). */
 const COMPLETION_TIME_THRESHOLD_PCT = 80;
@@ -30,13 +32,13 @@ const getCycleRanges = (frequency, fromDate, toDate = new Date()) => {
 
   const ranges = [];
   const seen = new Set();
-  let probe = moment(fromDate).toDate();
-  const limit = moment(toDate).endOf('day');
+  let probe = vnMoment(fromDate).toDate();
+  const limit = vnMoment(toDate).endOf('day');
 
-  while (moment(probe).isSameOrBefore(limit)) {
+  while (vnMoment(probe).isSameOrBefore(limit)) {
     const { start, end } = getCurrentCycleDateRange(frequency, probe);
     const key = start.toISOString();
-    if (!seen.has(key) && moment(start).isSameOrBefore(limit)) {
+    if (!seen.has(key) && vnMoment(start).isSameOrBefore(limit)) {
       seen.add(key);
       ranges.push({ start, end });
     }
@@ -163,10 +165,10 @@ const findExamSessionInCycle = (examSessions, patientId, examType, cycleStart, c
 const getCycleRangesInWindow = (frequency, fromDate, windowStart, windowEnd) => {
   if (!fromDate || !frequency || !windowStart || !windowEnd) return [];
 
-  const effectiveStart = moment.max(moment(fromDate), moment(windowStart)).toDate();
-  const effectiveEnd = moment.min(moment(windowEnd), moment()).endOf('day').toDate();
+  const effectiveStart = moment.max(vnMoment(fromDate), vnMoment(windowStart)).toDate();
+  const effectiveEnd = moment.min(vnMoment(windowEnd), vnMoment()).endOf('day').toDate();
 
-  if (moment(effectiveStart).isAfter(effectiveEnd)) return [];
+  if (vnMoment(effectiveStart).isAfter(effectiveEnd)) return [];
 
   return getCycleRanges(frequency, effectiveStart, effectiveEnd);
 };
