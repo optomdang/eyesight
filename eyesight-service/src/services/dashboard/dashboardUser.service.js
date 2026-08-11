@@ -21,6 +21,7 @@ const {
   computePatientCompletionPct,
   computePatientFocusPct,
   computeCenterCombinedCompletionRate,
+  groupExerciseResultsBySessionId,
 } = require('./leaderboardMetrics');
 
 // Far vision level → Snellen denominator lookup (mirrors frontend constant.ts)
@@ -411,14 +412,7 @@ const getCompletionStats = async (centerId, doctorId = null) => {
     if (!examResultBySessionId[r.examSessionId]) examResultBySessionId[r.examSessionId] = r;
   });
 
-  const exerciseResultsBySessionId = {};
-  exerciseResults.forEach((r) => {
-    if (!r.exerciseSessionId) return;
-    if (!exerciseResultsBySessionId[r.exerciseSessionId]) {
-      exerciseResultsBySessionId[r.exerciseSessionId] = [];
-    }
-    exerciseResultsBySessionId[r.exerciseSessionId].push(r);
-  });
+  const exerciseResultsBySessionId = groupExerciseResultsBySessionId(exerciseResults);
 
   const assignmentRows = exerciseAssignments.map((a) => ({
     id: a.id,
@@ -560,12 +554,7 @@ const getLeaderboard = async (centerId, doctorId = null) => {
       }
     });
 
-    const exResultsBySessionId = {};
-    (exResultsByPatient[p.id] || []).forEach((r) => {
-      if (!r.exerciseSessionId) return;
-      if (!exResultsBySessionId[r.exerciseSessionId]) exResultsBySessionId[r.exerciseSessionId] = [];
-      exResultsBySessionId[r.exerciseSessionId].push(r);
-    });
+    const exResultsBySessionId = groupExerciseResultsBySessionId(exResultsByPatient[p.id] || []);
 
     const completionRate = round2(
       computePatientCompletionPct({
@@ -710,14 +699,7 @@ const getPatientOverallCompletionPct = async (patientId) => {
     }
   });
 
-  const exerciseResultsBySessionId = {};
-  exerciseResults.forEach((r) => {
-    if (!r.exerciseSessionId) return;
-    if (!exerciseResultsBySessionId[r.exerciseSessionId]) {
-      exerciseResultsBySessionId[r.exerciseSessionId] = [];
-    }
-    exerciseResultsBySessionId[r.exerciseSessionId].push(r);
-  });
+  const exerciseResultsBySessionId = groupExerciseResultsBySessionId(exerciseResults);
 
   const mappedAssignments = exerciseAssignments.map((a) => ({
     id: a.id,

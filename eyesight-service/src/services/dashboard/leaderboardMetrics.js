@@ -124,18 +124,28 @@ const pickTopExerciseSlotScores = (session, results, slotCount) => {
   return top;
 };
 
+const resultsForSession = (byId, sessionId) => {
+  if (!byId) return [];
+  if (byId[sessionId]?.length) return byId[sessionId];
+  const n = Number(sessionId);
+  if (Number.isFinite(n) && byId[n]?.length) return byId[n];
+  const s = String(sessionId);
+  if (byId[s]?.length) return byId[s];
+  return [];
+};
+
 const exerciseSessionSlotPcts = (session, exerciseResultsBySessionId) => {
   const assigned = Math.max(0, parseInt(session?.executionCount, 10) || 0);
   if (assigned === 0) return [];
 
-  const results = exerciseResultsBySessionId[session.id] || [];
+  const results = resultsForSession(exerciseResultsBySessionId, session.id);
   return pickTopExerciseSlotScores(session, results, assigned).map((row) => row.pct);
 };
 
 const findExerciseSessionInCycle = (exerciseSessions, assignmentId, cycleStart, cycleEnd) =>
   exerciseSessions.find(
     (s) =>
-      s.exerciseAssignmentId === assignmentId &&
+      Number(s.exerciseAssignmentId) === Number(assignmentId) &&
       isInCycle(s.startedAt, cycleStart, cycleEnd)
   );
 
@@ -224,7 +234,7 @@ const computeCenterExerciseStats = ({
 
       if (!session) return;
 
-      const results = exerciseResultsBySessionId[session.id] || [];
+      const results = resultsForSession(exerciseResultsBySessionId, session.id);
       const topSlots = pickTopExerciseSlotScores(session, results, cycleExecCount);
       topSlots.forEach((slot) => {
         const r = slot.result;
@@ -469,9 +479,9 @@ const computePatientCompletionPctLegacy = ({
 };
 
 /**
- * TB % hoàn thành (#8) — trung bình mọi lượt giao, kể cả hôm nay (chưa làm = 0%).
- * Mỗi buổi tập lấy N lần % thời gian cao nhất (làm lại đủ thay lần dở).
- * Ngày bác sĩ/admin duyệt hoàn thành tính 100% cho chu kỳ đó.
+ * LOCKED — công thức % hoàn thành tổng (BXH + lịch cam kết):
+ *   top-N lần % thời gian cao nhất mỗi buổi + hôm nay chưa làm = 0% (vẫn cộng vào TB).
+ * Không skip ngày đang mở. Không lấy N lần đầu theo createdAt.
  */
 const computePatientCompletionPct = ({
   examAssignments = [],
@@ -613,6 +623,17 @@ const resolveInactivityCountOnComplete = (result, { movesCount, durationSec = 0 
   return Math.max(inactivityCount, minimumIdleEvents);
 };
 
+const groupExerciseResultsBySessionId = (rows) => {
+  const byId = {};
+  (rows || []).forEach((r) => {
+    const sid = Number(r?.exerciseSessionId);
+    if (!Number.isFinite(sid)) return;
+    if (!byId[sid]) byId[sid] = [];
+    byId[sid].push(r);
+  });
+  return byId;
+};
+
 const focusScoreFromCounts = (pauseCount, inactivityCount) =>
   Math.max(0, 100 - (pauseCount ?? 0) - (inactivityCount ?? 0));
 
@@ -630,6 +651,7 @@ module.exports = {
   isExerciseSlotFullyComplete,
   exerciseSessionSlotPcts,
   pickTopExerciseSlotScores,
+  groupExerciseResultsBySessionId,
   computePatientCompletionPct,
   computeCenterExerciseStats,
   computeCenterExamComplianceRate,

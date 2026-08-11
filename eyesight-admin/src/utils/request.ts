@@ -147,8 +147,8 @@ async function requestWithAuth<T>(
 }
 
 // Data cho GET
-async function getData<T>(url: string): Promise<T> {
-  return requestWithAuth<T>(url, { method: 'GET' });
+async function getData<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  return requestWithAuth<T>(url, { method: 'GET', ...config });
 }
 
 async function getDataTable<T>(url: string): Promise<PaginatedResponse<T>> {

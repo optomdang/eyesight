@@ -187,6 +187,11 @@ const DiligenceCalendar: React.FC<DiligenceCalendarProps> = ({
             {overallPct != null ? `${overallPct}%` : loading ? '…' : '—'}
           </LabelWithHelp>
         </Typography>
+        {data?.overallCompletionPct != null && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            {data.overallCompletionPct.toFixed(1)}% · {data.completionFormula || 'top-n'}
+          </Typography>
+        )}
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>

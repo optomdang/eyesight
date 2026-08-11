@@ -146,12 +146,15 @@ export const getPatientDiligenceCalendar = (
   month: string
 ): Promise<DiligenceCalendarResponse> =>
   getData<DiligenceCalendarResponse>(
-    `patients/${patientId}/diligence-calendar?month=${encodeURIComponent(month)}`
+    `patients/${patientId}/diligence-calendar?month=${encodeURIComponent(month)}`,
+    { timeout: 30000 }
   );
 
 /** GET /me/diligence-calendar?month=YYYY-MM — patient portal (own calendar) */
 export const getMyDiligenceCalendar = (month: string): Promise<DiligenceCalendarResponse> =>
-  getData<DiligenceCalendarResponse>(`me/diligence-calendar?month=${encodeURIComponent(month)}`);
+  getData<DiligenceCalendarResponse>(`me/diligence-calendar?month=${encodeURIComponent(month)}`, {
+    timeout: 30000,
+  });
 
 /** PUT /patients/:patientId/diligence-calendar/:date — mark day complete */
 export const overridePatientDiligenceDay = (
