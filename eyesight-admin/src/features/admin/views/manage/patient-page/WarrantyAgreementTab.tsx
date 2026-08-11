@@ -113,13 +113,18 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
     }
   }, [selectedPhase]);
 
+  const isAdmin = user?.userType === 'admin';
   const isPhaseImmutable = selectedPhase?.status === 'completed';
   const canDoctorSign = selectedPhase?.status === 'awaiting_doctor';
   // Doctor enters clinical data BEFORE sending link to guardian (awaiting_guardian / draft)
   // After guardian signs (awaiting_doctor), data is locked — backend also enforces this
+  // Admin may amend clinical data on completed phases without re-signing
   const canEditClinical = Boolean(
-    selectedPhase && !['completed', 'awaiting_doctor'].includes(selectedPhase.status)
+    selectedPhase &&
+      (['draft', 'awaiting_guardian'].includes(selectedPhase.status) ||
+        (isAdmin && selectedPhase.status === 'completed'))
   );
+  const isAdminAmendCompleted = Boolean(isAdmin && selectedPhase?.status === 'completed');
 
   const reexamEarly = useMemo(
     () => (agreement ? isReexamWithinSixMonths(agreement.phases ?? []) : false),
@@ -230,7 +235,7 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
   };
 
   const handleSaveClinical = async () => {
-    if (!agreement || !selectedPhase || !clinicalDraft || isPhaseImmutable) return;
+    if (!agreement || !selectedPhase || !clinicalDraft || !canEditClinical) return;
 
     if (
       selectedPhase.phaseType === 'reexam' &&
@@ -239,6 +244,16 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
     ) {
       showSnackbar('Vui lòng nhập lý do tái khám sớm (< 6 tháng).', SNACKBAR_SEVERITY.WARNING);
       return;
+    }
+
+    if (isAdminAmendCompleted) {
+      const ok = await confirm({
+        title: 'Sửa dữ liệu sau khi đã ký',
+        message:
+          'Chữ ký phụ huynh và bác sĩ sẽ được giữ nguyên. PDF cam kết sẽ phản ánh dữ liệu lâm sàng mới. Tiếp tục lưu?',
+        confirmText: 'Lưu',
+      });
+      if (!ok) return;
     }
 
     setActionLoading(true);
@@ -251,10 +266,18 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
       setSelectedPhase(updated);
       setClinicalDraft(updated.clinicalData);
       setClinicalDirty(false);
-      showSnackbar('Đã lưu dữ liệu lâm sàng.', SNACKBAR_SEVERITY.SUCCESS);
+      showSnackbar(
+        isAdminAmendCompleted
+          ? 'Đã cập nhật dữ liệu lâm sàng (giữ nguyên chữ ký).'
+          : 'Đã lưu dữ liệu lâm sàng.',
+        SNACKBAR_SEVERITY.SUCCESS
+      );
     } catch (error) {
       console.error('Save clinical data failed:', error);
-      showSnackbar('Không lưu được dữ liệu lâm sàng.', SNACKBAR_SEVERITY.ERROR);
+      showSnackbar(
+        getErrorMessage(error, 'Không lưu được dữ liệu lâm sàng.'),
+        SNACKBAR_SEVERITY.ERROR
+      );
     } finally {
       setActionLoading(false);
     }
@@ -443,7 +466,7 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                   )}
                 </Box>
 
-                {canEditClinical && (
+                {canEditClinical && !isAdminAmendCompleted && (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                       Bước 1: Nhập kết quả khám (cột Ban đầu) và nhận xét bác sĩ bên dưới → Lưu
@@ -469,6 +492,13 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                         Tạo link ký cho phụ huynh
                       </Button>
                     </Box>
+                  </Alert>
+                )}
+
+                {isAdminAmendCompleted && (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    Giai đoạn đã ký xong. Admin có thể bổ sung/sửa dữ liệu lâm sàng — chữ ký phụ
+                    huynh và bác sĩ được giữ nguyên; PDF sẽ phản ánh dữ liệu mới.
                   </Alert>
                 )}
 
@@ -532,8 +562,10 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
                 )}
 
                 {isPhaseImmutable && (
-                  <Alert severity="success" sx={{ mt: 2 }}>
-                    Giai đoạn đã hoàn tất — không thể chỉnh sửa.
+                  <Alert severity={canEditClinical ? 'info' : 'success'} sx={{ mt: 2 }}>
+                    {canEditClinical
+                      ? 'Giai đoạn đã hoàn tất — chữ ký giữ nguyên.'
+                      : 'Giai đoạn đã hoàn tất — không thể chỉnh sửa.'}
                     {(selectedPhase.guardianSignature || selectedPhase.doctorSignature) && (
                       <Stack spacing={1.5} sx={{ mt: 1.5 }}>
                         {selectedPhase.guardianSignature && (

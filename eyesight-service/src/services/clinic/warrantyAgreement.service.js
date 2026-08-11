@@ -347,23 +347,49 @@ const updatePhaseClinicalData = async (agreementId, phaseId, body, user, request
   if (!phase) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Giai đoạn không tồn tại');
   }
-  if (phase.status === PHASE_STATUSES.COMPLETED) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Giai đoạn đã hoàn tất, không thể chỉnh sửa');
-  }
   if (phase.status === PHASE_STATUSES.AWAITING_DOCTOR) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Không thể cập nhật dữ liệu khi đang chờ bác sĩ ký');
   }
 
-  await phase.update({
-    clinicalData: body.clinicalData,
-  });
+  const isAdminAmendCompleted =
+    phase.status === PHASE_STATUSES.COMPLETED && user.userType === 'admin';
+  if (phase.status === PHASE_STATUSES.COMPLETED && !isAdminAmendCompleted) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Giai đoạn đã hoàn tất, không thể chỉnh sửa');
+  }
+
+  const previousClinicalData = phase.clinicalData;
+  const updates = { clinicalData: body.clinicalData };
+
+  // Admin may fill/correct clinical data after both parties signed without re-signing.
+  // Keep signatures; recompute documentHash so PDF/hash stay consistent with clinical data.
+  if (isAdminAmendCompleted) {
+    const phaseJson = {
+      ...phase.toJSON(),
+      clinicalData: body.clinicalData,
+    };
+    updates.documentHash = computeDocumentHash(buildDocumentSnapshot(phaseJson, agreement));
+  }
+
+  await phase.update(updates);
 
   await logWarrantyAudit({
     user,
-    action: 'warrantyAgreement.phase.updateClinicalData',
+    action: isAdminAmendCompleted
+      ? 'warrantyAgreement.phase.adminAmendClinicalData'
+      : 'warrantyAgreement.phase.updateClinicalData',
     entityId: agreement.id,
     centerId: agreement.centerId,
-    metadata: { patientId: agreement.patientId, phaseId: phase.id },
+    metadata: {
+      patientId: agreement.patientId,
+      phaseId: phase.id,
+      ...(isAdminAmendCompleted
+        ? {
+            previousClinicalData,
+            signaturesPreserved: true,
+            documentHashUpdated: true,
+          }
+        : {}),
+    },
     requestContext,
   });
 
