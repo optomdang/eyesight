@@ -195,6 +195,46 @@ describe('leaderboardMetrics', () => {
       // Ngày 29 = 50%, ngày 30 override = 100% → TB = 75
       expect(pct).toBeCloseTo(75, 1);
     });
+
+    it('chu kỳ hôm nay chưa tập thì không kéo % tổng xuống', () => {
+      const assignedAt = new Date('2026-06-29T08:00:00+07:00');
+      const now = new Date('2026-06-30T12:00:00+07:00');
+      const pct = computePatientCompletionPct({
+        exerciseAssignments: [
+          {
+            id: 1,
+            assignedAt,
+            frequency: 'daily',
+            executionCount: 2,
+          },
+        ],
+        exerciseSessions: [
+          {
+            id: 10,
+            exerciseAssignmentId: 1,
+            executionCount: 2,
+            executionDuration: 10,
+            startedAt: new Date('2026-06-29T00:00:00+07:00'),
+          },
+          {
+            id: 11,
+            exerciseAssignmentId: 1,
+            executionCount: 2,
+            executionDuration: 10,
+            startedAt: new Date('2026-06-30T00:00:00+07:00'),
+          },
+        ],
+        exerciseResultsBySessionId: {
+          10: [
+            { status: 'completed', duration: 600 },
+            { status: 'completed', duration: 600 },
+          ],
+          11: [],
+        },
+        now,
+      });
+      expect(pct).toBe(100);
+    });
   });
 
   describe('computeCenterExerciseStats', () => {

@@ -468,10 +468,15 @@ const computePatientCompletionPctLegacy = ({
   return unitPcts.reduce((a, b) => a + b, 0) / unitPcts.length;
 };
 
+/** Chu kỳ chưa kết thúc và chưa có % nào > 0 — chưa tính vào tổng (tránh phiên trống hôm nay kéo %). */
+const shouldSkipOpenEmptyCycle = (cycleEnd, now, pcts) =>
+  moment(now).isBefore(cycleEnd) && (pcts || []).every((p) => !p);
+
 /**
  * TB % hoàn thành (#8) — gồm chu kỳ không làm (0%).
  * Ngày bác sĩ/admin duyệt hoàn thành (diligenceDayOverrides) tính 100% cho chu kỳ đó;
  * các ngày khác giữ % thực tế.
+ * Chu kỳ đang mở (vd. hôm nay) mà chưa tập/test thì bỏ qua, không tính 0%.
  */
 const computePatientCompletionPct = ({
   examAssignments = [],
@@ -508,12 +513,11 @@ const computePatientCompletionPct = ({
         return;
       }
       const session = findExamSessionInCycleLegacy(typeSessions, config.examType, start, end);
-      if (!session) {
-        unitPcts.push(0);
-        return;
-      }
-      const result = examResultBySessionId[session.id] || null;
-      unitPcts.push(examSessionCompletionPct(result, config.examType));
+      const pct = session
+        ? examSessionCompletionPct(examResultBySessionId[session.id] || null, config.examType)
+        : 0;
+      if (shouldSkipOpenEmptyCycle(end, now, [pct])) return;
+      unitPcts.push(pct);
     });
   });
 
@@ -539,16 +543,17 @@ const computePatientCompletionPct = ({
         return;
       }
       const session = findExerciseSessionInCycle(assignmentSessions, assignment.id, start, end);
+      let slotPcts;
       if (!session) {
-        for (let i = 0; i < defaultExecutionCount; i += 1) unitPcts.push(0);
-        return;
-      }
-      const slotPcts = exerciseSessionSlotPcts(session, exerciseResultsBySessionId);
-      if (slotPcts.length === 0) {
-        for (let i = 0; i < defaultExecutionCount; i += 1) unitPcts.push(0);
+        slotPcts = Array.from({ length: defaultExecutionCount }, () => 0);
       } else {
-        unitPcts.push(...slotPcts);
+        slotPcts = exerciseSessionSlotPcts(session, exerciseResultsBySessionId);
+        if (slotPcts.length === 0) {
+          slotPcts = Array.from({ length: defaultExecutionCount }, () => 0);
+        }
       }
+      if (shouldSkipOpenEmptyCycle(end, now, slotPcts)) return;
+      unitPcts.push(...slotPcts);
     });
   });
 
