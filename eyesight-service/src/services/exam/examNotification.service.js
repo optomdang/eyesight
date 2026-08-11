@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const cron = require('node-cron');
 const moment = require('moment');
+const { vnMoment } = require('../../utils/common');
 const { ExamAssignment, Patient, ExamSession, Notification } = require('../../models');
 const { notificationTemplateService, emailService, zaloService } = require('../index');
 const logger = require('../../config/logger');
@@ -24,8 +25,8 @@ const frequencyNames = {
  * @param {string} examType - Exam type to filter by (optional)
  */
 const getExamSessionsDueForNotification = async (centerId, examType) => {
-  const today = moment().startOf('day').toDate();
-  const tomorrow = moment().add(1, 'day').startOf('day').toDate();
+  const today = vnMoment().startOf('day').toDate();
+  const tomorrow = vnMoment().add(1, 'day').startOf('day').toDate();
 
   // Build where clause
   const whereSession = {

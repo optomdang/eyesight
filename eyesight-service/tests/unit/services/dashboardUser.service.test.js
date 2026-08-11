@@ -89,7 +89,7 @@ describe('Dashboard User Service - getPatientStatistics', () => {
     // The activity trend (#6) is a raw SQL query over completed results, scoped by centerId.
     const trendQuery = queryMock.mock.calls.map((c) => c[0]).find((s) => s.includes('COUNT(DISTINCT "patientId")'));
     expect(trendQuery).toBeDefined();
-    expect(trendQuery).toContain("AT TIME ZONE 'UTC'");
+    expect(trendQuery).toContain("AT TIME ZONE 'Asia/Ho_Chi_Minh'");
   });
 
   it('#7 leaderboard ranks Hoàn thành → Tập trung → Cải thiện, capped at 10', async () => {
@@ -223,9 +223,10 @@ describe('getUserActivityTrend (SQL group-by + gap-fill)', () => {
     expect(opts.replacements.doctorId).toBe(42);
   });
 
-  it('gap-fill ends on today (UTC) and maps SQL day keys correctly', async () => {
+  it('gap-fill ends on today (Vietnam) and maps SQL day keys correctly', async () => {
     const now = new Date();
-    const todayKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+    const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const todayKey = `${vn.getUTCFullYear()}-${String(vn.getUTCMonth() + 1).padStart(2, '0')}-${String(vn.getUTCDate()).padStart(2, '0')}`;
 
     jest.spyOn(sequelize, 'query').mockResolvedValue([{ date: todayKey, count: 2 }]);
 

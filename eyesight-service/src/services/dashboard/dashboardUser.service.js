@@ -23,6 +23,7 @@ const {
   computeCenterCombinedCompletionRate,
   groupExerciseResultsBySessionId,
 } = require('./leaderboardMetrics');
+const { vnMoment } = require('../../utils/common');
 
 // Far vision level → Snellen denominator lookup (mirrors frontend constant.ts)
 const FAR_VISION_DENOMINATORS = {
@@ -95,24 +96,14 @@ const getTotalPatientsStats = async (centerId, doctorId = null) => {
 const round2 = (n) => parseFloat(n.toFixed(2));
 const round1 = (n) => parseFloat(n.toFixed(1));
 
-/** YYYY-MM-DD theo UTC — khớp DATE(col AT TIME ZONE 'UTC') trong SQL. */
-const toUtcDateKey = (date) => {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(date.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
+/** YYYY-MM-DD theo ngày lâm sàng VN. */
+const toVnDateKey = (date) => vnMoment(date).format('YYYY-MM-DD');
 
-/** Khoảng [start, end] UTC đủ totalDays ngày, kết thúc hôm nay (UTC). */
-const buildUtcTrendWindow = (totalDays) => {
-  const now = new Date();
-  const endDate = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)
-  );
-  const startDate = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (totalDays - 1), 0, 0, 0, 0)
-  );
-  return { startDate, endDate };
+/** Khoảng [start, end] đủ totalDays ngày VN, kết thúc hôm nay (VN). */
+const buildVnTrendWindow = (totalDays) => {
+  const end = vnMoment().endOf('day');
+  const start = vnMoment().startOf('day').subtract(totalDays - 1, 'day');
+  return { startDate: start.toDate(), endDate: end.toDate() };
 };
 
 /**
@@ -246,7 +237,7 @@ const getInactivePatients = async (centerId, inactiveDays = 7, options = {}) => 
  */
 const getUserActivityTrend = async (centerId, days = 30, doctorId = null) => {
   const totalDays = Math.max(1, parseInt(days, 10) || 30);
-  const { startDate, endDate } = buildUtcTrendWindow(totalDays);
+  const { startDate, endDate } = buildVnTrendWindow(totalDays);
 
   const doctorEx = doctorId ? 'AND er."patientId" IN (SELECT id FROM "Patients" WHERE "doctorId" = :doctorId)' : '';
   const doctorExam = doctorId ? 'AND ex."patientId" IN (SELECT id FROM "Patients" WHERE "doctorId" = :doctorId)' : '';
@@ -254,12 +245,12 @@ const getUserActivityTrend = async (centerId, days = 30, doctorId = null) => {
   const rows = await sequelize.query(
     `SELECT TO_CHAR(d, 'YYYY-MM-DD') AS date, COUNT(DISTINCT "patientId")::int AS count
        FROM (
-         SELECT DATE(COALESCE(er."startedAt", er."createdAt") AT TIME ZONE 'UTC') AS d, er."patientId"
+         SELECT DATE((COALESCE(er."startedAt", er."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, er."patientId"
            FROM "ExerciseResults" er
           WHERE er."centerId" = :centerId AND er.deleted = false
             AND COALESCE(er."startedAt", er."createdAt") BETWEEN :startDate AND :endDate ${doctorEx}
          UNION ALL
-         SELECT DATE(COALESCE(ex."startedAt", ex."createdAt") AT TIME ZONE 'UTC') AS d, ex."patientId"
+         SELECT DATE((COALESCE(ex."startedAt", ex."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, ex."patientId"
            FROM "ExamResults" ex
           WHERE ex."centerId" = :centerId AND ex.deleted = false
             AND COALESCE(ex."startedAt", ex."createdAt") BETWEEN :startDate AND :endDate ${doctorExam}
@@ -280,9 +271,7 @@ const getUserActivityTrend = async (centerId, days = 30, doctorId = null) => {
   // Fill in missing dates with 0. Key `loginCount` giữ nguyên cho FE tương thích (P8 sẽ đổi tên thành activePatients).
   const trend = [];
   for (let i = 0; i < totalDays; i += 1) {
-    const date = new Date(startDate);
-    date.setUTCDate(startDate.getUTCDate() + i);
-    const dateStr = toUtcDateKey(date);
+    const dateStr = toVnDateKey(vnMoment(startDate).add(i, 'day'));
     trend.push({
       date: dateStr,
       loginCount: byDate[dateStr] || 0,

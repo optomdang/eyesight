@@ -129,7 +129,7 @@ const calculateEndDate = (startDate, frequency) => {
 };
 
 const calculateStartDate = (config, currentDate = new Date()) => {
-  const start = moment(currentDate).startOf('day');
+  const start = vnMoment(currentDate).startOf('day');
 
   if (config.frequencyUnit === 'week') {
     start.startOf('week'); // Sunday as start
@@ -150,7 +150,7 @@ const calculateStartDate = (config, currentDate = new Date()) => {
  */
 const calculateNextStartDate = (currentEndDate, frequency) => {
   const baseDate = currentEndDate || new Date();
-  const nextDay = moment(baseDate).add(1, 'day').startOf('day');
+  const nextDay = vnMoment(baseDate).add(1, 'day').startOf('day');
 
   // Adjust to cycle start based on frequency
   if (frequency === 'weekly') {
@@ -269,9 +269,13 @@ const calculateNextDueDate = (lastDate, frequency) => {
  * - yearly:  Jan 1st → Dec 31st (VN)
  */
 const VN_UTC_OFFSET_MINUTES = 7 * 60;
+const VN_TZ = 'Asia/Ho_Chi_Minh';
+
+/** Clinic calendar clock — always Vietnam, never server TZ or the user's login location. */
+const vnMoment = (value) => moment(value).utcOffset(VN_UTC_OFFSET_MINUTES);
 
 const getCurrentCycleDateRange = (frequency, now = new Date()) => {
-  const start = moment(now).utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day');
+  const start = vnMoment(now).startOf('day');
 
   // Adjust to cycle start based on frequency
   if (frequency === 'weekly') {
@@ -316,4 +320,6 @@ module.exports = {
   calculateNextDueDate,
   getCurrentCycleDateRange,
   VN_UTC_OFFSET_MINUTES,
+  VN_TZ,
+  vnMoment,
 };

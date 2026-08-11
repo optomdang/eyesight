@@ -10,9 +10,7 @@
  */
 
 const moment = require('moment');
-const { getCurrentCycleDateRange, VN_UTC_OFFSET_MINUTES } = require('../../utils/common');
-
-const vnMoment = (value) => moment(value).utcOffset(VN_UTC_OFFSET_MINUTES);
+const { getCurrentCycleDateRange, vnMoment } = require('../../utils/common');
 
 /** Ngưỡng thời gian coi lượt tập là "hoàn thành" (dùng cho session stats, không ép cột BXH = 100). */
 const COMPLETION_TIME_THRESHOLD_PCT = 80;
@@ -446,8 +444,8 @@ const findExamSessionInCycleLegacy = (examSessions, examType, cycleStart, cycleE
  */
 const isCycleDiligenceOverrideComplete = (cycleStart, cycleEnd, diligenceDayOverrides) => {
   if (!diligenceDayOverrides || typeof diligenceDayOverrides !== 'object') return false;
-  const cursor = moment(cycleStart).startOf('day');
-  const end = moment(cycleEnd).startOf('day');
+  const cursor = vnMoment(cycleStart).startOf('day');
+  const end = vnMoment(cycleEnd).startOf('day');
   let guard = 0;
   while (cursor.isSameOrBefore(end, 'day') && guard < 400) {
     const key = cursor.format('YYYY-MM-DD');
