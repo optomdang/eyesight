@@ -157,7 +157,7 @@ Patient.init(
       allowNull: true,
       defaultValue: {},
       comment:
-        'Doctor/admin overrides for daily diligence calendar keyed by YYYY-MM-DD',
+        'Admin overrides for daily diligence calendar keyed by YYYY-MM-DD',
     },
     updatedBy: { type: DataTypes.INTEGER },
     deletedAt: { type: DataTypes.DATE },

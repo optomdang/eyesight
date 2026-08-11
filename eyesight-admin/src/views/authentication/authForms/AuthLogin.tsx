@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'src/hooks/useTranslation';
-import { Box, Typography, FormGroup, FormControlLabel, Button, Stack, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  FormGroup,
+  FormControlLabel,
+  Button,
+  Stack,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -13,12 +22,14 @@ import { loginSchema, type LoginFormData } from 'src/validations';
 import useMounted from 'src/contexts/authGuard/useMounted';
 import useAuth from 'src/contexts/authGuard/useAuth';
 import { getRememberMePreference } from 'src/utils/Jwt';
+import { ensureApiReady } from 'src/utils/wakeApi';
 
 const AuthLogin = ({ title }: loginType) => {
   const { t } = useTranslation();
   const mounted = useMounted();
   const { login } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(getRememberMePreference);
 
   const {
@@ -36,12 +47,22 @@ const AuthLogin = ({ title }: loginType) => {
   const onSubmit = async (values: LoginFormData) => {
     try {
       setSubmitError(null);
+      setStatusText('Đang kết nối máy chủ...');
+      const ready = await ensureApiReady();
+      if (!ready) {
+        throw new Error(
+          'Máy chủ đang khởi động chậm. Đợi khoảng 30 giây rồi thử lại (gói Render miễn phí ngủ khi không dùng).'
+        );
+      }
+      setStatusText('Đang đăng nhập...');
       await login(values.email, values.password, rememberMe);
     } catch (err: Error | unknown) {
       if (mounted.current) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
         setSubmitError(errorMessage);
       }
+    } finally {
+      if (mounted.current) setStatusText(null);
     }
   };
 
@@ -55,6 +76,11 @@ const AuthLogin = ({ title }: loginType) => {
       {submitError && (
         <Box mt={2}>
           <Alert severity="error">{submitError}</Alert>
+        </Box>
+      )}
+      {statusText && !submitError && (
+        <Box mt={2}>
+          <Alert severity="info">{statusText}</Alert>
         </Box>
       )}
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -127,8 +153,9 @@ const AuthLogin = ({ title }: loginType) => {
             fullWidth
             type="submit"
             disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : null}
           >
-            Sign In
+            {isSubmitting ? statusText || 'Đang đăng nhập...' : 'Sign In'}
           </Button>
         </Box>
       </form>

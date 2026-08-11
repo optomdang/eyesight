@@ -421,7 +421,7 @@ const WarrantyAgreementTab: React.FC<WarrantyAgreementTabProps> = ({ patient }) 
 
             <DiligenceCalendar
               patientId={patientId}
-              canEdit={user?.userType === 'admin' || user?.userType === 'doctor'}
+              canEdit={user?.userType === 'admin'}
             />
 
             {reexamEarly && (

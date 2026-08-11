@@ -13,7 +13,7 @@ const isUserActive = (user) => user?.active === true;
 const loginUserWithEmailAndPassword = async (email, password, requestContext = {}) => {
   const user = await userService.getUserByEmail(email);
   if (!user || !(await user.isPasswordMatch(password))) {
-    await auditLogService.logAuthEvent({
+    void auditLogService.logAuthEvent({
       user,
       email,
       status: 'failed',
@@ -29,11 +29,9 @@ const loginUserWithEmailAndPassword = async (email, password, requestContext = {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'Tài khoản đã bị khóa hoặc không hoạt động');
   }
 
-  // Update lastLoginAt timestamp
   const loginTime = new Date();
-  await user.update({ lastLoginAt: loginTime });
-
-  await auditLogService.logAuthEvent({
+  void user.update({ lastLoginAt: loginTime });
+  void auditLogService.logAuthEvent({
     user,
     email,
     status: 'success',

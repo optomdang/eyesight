@@ -7,7 +7,7 @@
  * - none: no login and no activity
  *
  * Weekly/monthly/quarterly exams do NOT affect day color.
- * Doctor/admin override to complete also completes that day's daily sessions (option B).
+ * Admin override to complete also completes that day's daily sessions (option B).
  */
 
 const httpStatus = require('http-status');
@@ -313,8 +313,8 @@ const overrideDayComplete = async (patientId, dateKey, { reason, actor }) => {
   const day = parseDateKey(dateKey);
   const patient = await assertPatientAccess(patientId, actor);
 
-  if (!['admin', 'doctor'].includes(actor?.userType)) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Chỉ admin hoặc bác sĩ được chỉnh sửa ngày tuân thủ');
+  if (actor?.userType !== 'admin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Chỉ admin được chỉnh sửa ngày tuân thủ');
   }
 
   const dayStart = day.clone().startOf('day').toDate();
@@ -430,7 +430,7 @@ const overrideDayComplete = async (patientId, dateKey, { reason, actor }) => {
       ...(patient.diligenceDayOverrides || {}),
       [dateStr]: {
         status: 'complete',
-        reason: reason || 'Admin/bác sĩ xác nhận hoàn thành (lỗi hệ thống / ngoại lệ)',
+        reason: reason || 'Admin xác nhận hoàn thành (lỗi hệ thống / ngoại lệ)',
         overriddenBy: actor.id,
         overriddenAt: now.toISOString(),
       },

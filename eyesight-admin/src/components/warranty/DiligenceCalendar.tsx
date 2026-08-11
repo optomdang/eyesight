@@ -1,7 +1,7 @@
 /**
  * Monthly diligence calendar for Warranty Agreement tab.
  * Blue = complete day, yellow = partial, gray = none.
- * Admin/doctor can override a day to complete.
+ * Admin can override a day to complete.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -36,7 +36,7 @@ const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const OVERALL_COMPLETION_HELP =
   'Tỷ lệ hoàn thành tổng của bệnh nhân (cùng công thức BXH): trung bình % hoàn thành các buổi test và lượt tập theo chu kỳ được giao. ' +
   'Mỗi bài lấy đúng số lần được giao, ưu tiên các lần có % thời gian cao nhất (làm lại đủ sẽ thay lần dở). ' +
-  'Kể cả hôm nay: lượt chưa làm tính 0%. Ngày bác sĩ/admin duyệt hoàn thành được tính 100%.';
+  'Kể cả hôm nay: lượt chưa làm tính 0%. Ngày admin duyệt hoàn thành được tính 100%.';
 
 const overallCompletionColor = (pct: number): string => {
   if (pct > 90) return '#9B8EC4'; // xanh tím pastel
@@ -251,7 +251,7 @@ const DiligenceCalendar: React.FC<DiligenceCalendarProps> = ({
           const status = day?.status ?? 'none';
           const tooltip = day
             ? [
-                `${cell.date}${day.overridden ? ' (đã chỉnh bởi bác sĩ/admin)' : ''}`,
+                `${cell.date}${day.overridden ? ' (đã chỉnh bởi admin)' : ''}`,
                 `Hoàn thành: ${day.completionPct}%`,
                 `Thời gian tập: ${formatDuration(day.actualSec)}`,
                 day.assignedSec > 0 ? `Thời lượng giao: ${formatDuration(day.assignedSec)}` : null,
