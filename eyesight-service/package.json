@@ -1,6 +1,6 @@
 {
   "name": "eye-sight-service",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Eye-Sight backend — RESTful API quản lý khám và điều trị thị lực (Express + Sequelize/PostgreSQL)",
   "main": "src/index.js",

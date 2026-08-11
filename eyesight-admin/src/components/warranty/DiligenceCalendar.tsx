@@ -36,7 +36,7 @@ const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const OVERALL_COMPLETION_HELP =
   'Tỷ lệ hoàn thành tổng của bệnh nhân (cùng công thức BXH): trung bình % hoàn thành các buổi test và lượt tập theo chu kỳ được giao. ' +
   'Mỗi bài lấy đúng số lần được giao, ưu tiên các lần có % thời gian cao nhất (làm lại đủ sẽ thay lần dở). ' +
-  'Ngày hôm nay chưa tập thì chưa tính vào tổng. Ngày bác sĩ/admin duyệt hoàn thành được tính 100%; các ngày khác giữ đúng % thực tế.';
+  'Ngày bác sĩ/admin duyệt hoàn thành được tính 100% trong tổng; các ngày khác (kể cả hôm nay) giữ đúng % thực tế.';
 
 const overallCompletionColor = (pct: number): string => {
   if (pct > 90) return '#9B8EC4'; // xanh tím pastel

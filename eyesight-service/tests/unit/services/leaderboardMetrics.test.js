@@ -196,7 +196,7 @@ describe('leaderboardMetrics', () => {
       expect(pct).toBeCloseTo(75, 1);
     });
 
-    it('chu kỳ hôm nay chưa tập thì không kéo % tổng xuống', () => {
+    it('ngày hôm nay chưa tập vẫn tính 0% vào tổng', () => {
       const assignedAt = new Date('2026-06-29T08:00:00+07:00');
       const now = new Date('2026-06-30T12:00:00+07:00');
       const pct = computePatientCompletionPct({
@@ -233,7 +233,8 @@ describe('leaderboardMetrics', () => {
         },
         now,
       });
-      expect(pct).toBe(100);
+      // Ngày 29 = 100%+100%, hôm nay 0%+0% → 50
+      expect(pct).toBe(50);
     });
   });
 
