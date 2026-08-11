@@ -88,7 +88,7 @@ app.get('/api/v1/version', (req, res) => {
     version: packageJson.version,
     environment: config.env,
     name: packageJson.name,
-    completionFormula: 'top-n',
+    completionFormula: 'top-n-open-actual',
   });
 });
 

@@ -196,10 +196,10 @@ describe('leaderboardMetrics', () => {
       expect(pct).toBeCloseTo(75, 1);
     });
 
-    it('ngày hôm nay chưa tập vẫn tính 0% vào tổng', () => {
+    it('hôm nay chưa tập thì chưa pad 0; đã tập thì tính lượt đó', () => {
       const assignedAt = new Date('2026-06-29T08:00:00+07:00');
       const now = new Date('2026-06-30T12:00:00+07:00');
-      const pct = computePatientCompletionPct({
+      const emptyToday = computePatientCompletionPct({
         exerciseAssignments: [
           {
             id: 1,
@@ -233,8 +233,44 @@ describe('leaderboardMetrics', () => {
         },
         now,
       });
-      // Ngày 29 = 100%+100%, hôm nay 0%+0% → 50
-      expect(pct).toBe(50);
+      expect(emptyToday).toBe(100);
+
+      const partialToday = computePatientCompletionPct({
+        exerciseAssignments: [
+          {
+            id: 1,
+            assignedAt,
+            frequency: 'daily',
+            executionCount: 2,
+          },
+        ],
+        exerciseSessions: [
+          {
+            id: 10,
+            exerciseAssignmentId: 1,
+            executionCount: 2,
+            executionDuration: 10,
+            startedAt: new Date('2026-06-29T00:00:00+07:00'),
+          },
+          {
+            id: 11,
+            exerciseAssignmentId: 1,
+            executionCount: 2,
+            executionDuration: 10,
+            startedAt: new Date('2026-06-30T00:00:00+07:00'),
+          },
+        ],
+        exerciseResultsBySessionId: {
+          10: [
+            { status: 'completed', duration: 600 },
+            { status: 'completed', duration: 600 },
+          ],
+          11: [{ status: 'completed', duration: 300 }],
+        },
+        now,
+      });
+      // Ngày 29: 100+100; hôm nay chỉ tính 1 lượt đã làm 50% (chưa pad lượt trống)
+      expect(partialToday).toBeCloseTo(83.33, 1);
     });
   });
 

@@ -225,6 +225,7 @@ const getDiligenceCalendar = catchAsync(async (req, res) => {
   const patientId = parseInt(req.params.patientId, 10);
   const month = req.query.month;
   const calendar = await diligenceCalendarService.getMonthCalendar(patientId, month, req.user);
+  res.set('Cache-Control', 'no-store');
   res.send(calendar);
 });
 
