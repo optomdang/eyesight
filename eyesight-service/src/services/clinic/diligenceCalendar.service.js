@@ -301,7 +301,7 @@ const getMonthCalendar = async (patientId, month, actor) => {
     month,
     patientId: patient.id,
     thresholdPct: EXERCISE_COMPLETE_THRESHOLD * 100,
-    completionFormula: 'top-n-open-actual',
+    completionFormula: 'top-n',
     overallCompletionPct: await dashboardUserService
       .getPatientOverallCompletionPct(patient.id)
       .catch(() => 0),

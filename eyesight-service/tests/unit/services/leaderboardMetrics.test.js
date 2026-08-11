@@ -196,10 +196,10 @@ describe('leaderboardMetrics', () => {
       expect(pct).toBeCloseTo(75, 1);
     });
 
-    it('hôm nay chưa tập thì chưa pad 0; đã tập thì tính lượt đó', () => {
+    it('hôm nay chưa tập vẫn tính 0% — lấy N lần tốt nhất các ngày trước', () => {
       const assignedAt = new Date('2026-06-29T08:00:00+07:00');
       const now = new Date('2026-06-30T12:00:00+07:00');
-      const emptyToday = computePatientCompletionPct({
+      const pct = computePatientCompletionPct({
         exerciseAssignments: [
           {
             id: 1,
@@ -226,6 +226,7 @@ describe('leaderboardMetrics', () => {
         ],
         exerciseResultsBySessionId: {
           10: [
+            { status: 'incomplete', duration: 60 },
             { status: 'completed', duration: 600 },
             { status: 'completed', duration: 600 },
           ],
@@ -233,44 +234,8 @@ describe('leaderboardMetrics', () => {
         },
         now,
       });
-      expect(emptyToday).toBe(100);
-
-      const partialToday = computePatientCompletionPct({
-        exerciseAssignments: [
-          {
-            id: 1,
-            assignedAt,
-            frequency: 'daily',
-            executionCount: 2,
-          },
-        ],
-        exerciseSessions: [
-          {
-            id: 10,
-            exerciseAssignmentId: 1,
-            executionCount: 2,
-            executionDuration: 10,
-            startedAt: new Date('2026-06-29T00:00:00+07:00'),
-          },
-          {
-            id: 11,
-            exerciseAssignmentId: 1,
-            executionCount: 2,
-            executionDuration: 10,
-            startedAt: new Date('2026-06-30T00:00:00+07:00'),
-          },
-        ],
-        exerciseResultsBySessionId: {
-          10: [
-            { status: 'completed', duration: 600 },
-            { status: 'completed', duration: 600 },
-          ],
-          11: [{ status: 'completed', duration: 300 }],
-        },
-        now,
-      });
-      // Ngày 29: 100+100; hôm nay chỉ tính 1 lượt đã làm 50% (chưa pad lượt trống)
-      expect(partialToday).toBeCloseTo(83.33, 1);
+      // Ngày 29 lấy 2 lần tốt nhất = 100+100, hôm nay 0+0 → 50
+      expect(pct).toBe(50);
     });
   });
 
