@@ -1,11 +1,12 @@
 /**
  * Patient daily diligence calendar (warranty tab).
  *
- * Day color (display only — overall warranty % still uses existing compliance rules):
+ * Day color (display only — does NOT inflate the day's %):
  * - complete (blue): exercise actualSec/assignedSec >= 80% AND all daily-frequency exams that day completed
  * - partial (yellow): login and/or activity, but not complete
  * - none: no login and no activity
  *
+ * Overall % = trung bình cộng completionPct các ngày có nhiệm vụ (giữ nguyên 86%, không làm tròn lên 100% vì ≥80%).
  * Weekly/monthly/quarterly exams do NOT affect day color.
  * Admin override to complete also completes that day's daily sessions (option B).
  */
@@ -29,11 +30,12 @@ const {
 const { recordSessionCompletion } = require('../exercise/exerciseSessionCompletion.service');
 const { recalculatePatientComplianceByType } = require('./compliance.service');
 const auditLogService = require('../system/auditLog.service');
-const dashboardUserService = require('../dashboard/dashboardUser.service');
 
 const VN_UTC_OFFSET_MINUTES = 7 * 60;
 const EXERCISE_COMPLETE_THRESHOLD = 0.8;
 const EXAM_TYPES = ['far', 'near', 'contrast', 'stereopsis'];
+/** Overall completion on the diligence calendar / portal summary. */
+const COMPLETION_FORMULA_DAILY_AVG = 'daily-avg';
 
 const toDateKey = (value) => moment(value).utcOffset(VN_UTC_OFFSET_MINUTES).format('YYYY-MM-DD');
 
@@ -88,43 +90,27 @@ const computeDayStatus = ({
   return 'none';
 };
 
-const assertPatientAccess = async (patientId, actor) => {
-  const patient = await Patient.findOne({
-    where: { id: patientId, deleted: false },
-    include: [{ model: User, as: 'user', attributes: ['id', 'email', 'name'] }],
+/**
+ * Trung bình cộng % từng ngày có nhiệm vụ.
+ * Giữ nguyên completionPct thực tế (86% vẫn là 86%) — ngưỡng 80% chỉ ảnh hưởng màu ô lịch.
+ * @param {Array<{ date: string, completionPct: number, assignedSec: number, dailyExamRequired: number, overridden?: boolean }>} days
+ * @param {string} [todayKey] YYYY-MM-DD — bỏ qua ngày tương lai
+ */
+const averageDailyCompletionPct = (days, todayKey = toDateKey(new Date())) => {
+  const countable = (days || []).filter((d) => {
+    if (!d?.date || d.date > todayKey) return false;
+    return (d.assignedSec || 0) > 0 || (d.dailyExamRequired || 0) > 0 || Boolean(d.overridden);
   });
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Bệnh nhân không tồn tại');
-  }
-  // Patient may only view their own calendar
-  if (actor?.userType === 'patient') {
-    if (patient.userId !== actor.id) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
-    }
-    return patient;
-  }
-  if (actor?.centerId != null && patient.centerId !== actor.centerId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
-  }
-  if (actor?.userType === 'doctor') {
-    const doctorId = actor.doctor?.id;
-    if (!doctorId || patient.doctorId !== doctorId) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
-    }
-  }
-  return patient;
+  if (countable.length === 0) return 0;
+  const sum = countable.reduce((acc, d) => acc + (Number(d.completionPct) || 0), 0);
+  return Math.round((sum / countable.length) * 10) / 10;
 };
 
-const getMonthCalendar = async (patientId, month, actor) => {
-  const { startDate, endDate, start, end } = parseMonth(month);
-  const patient = await assertPatientAccess(patientId, actor);
-  const userId = patient.userId;
-  const overrides = patient.diligenceDayOverrides || {};
-
-  const dailyExerciseAssignments = await ExerciseAssignment.findAll({
+const loadDailyExerciseAssignments = async (patientId) =>
+  ExerciseAssignment.findAll({
     where: {
       patientId,
-      status: { [Op.in]: ['active', 'on_track', 'overdue'] },
+      status: { [Op.in]: ['active', 'on_track', 'overdue', 'completed'] },
     },
     include: [
       {
@@ -135,17 +121,51 @@ const getMonthCalendar = async (patientId, month, actor) => {
       },
     ],
   });
+
+const loadDailyExamAssignments = async (patientId) =>
+  ExamAssignment.findAll({
+    where: {
+      patientId,
+      isEnabled: true,
+      frequency: 'daily',
+    },
+  });
+
+const resolveOverallStart = (patient, dailyExerciseAssignments, dailyExamAssignments, fallbackStart) => {
+  const candidates = [];
+  if (patient.activeFrom) {
+    candidates.push(moment(patient.activeFrom).utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day'));
+  }
+  (dailyExerciseAssignments || []).forEach((a) => {
+    if (a.assignedAt) {
+      candidates.push(moment(a.assignedAt).utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day'));
+    }
+  });
+  (dailyExamAssignments || []).forEach((a) => {
+    if (a.createdAt) {
+      candidates.push(moment(a.createdAt).utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day'));
+    }
+  });
+  if (!candidates.length) return fallbackStart.clone().startOf('day');
+  return moment.min(candidates);
+};
+
+/**
+ * Build diligence day rows for an inclusive VN date range.
+ */
+const buildDiligenceDaysForRange = async (patient, start, end) => {
+  const patientId = patient.id;
+  const userId = patient.userId;
+  const overrides = patient.diligenceDayOverrides || {};
+  const startDate = start.toDate();
+  const endDate = end.toDate();
+
+  const dailyExerciseAssignments = await loadDailyExerciseAssignments(patientId);
   const dailyAssignmentIds = dailyExerciseAssignments.map((a) => a.id);
 
   const [dailyExamAssignments, exerciseSessions, exerciseDurations, examSessions, loginRows] =
     await Promise.all([
-      ExamAssignment.findAll({
-        where: {
-          patientId,
-          isEnabled: true,
-          frequency: 'daily',
-        },
-      }),
+      loadDailyExamAssignments(patientId),
       dailyAssignmentIds.length
         ? ExerciseSession.findAll({
             where: {
@@ -231,8 +251,9 @@ const getMonthCalendar = async (patientId, month, actor) => {
   });
 
   const days = [];
-  const cursor = start.clone();
-  while (cursor.isBefore(end, 'day') || cursor.isSame(end, 'day')) {
+  const cursor = start.clone().startOf('day');
+  const rangeEnd = end.clone().startOf('day');
+  while (cursor.isBefore(rangeEnd, 'day') || cursor.isSame(rangeEnd, 'day')) {
     const date = cursor.format('YYYY-MM-DD');
     const override = overrides[date] || null;
     const overriddenComplete = override?.status === 'complete';
@@ -263,6 +284,7 @@ const getMonthCalendar = async (patientId, month, actor) => {
       overriddenComplete,
     });
 
+    // Keep the real day % (e.g. 86). The 80% threshold only drives status color.
     let completionPct = 0;
     if (overriddenComplete) {
       completionPct = 100;
@@ -298,13 +320,101 @@ const getMonthCalendar = async (patientId, month, actor) => {
   }
 
   return {
+    days,
+    dailyExerciseAssignments,
+    dailyExamAssignments,
+  };
+};
+
+/**
+ * % hoàn thành tổng = TB các ngày có nhiệm vụ (actual day %, không nâng ≥80% → 100%).
+ */
+const getPatientDailyAverageCompletionPct = async (patientId) => {
+  const id = Number(patientId);
+  if (!Number.isFinite(id) || id <= 0) return 0;
+
+  const patient = await Patient.findOne({
+    where: { id, deleted: false },
+    include: [{ model: User, as: 'user', attributes: ['id', 'email', 'name'] }],
+  });
+  if (!patient) return 0;
+
+  const today = moment().utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day');
+  const todayKey = today.format('YYYY-MM-DD');
+  const [dailyExerciseAssignments, dailyExamAssignments] = await Promise.all([
+    loadDailyExerciseAssignments(id),
+    loadDailyExamAssignments(id),
+  ]);
+  const overallStart = resolveOverallStart(
+    patient,
+    dailyExerciseAssignments,
+    dailyExamAssignments,
+    today
+  );
+  if (overallStart.isAfter(today, 'day')) return 0;
+
+  const { days } = await buildDiligenceDaysForRange(patient, overallStart, today);
+  return averageDailyCompletionPct(days, todayKey);
+};
+
+const assertPatientAccess = async (patientId, actor) => {
+  const patient = await Patient.findOne({
+    where: { id: patientId, deleted: false },
+    include: [{ model: User, as: 'user', attributes: ['id', 'email', 'name'] }],
+  });
+  if (!patient) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Bệnh nhân không tồn tại');
+  }
+  // Patient may only view their own calendar
+  if (actor?.userType === 'patient') {
+    if (patient.userId !== actor.id) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
+    }
+    return patient;
+  }
+  if (actor?.centerId != null && patient.centerId !== actor.centerId) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
+  }
+  if (actor?.userType === 'doctor') {
+    const doctorId = actor.doctor?.id;
+    if (!doctorId || patient.doctorId !== doctorId) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Không có quyền truy cập bệnh nhân này');
+    }
+  }
+  return patient;
+};
+
+const getMonthCalendar = async (patientId, month, actor) => {
+  const { start, end } = parseMonth(month);
+  const patient = await assertPatientAccess(patientId, actor);
+  const today = moment().utcOffset(VN_UTC_OFFSET_MINUTES).startOf('day');
+  const todayKey = today.format('YYYY-MM-DD');
+
+  const [dailyExerciseAssignments, dailyExamAssignments] = await Promise.all([
+    loadDailyExerciseAssignments(patient.id),
+    loadDailyExamAssignments(patient.id),
+  ]);
+  const overallStart = resolveOverallStart(
+    patient,
+    dailyExerciseAssignments,
+    dailyExamAssignments,
+    start
+  );
+
+  // One pass covering both the viewed month and the overall window (activeFrom → today).
+  const rangeStart = moment.min(start.clone().startOf('day'), overallStart);
+  const rangeEnd = moment.max(end.clone().startOf('day'), today);
+  const { days: allDays } = await buildDiligenceDaysForRange(patient, rangeStart, rangeEnd);
+
+  const monthPrefix = `${month}-`;
+  const days = allDays.filter((d) => d.date.startsWith(monthPrefix));
+
+  return {
     month,
     patientId: patient.id,
     thresholdPct: EXERCISE_COMPLETE_THRESHOLD * 100,
-    completionFormula: 'top-n',
-    overallCompletionPct: await dashboardUserService
-      .getPatientOverallCompletionPct(patient.id)
-      .catch(() => 0),
+    completionFormula: COMPLETION_FORMULA_DAILY_AVG,
+    overallCompletionPct: averageDailyCompletionPct(allDays, todayKey),
     days,
   };
 };
@@ -322,20 +432,7 @@ const overrideDayComplete = async (patientId, dateKey, { reason, actor }) => {
   const dateStr = day.format('YYYY-MM-DD');
   const now = new Date();
 
-  const dailyExerciseAssignments = await ExerciseAssignment.findAll({
-    where: {
-      patientId,
-      status: { [Op.in]: ['active', 'on_track', 'overdue'] },
-    },
-    include: [
-      {
-        model: ExerciseConfig,
-        as: 'exerciseConfig',
-        required: true,
-        where: { frequency: 'daily', deleted: false },
-      },
-    ],
-  });
+  const dailyExerciseAssignments = await loadDailyExerciseAssignments(patientId);
   const dailyAssignmentIds = dailyExerciseAssignments.map((a) => a.id);
 
   const transaction = await sequelize.transaction();
@@ -477,8 +574,11 @@ const overrideDayComplete = async (patientId, dateKey, { reason, actor }) => {
 module.exports = {
   getMonthCalendar,
   overrideDayComplete,
+  getPatientDailyAverageCompletionPct,
   computeDayStatus,
+  averageDailyCompletionPct,
   toDateKey,
   EXERCISE_COMPLETE_THRESHOLD,
+  COMPLETION_FORMULA_DAILY_AVG,
   EXAM_TYPES,
 };

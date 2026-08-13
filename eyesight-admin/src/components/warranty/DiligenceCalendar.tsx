@@ -34,9 +34,9 @@ import { LabelWithHelp } from 'src/components/shared/HelpTooltip';
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 const OVERALL_COMPLETION_HELP =
-  'Tỷ lệ hoàn thành tổng của bệnh nhân (cùng công thức BXH): trung bình % hoàn thành các buổi test và lượt tập theo chu kỳ được giao. ' +
-  'Mỗi bài lấy đúng số lần được giao, ưu tiên các lần có % thời gian cao nhất (làm lại đủ sẽ thay lần dở). ' +
-  'Kể cả hôm nay: lượt chưa làm tính 0%. Ngày admin duyệt hoàn thành được tính 100%.';
+  'Tỷ lệ hoàn thành tổng = trung bình cộng % hoàn thành từng ngày có nhiệm vụ tập/test. ' +
+  'Mỗi ngày giữ đúng % thực tế (ví dụ 86% thời lượng vẫn tính 86%), không làm tròn lên 100% dù đã đạt ngưỡng tô xanh (≥80%). ' +
+  'Ngày chưa tập tính 0%. Chỉ ngày admin duyệt hoàn thành mới được tính 100%.';
 
 const overallCompletionColor = (pct: number): string => {
   if (pct > 90) return '#9B8EC4'; // xanh tím pastel
@@ -187,11 +187,6 @@ const DiligenceCalendar: React.FC<DiligenceCalendarProps> = ({
             {overallPct != null ? `${overallPct}%` : loading ? '…' : '—'}
           </LabelWithHelp>
         </Typography>
-        {data?.overallCompletionPct != null && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            {data.overallCompletionPct.toFixed(1)}% · {data.completionFormula || 'top-n'}
-          </Typography>
-        )}
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>

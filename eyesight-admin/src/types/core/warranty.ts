@@ -127,7 +127,7 @@ export interface DiligenceCalendarResponse {
   thresholdPct: number;
   /** Overall completion % (same formula as BXH HOÀN THÀNH) */
   overallCompletionPct?: number;
-  /** Locked formula id from API, e.g. top-n */
+  /** Locked formula id from API, e.g. daily-avg */
   completionFormula?: string;
   days: DiligenceCalendarDay[];
 }
