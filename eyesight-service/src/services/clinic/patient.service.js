@@ -3,7 +3,7 @@ const { Op, literal } = require('sequelize');
 const ApiError = require('../../utils/ApiError');
 const { patientErrors } = require('../../utils/errorFactory');
 const logger = require('../../config/logger');
-const { User, Patient, Doctor, Clinic } = require('../../models');
+const { User, Patient, Doctor, Clinic, PatientTreatmentPackage, TreatmentPackage } = require('../../models');
 const auditLogService = require('../system/auditLog.service');
 const {
   buildInTreatmentWhereClause,
@@ -190,6 +190,29 @@ const queryPatients = async (originalFilter, options) => {
           },
         ],
       },
+      {
+        model: PatientTreatmentPackage,
+        as: 'treatmentPackageAssignments',
+        required: false,
+        separate: true,
+        limit: 1,
+        order: [['assignedAt', 'DESC']],
+        where: {
+          deleted: false,
+          status: 'active',
+          expiresAt: { [Op.gt]: new Date() },
+        },
+        attributes: ['id', 'treatmentPackageId', 'assignedAt', 'expiresAt', 'status'],
+        include: [
+          {
+            model: TreatmentPackage,
+            as: 'treatmentPackage',
+            required: false,
+            where: { deleted: false },
+            attributes: ['id', 'name', 'code'],
+          },
+        ],
+      },
     ];
 
     const { count, rows } = await Patient.findAndCountAll({
@@ -205,6 +228,9 @@ const queryPatients = async (originalFilter, options) => {
     const processedRows = rows.map((patient) => {
       const plainPatient = patient.get({ plain: true });
       const now = new Date();
+      const { treatmentPackageAssignments, ...patientWithoutAssignments } = plainPatient;
+      const activeAssignment = (treatmentPackageAssignments || []).find((row) => row?.treatmentPackage);
+      const activePkg = activeAssignment?.treatmentPackage || null;
 
       // Calculate display fields only (no filtering)
       let calculatedInactiveDays = null;
@@ -226,10 +252,14 @@ const queryPatients = async (originalFilter, options) => {
         : null;
 
       return {
-        ...plainPatient,
+        ...patientWithoutAssignments,
         inactiveDays: calculatedInactiveDays,
         activeDuration,
         remainingDuration,
+        activeTreatmentPackageName: activePkg?.name || null,
+        activeTreatmentPackage: activePkg
+          ? { id: activePkg.id, name: activePkg.name, code: activePkg.code || undefined }
+          : null,
       };
     });
 

@@ -23,6 +23,8 @@ import {
   adminListTableSx,
   colLayout,
 } from 'src/utils/adminDataTableLayout';
+import { getTreatmentStatusChipProps, TREATMENT_STATUS } from 'src/utils/treatmentStatus';
+import TreatmentPackageTierChip from 'src/components/shared/TreatmentPackageTierChip';
 
 const renderFarEyeVision = (
   patient: Patient | undefined,
@@ -87,6 +89,26 @@ const getColumns = (
           {value || t('common.notAvailable')}
         </Typography>
       ),
+    },
+  },
+  {
+    name: 'activeTreatmentPackageName',
+    label: t('patient.treatmentPackage', 'Gói điều trị'),
+    options: {
+      sort: false,
+      ...colLayout('center', 120),
+      customBodyRender: (_value, tableMeta) => {
+        const patient = dataRes.rows[tableMeta.rowIndex];
+        return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <TreatmentPackageTierChip
+              name={patient?.activeTreatmentPackageName || patient?.activeTreatmentPackage?.name}
+              code={patient?.activeTreatmentPackage?.code}
+              emptyLabel={t('patient.noTreatmentPackage', 'Chưa gán gói')}
+            />
+          </Box>
+        );
+      },
     },
   },
   {
@@ -196,17 +218,13 @@ const PatientPage = () => {
 
   const getTreatmentStatusChip = useCallback(
     (patient: Patient) => {
-      const isActive = patient.treatmentStatus !== false;
+      const chip = getTreatmentStatusChipProps(patient.treatmentStatus);
       return (
         <Chip
-          label={
-            isActive
-              ? t('patient.treatmentActive', 'Đang điều trị')
-              : t('patient.pause', 'Tạm dừng')
-          }
-          color={isActive ? 'success' : 'warning'}
+          label={t(chip.labelKey, chip.labelFallback)}
+          color={chip.color}
           size="small"
-          variant={isActive ? 'filled' : 'outlined'}
+          variant={chip.variant}
         />
       );
     },
@@ -328,14 +346,16 @@ const PatientPage = () => {
             <IconEye />
           </IconButton>
         </Tooltip>
-        {canActivatePatient && rowData.treatmentStatus !== 'paused' && rowData.treatmentStatus !== false && (
+        {canActivatePatient && rowData.treatmentStatus === TREATMENT_STATUS.ACTIVE && (
           <Tooltip title={t('patient.pause', 'Tạm dừng')} arrow>
             <IconButton size="small" onClick={() => void handlePausePatient(rowData)}>
               <PauseCircleOutline />
             </IconButton>
           </Tooltip>
         )}
-        {canActivatePatient && (rowData.treatmentStatus === 'paused' || rowData.treatmentStatus === false) && (
+        {canActivatePatient &&
+          (rowData.treatmentStatus === TREATMENT_STATUS.PAUSED ||
+            rowData.treatmentStatus === false) && (
           <Tooltip title={t('patient.resumeAction', 'Tiếp tục')} arrow>
             <IconButton size="small" onClick={() => void handleResumePatient(rowData)}>
               <PlayCircleOutline />

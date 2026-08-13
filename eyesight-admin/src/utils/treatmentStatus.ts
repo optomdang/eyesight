@@ -20,6 +20,50 @@ export const TREATMENT_STATUS = {
 export const isActiveTreatment = (status?: TreatmentStatus | null): boolean =>
   status === TREATMENT_STATUS.ACTIVE;
 
+export type TreatmentStatusChip = {
+  labelKey: string;
+  labelFallback: string;
+  color: 'default' | 'success' | 'warning' | 'info';
+  variant: 'filled' | 'outlined';
+};
+
+/** Map stored enum (and legacy boolean false) to list-chip label/color. */
+export const getTreatmentStatusChipProps = (
+  status?: TreatmentStatus | boolean | null
+): TreatmentStatusChip => {
+  if (status === false || status === TREATMENT_STATUS.PAUSED) {
+    return {
+      labelKey: 'patient.treatmentPhase.paused',
+      labelFallback: 'Tạm dừng',
+      color: 'warning',
+      variant: 'outlined',
+    };
+  }
+  if (status === TREATMENT_STATUS.COMPLETED) {
+    return {
+      labelKey: 'patient.treatmentPhase.completed',
+      labelFallback: 'Hoàn thành',
+      color: 'info',
+      variant: 'outlined',
+    };
+  }
+  if (status === TREATMENT_STATUS.ACTIVE) {
+    return {
+      labelKey: 'patient.treatmentPhase.active',
+      labelFallback: 'Đang điều trị',
+      color: 'success',
+      variant: 'filled',
+    };
+  }
+  // not_started | null | unknown — chưa thiết lập / chưa tới ngày bắt đầu
+  return {
+    labelKey: 'patient.treatmentPhase.notStarted',
+    labelFallback: 'Chưa kích hoạt',
+    color: 'default',
+    variant: 'outlined',
+  };
+};
+
 /**
  * Derive the enum from the doctor's pause intent + the license dates.
  * Mirrors backend `computeTreatmentStatus`. `now` is injectable for tests.
@@ -33,6 +77,7 @@ export const computeTreatmentStatus = (
   now: dayjs.Dayjs = dayjs()
 ): TreatmentStatus => {
   if (paused) return TREATMENT_STATUS.PAUSED;
+  if (!activeFrom && !activeTo) return TREATMENT_STATUS.NOT_STARTED;
   if (activeFrom && now.isBefore(dayjs(activeFrom), 'day')) return TREATMENT_STATUS.NOT_STARTED;
   if (activeTo && now.isAfter(dayjs(activeTo), 'day')) return TREATMENT_STATUS.COMPLETED;
   return TREATMENT_STATUS.ACTIVE;

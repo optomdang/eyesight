@@ -146,7 +146,7 @@
     },
     "patient": "Patient",
     "treatmentPhase": {
-      "notStarted": "Not started",
+      "notStarted": "Not activated",
       "active": "In treatment",
       "paused": "Treatment paused",
       "completed": "Completed",
@@ -163,6 +163,8 @@
     "fullName": "Full Name",
     "email": "Email",
     "phone": "Phone Number",
+    "treatmentPackage": "Treatment package",
+    "noTreatmentPackage": "No package",
     "dateOfBirth": "Date of Birth",
     "gender": "Gender",
     "male": "Male",

@@ -9,7 +9,7 @@ import type { User } from './user';
  * Treatment status enum — MUST match backend `Patient.treatmentStatus` (SOT).
  * Source: eye-sight-service/src/utils/treatmentUtils.js (TREATMENT_STATUS)
  *
- * - not_started: hồ sơ đã tạo nhưng chưa tới ngày bắt đầu (now < activeFrom)
+ * - not_started: hồ sơ đã tạo nhưng chưa kích hoạt (thiếu thời gian sử dụng, hoặc now < activeFrom)
  * - active:      đang trong liệu trình (activeFrom ≤ now ≤ activeTo, không bị tạm dừng)
  * - paused:      bác sĩ chủ động tạm dừng
  * - completed:   hết liệu trình (now > activeTo) — job đồng bộ set
@@ -65,6 +65,10 @@ export interface Patient {
   treatmentStatus?: TreatmentStatus;
   activeFrom?: string;
   activeTo?: string;
+
+  /** Active (non-expired) treatment package label from list API */
+  activeTreatmentPackageName?: string | null;
+  activeTreatmentPackage?: { id: number; name: string; code?: string } | null;
 
   // Computed fields (from backend)
   inactiveDays?: number | null;

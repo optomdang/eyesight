@@ -146,7 +146,7 @@
     },
     "patient": "Bệnh nhân",
     "treatmentPhase": {
-      "notStarted": "Chưa bắt đầu",
+      "notStarted": "Chưa kích hoạt",
       "active": "Đang điều trị",
       "paused": "Tạm dừng điều trị",
       "completed": "Hoàn thành",
@@ -163,6 +163,8 @@
     "fullName": "Họ và tên",
     "email": "Email",
     "phone": "Số điện thoại",
+    "treatmentPackage": "Gói điều trị",
+    "noTreatmentPackage": "Chưa gán gói",
     "dateOfBirth": "Ngày sinh",
     "gender": "Giới tính",
     "male": "Nam",
