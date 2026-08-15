@@ -26,7 +26,11 @@ import {
   getReportedTimeoutDurationSeconds,
   resolveAssignedDurationMinutes,
 } from 'src/utils/exerciseDuration';
-import { calculateVisualSettings, computeExercisePatientVision, resolveAssignmentTrainingEye } from 'src/utils/visionUtils';
+import {
+  calculateVisualSettings,
+  computeExercisePatientVision,
+  resolveAssignmentTrainingEye,
+} from 'src/utils/visionUtils';
 import { hasExerciseVisionLevel } from 'src/utils/exerciseVisionPrerequisites';
 import { resolveExerciseStartVisionLevel } from 'src/utils/exerciseDifficultyBaseline';
 import useFreshPatientExamResults from 'src/hooks/useFreshPatientExamResults';
@@ -59,7 +63,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 }) => {
   const { user } = useAuth(); // Get user info from auth context
   const { showSnackbar } = useSnackbar();
-  const { examResults: freshExamResults, loading: examResultsLoading } = useFreshPatientExamResults();
+  const { examResults: freshExamResults, loading: examResultsLoading } =
+    useFreshPatientExamResults();
   const patient = user?.patient;
   // Helper to access exerciseConfig safely
   // const exerciseConfig = assignment?.exerciseConfig;
@@ -205,8 +210,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   // Block navigation when exercise is active (not during timeout completion)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     return Boolean(
-      shouldBlockExerciseNavigation() &&
-      currentLocation.pathname !== nextLocation.pathname
+      shouldBlockExerciseNavigation() && currentLocation.pathname !== nextLocation.pathname
     );
   });
 
@@ -539,9 +543,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     const visionType = exerciseConfig.visionType;
     const distance = parseFloat(String(exerciseConfig.distance || '0.5'));
     const colorScheme =
-      exerciseConfig.colorScheme?.preset === 'original'
-        ? undefined
-        : exerciseConfig.colorScheme;
+      exerciseConfig.colorScheme?.preset === 'original' ? undefined : exerciseConfig.colorScheme;
 
     try {
       let visionLevel: number | null = null;
@@ -627,13 +629,13 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         return result;
       };
 
-      // Override actuate to track score and game over
+      // Override actuate to track score and soft-reset board on game over
+      // (therapy sessions must keep running for assigned duration — do not end on lose).
+      let softResetInProgress = false;
       actuator.actuate = function (grid: any, metadata: any) {
-        originalActuate.call(this, grid, metadata);
-
         const currentSession = gameExecutionRef.current;
         if (currentSession && !currentSession.completed) {
-          // Inline score update
+          // Inline score update (including the move that filled the board)
           if (metadata && metadata.score !== undefined && metadata.score >= 0) {
             const maxScore = currentSession.maxScore ?? 0;
             const scoringMoves = currentSession.scoringMoves ?? 0;
@@ -651,7 +653,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
               const mergeAccuracy = moves > 0 ? scoring / moves : 0;
               const score = metadata.score as number;
               if (
-                score - lastDichopticScoreMilestoneRef.current >= DICHOPTIC_2048_SCORE_MILESTONE
+                score - lastDichopticScoreMilestoneRef.current >=
+                DICHOPTIC_2048_SCORE_MILESTONE
               ) {
                 lastDichopticScoreMilestoneRef.current = score;
                 tryAdvanceOnAccuracyRef.current(mergeAccuracy);
@@ -659,16 +662,42 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
             }
           }
 
-          // Check game over - will be handled by endExerciseResult defined below
-          if (metadata && metadata.over && !metadata.won) {
-            // Call endExerciseResult which is defined after hook
-            setTimeout(() => {
-              if (endExerciseResult) {
-                endExerciseResult(false, metadata.score || 0);
+          // Board full / no moves: reset tiles only, keep cumulative score & session metrics.
+          // Skip painting the lose overlay — soft-reset then actuate a fresh board.
+          if (!softResetInProgress && metadata && metadata.over && !metadata.won) {
+            softResetInProgress = true;
+            try {
+              const gm = gameManager as GameManager & {
+                size: number;
+                score: number;
+                over: boolean;
+                won: boolean;
+                keepPlaying: boolean;
+                grid: unknown;
+                addStartTiles: () => void;
+                storageManager?: { clearGameState?: () => void };
+                actuator?: { continueGame?: () => void };
+              };
+              const keptScore = typeof gm.score === 'number' ? gm.score : metadata.score || 0;
+              gm.storageManager?.clearGameState?.();
+              gm.actuator?.continueGame?.();
+              if (typeof window.Grid === 'function') {
+                gm.grid = new window.Grid(gm.size);
+                gm.score = keptScore;
+                gm.over = false;
+                gm.won = false;
+                gm.keepPlaying = false;
+                gm.addStartTiles();
+                gm.actuate();
               }
-            }, 0);
+            } finally {
+              softResetInProgress = false;
+            }
+            return;
           }
         }
+
+        originalActuate.call(this, grid, metadata);
       };
     },
     [assignment]
@@ -716,12 +745,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         },
         { trainingEye: assignment?.trainingEye ?? null }
       ),
-    [
-      exerciseConfig?.colorScheme,
-      sessionDichoptic,
-      exerciseConfig?.eye,
-      assignment?.trainingEye,
-    ]
+    [exerciseConfig?.colorScheme, sessionDichoptic, exerciseConfig?.eye, assignment?.trainingEye]
   );
 
   // ==================== GAME ENGINE HOOK ====================
@@ -938,18 +962,9 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   };
 
   /**
-   * Handle game over (called by GameManager when no moves left)
+   * Soft board reset on lose is handled in attachGameTracking (keep score, continue session).
+   * Exercise completion still happens via timeout / explicit end — not on game over.
    */
-  const endExerciseResult = useCallback(
-    async (_gameWon: boolean, finalScore: number) => {
-      const outcome = await completeExerciseResult(finalScore);
-      if (outcome.success) {
-        setCompletionSlotCounted(outcome.slotCounted);
-        setShowCompletionDialog(true);
-      }
-    },
-    [completeExerciseResult]
-  );
 
   // ==============================================================
   // OLD CODE REMOVED: Lines 636-884 (250 lines)
@@ -969,7 +984,15 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   if (!canDetermineVisionSize) {
     if (examResultsLoading) {
       return (
-        <Box sx={{ width: '100vw', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box
+          sx={{
+            width: '100vw',
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <CircularProgress />
         </Box>
       );
