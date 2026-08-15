@@ -420,6 +420,36 @@ export const getPatientExamResults = (
   return getDataTable<any>(url);
 };
 
+/** Page size = BE sanitizePagination max for exam-results (100). */
+const EXAM_RESULTS_PAGE_SIZE = 100;
+
+/**
+ * Fetch every exam result for a patient (charts / history — no truncated page).
+ */
+export const getAllPatientExamResults = async (
+  patientId: number,
+  params?: { examType?: string }
+): Promise<PaginatedResponse<any>> => {
+  const rows: any[] = [];
+  let page = 1;
+  let totalPages = 1;
+  let count = 0;
+
+  do {
+    const res = await getPatientExamResults(patientId, {
+      ...params,
+      page,
+      limit: EXAM_RESULTS_PAGE_SIZE,
+    });
+    rows.push(...(res.rows ?? []));
+    count = res.count ?? rows.length;
+    totalPages = Math.max(1, res.totalPages ?? 1);
+    page += 1;
+  } while (page <= totalPages);
+
+  return { rows, count, page: 1, limit: rows.length, totalPages: 1 };
+};
+
 /**
  * Get patient's progress report
  * GET /v1/patients/:patientId/progress

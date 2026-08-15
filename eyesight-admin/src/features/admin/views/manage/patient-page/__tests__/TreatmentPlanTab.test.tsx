@@ -7,6 +7,7 @@ import * as PatientService from 'src/services/patient.service';
 
 vi.mock('src/services/patient.service', () => ({
   getPatientExamResults: vi.fn(),
+  getAllPatientExamResults: vi.fn(),
   getPatientExerciseSessions: vi.fn(),
 }));
 
@@ -56,9 +57,17 @@ vi.mock('recharts', () => ({
     return <div data-testid="tooltip-sample">{formatted[0]}</div>;
   },
   Line: ({ name, dataKey }: { name: string; dataKey?: string }) => (
-    <div data-testid="line-series" data-key={dataKey}>{name}</div>
+    <div data-testid="line-series" data-key={dataKey}>
+      {name}
+    </div>
   ),
-  LineChart: ({ data, children }: { data?: Array<Record<string, unknown>>; children: React.ReactNode }) => (
+  LineChart: ({
+    data,
+    children,
+  }: {
+    data?: Array<Record<string, unknown>>;
+    children: React.ReactNode;
+  }) => (
     <div data-testid="line-chart" data-length={(data || []).length}>
       {children}
     </div>
@@ -81,9 +90,27 @@ const basePatient: Patient = {
 
 const mockExamResultsResponse = {
   rows: [
-    { id: 1, examType: 'far', leftEyeLevel: 2,  rightEyeLevel: 4,  startedAt: '2025-12-15T09:00:00Z' },
-    { id: 2, examType: 'far', leftEyeLevel: 14, rightEyeLevel: 15, startedAt: '2026-02-04T00:10:00Z' },
-    { id: 3, examType: 'far', leftEyeLevel: 16, rightEyeLevel: 17, startedAt: '2026-05-05T23:47:00Z' },
+    {
+      id: 1,
+      examType: 'far',
+      leftEyeLevel: 2,
+      rightEyeLevel: 4,
+      startedAt: '2025-12-15T09:00:00Z',
+    },
+    {
+      id: 2,
+      examType: 'far',
+      leftEyeLevel: 14,
+      rightEyeLevel: 15,
+      startedAt: '2026-02-04T00:10:00Z',
+    },
+    {
+      id: 3,
+      examType: 'far',
+      leftEyeLevel: 16,
+      rightEyeLevel: 17,
+      startedAt: '2026-05-05T23:47:00Z',
+    },
   ],
 };
 
@@ -94,13 +121,19 @@ const mockSessionsResponse = {
       exerciseAssignmentId: 101,
       completedAt: '2026-02-10T08:00:00Z',
       averageScore: 200,
-      duration: 170,            // Σ active seconds (server snapshot)
-      executionDuration: 3,     // phút/lượt (snapshot)
-      executionCount: 1,        // số lượt (snapshot)
+      duration: 170, // Σ active seconds (server snapshot)
+      executionDuration: 3, // phút/lượt (snapshot)
+      executionCount: 1, // số lượt (snapshot)
       focusScore: 90,
-      visionLevel: 14,          // độ khó snapshot trên session
+      visionLevel: 14, // độ khó snapshot trên session
       exerciseAssignment: {
-        exerciseConfig: { id: 1, name: 'Config xa - MT', visionType: 'far', eye: 'left', frequency: 'daily' },
+        exerciseConfig: {
+          id: 1,
+          name: 'Config xa - MT',
+          visionType: 'far',
+          eye: 'left',
+          frequency: 'daily',
+        },
       },
     },
     {
@@ -114,7 +147,13 @@ const mockSessionsResponse = {
       focusScore: 85,
       visionLevel: 8,
       exerciseAssignment: {
-        exerciseConfig: { id: 2, name: 'Config gần - MP', visionType: 'near', eye: 'right', frequency: 'weekly' },
+        exerciseConfig: {
+          id: 2,
+          name: 'Config gần - MP',
+          visionType: 'near',
+          eye: 'right',
+          frequency: 'weekly',
+        },
       },
     },
   ],
@@ -131,7 +170,7 @@ describe('TreatmentPlanTab', () => {
   });
 
   beforeEach(() => {
-    vi.mocked(PatientService.getPatientExamResults).mockResolvedValue(
+    vi.mocked(PatientService.getAllPatientExamResults).mockResolvedValue(
       mockExamResultsResponse as never
     );
     vi.mocked(PatientService.getPatientExerciseSessions).mockResolvedValue(
@@ -140,20 +179,16 @@ describe('TreatmentPlanTab', () => {
   });
 
   it('fetches exam results and exercise sessions on mount', async () => {
-    renderWithTheme(
-      <TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />
-    );
+    renderWithTheme(<TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />);
 
     await waitFor(() => {
-      expect(PatientService.getPatientExamResults).toHaveBeenCalledWith(7);
+      expect(PatientService.getAllPatientExamResults).toHaveBeenCalledWith(7);
       expect(PatientService.getPatientExerciseSessions).toHaveBeenCalledWith(7, { limit: 500 });
     });
   });
 
   it('passes sessions to ExerciseSessionProgressChart', async () => {
-    renderWithTheme(
-      <TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />
-    );
+    renderWithTheme(<TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />);
 
     await waitFor(() => {
       const chart = screen.getByTestId('exercise-session-chart');
@@ -162,9 +197,7 @@ describe('TreatmentPlanTab', () => {
   });
 
   it('uses the shared vision formatter for the exam chart axis and tooltip', async () => {
-    renderWithTheme(
-      <TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />
-    );
+    renderWithTheme(<TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('y-axis-sample')).toHaveTextContent('20/20');
@@ -172,24 +205,19 @@ describe('TreatmentPlanTab', () => {
     });
   });
 
-  it('filters exam chart to activeFrom onward in all-time range', async () => {
-    renderWithTheme(
-      <TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />
-    );
+  it('shows all exam rows in all-time range (including before activeFrom)', async () => {
+    renderWithTheme(<TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />);
 
-    // basePatient.activeFrom = 2026-01-01 → row id:1 (2025-12-15) excluded → 2 rows remain
     await waitFor(() => {
-      expect(screen.getByTestId('line-chart')).toHaveAttribute('data-length', '2');
+      expect(screen.getByTestId('line-chart')).toHaveAttribute('data-length', '3');
     });
   });
 
   it('filters exam chart to 3 months when time range is changed', async () => {
-    renderWithTheme(
-      <TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />
-    );
+    renderWithTheme(<TreatmentPlanTab patient={basePatient} getExamTypeName={(t) => t} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('line-chart')).toHaveAttribute('data-length', '2');
+      expect(screen.getByTestId('line-chart')).toHaveAttribute('data-length', '3');
     });
 
     fireEvent.mouseDown(screen.getByRole('combobox'));

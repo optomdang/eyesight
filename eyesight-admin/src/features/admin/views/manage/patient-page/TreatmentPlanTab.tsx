@@ -39,7 +39,11 @@ import type { Patient, ExamResult } from 'src/types/core';
 import * as PatientService from 'src/services/patient.service';
 import { getExamResult } from 'src/services/exam.service';
 import dayjs from 'dayjs';
-import { formatVisionLevel, getVisionExamChartYAxisConfig, mapExamResultLevelsForChart } from 'src/utils/visionUtils';
+import {
+  formatVisionLevel,
+  getVisionExamChartYAxisConfig,
+  mapExamResultLevelsForChart,
+} from 'src/utils/visionUtils';
 
 interface TreatmentPlanTabProps {
   patient: Patient;
@@ -61,6 +65,7 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
   const { t } = useTranslation();
 
   // ── Date range filtering for exam chart ─────────────────────────────────
+  // "all" = mọi kết quả có dữ liệu. 3m/6m/12m = từ activeFrom → +N tháng đầu điều trị.
   const activeFromDate = useMemo(() => {
     if (!patient.activeFrom) return null;
     const parsed = dayjs(patient.activeFrom);
@@ -74,6 +79,9 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
   }, [activeFromDate, selectedTimeRange]);
 
   const filteredExamResultsChartData = useMemo(() => {
+    if (selectedTimeRange === 'all') {
+      return examResultsChartData;
+    }
     const isInRange = (timestamp: number) => {
       if (!timestamp) return false;
       const valueDate = dayjs(timestamp);
@@ -87,7 +95,7 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
         rows.filter((row) => isInRange(row.timestamp)),
       ])
     );
-  }, [activeFromDate, examResultsChartData, rangeEndDate]);
+  }, [activeFromDate, examResultsChartData, rangeEndDate, selectedTimeRange]);
 
   const examYAxis = useMemo(() => {
     const rows = filteredExamResultsChartData[selectedExamType] ?? [];
@@ -107,7 +115,7 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
         setLoading(true);
 
         const [examResultsResponse, sessionsResponse] = await Promise.all([
-          PatientService.getPatientExamResults(patientId),
+          PatientService.getAllPatientExamResults(patientId),
           PatientService.getPatientExerciseSessions(patientId, { limit: 500 }),
         ]);
 
@@ -173,12 +181,18 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
     <Box>
       <LoadingBoundary loading={loading} height="300px">
         <Grid container spacing={2}>
-
           {/* Biểu đồ kết quả kiểm tra thị lực */}
           <Grid size={12}>
             <Card elevation={2}>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                  }}
+                >
                   <Typography variant="h6">
                     {t('treatmentPlan.examHistory', 'Lịch sử kết quả kiểm tra theo thời gian')}
                   </Typography>
@@ -189,10 +203,18 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
                       label={t('treatmentPlan.timeRange', 'Khoảng thời gian')}
                       onChange={(e) => setSelectedTimeRange(e.target.value as TimeRangeOption)}
                     >
-                      <MenuItem value="all">{t('treatmentPlan.timeRangeAll', 'Toàn thời gian')}</MenuItem>
-                      <MenuItem value="3m">{t('treatmentPlan.timeRange3Months', '3 tháng đầu')}</MenuItem>
-                      <MenuItem value="6m">{t('treatmentPlan.timeRange6Months', '6 tháng đầu')}</MenuItem>
-                      <MenuItem value="12m">{t('treatmentPlan.timeRange12Months', '1 năm đầu')}</MenuItem>
+                      <MenuItem value="all">
+                        {t('treatmentPlan.timeRangeAll', 'Toàn thời gian')}
+                      </MenuItem>
+                      <MenuItem value="3m">
+                        {t('treatmentPlan.timeRange3Months', '3 tháng đầu')}
+                      </MenuItem>
+                      <MenuItem value="6m">
+                        {t('treatmentPlan.timeRange6Months', '6 tháng đầu')}
+                      </MenuItem>
+                      <MenuItem value="12m">
+                        {t('treatmentPlan.timeRange12Months', '1 năm đầu')}
+                      </MenuItem>
                     </Select>
                   </FormControl>
                 </Box>
@@ -226,11 +248,17 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
                         allowDecimals={examYAxis.allowDecimals}
                         reversed={examYAxis.reversed}
                         tickFormatter={examYAxis.tickFormatter}
-                        label={{ value: t('treatmentPlan.visionResult', 'Chỉ số thị lực'), angle: -90, position: 'insideLeft' }}
+                        label={{
+                          value: t('treatmentPlan.visionResult', 'Chỉ số thị lực'),
+                          angle: -90,
+                          position: 'insideLeft',
+                        }}
                       />
                       <Tooltip
                         formatter={(value: unknown, name: string) => [
-                          value == null ? '—' : formatVisionLevel(selectedExamType, value as number),
+                          value == null
+                            ? '—'
+                            : formatVisionLevel(selectedExamType, value as number),
                           name,
                         ]}
                       />
@@ -288,7 +316,10 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <DataTableProvider endpoint={`patients/${patient.id}/exam-results`}>
-                  <ExamHistoryTable onViewDetail={handleOpenResultDialog} getExamTypeName={getExamTypeName} />
+                  <ExamHistoryTable
+                    onViewDetail={handleOpenResultDialog}
+                    getExamTypeName={getExamTypeName}
+                  />
                 </DataTableProvider>
               </CardContent>
             </Card>
@@ -308,23 +339,35 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
               </CardContent>
             </Card>
           </Grid>
-
         </Grid>
 
         {/* Dialog chi tiết kết quả kiểm tra */}
-        <Dialog open={resultDetailDialogOpen} onClose={() => setResultDetailDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>{t('patient.dialog.resultDetailTitle', 'Chi tiết kết quả bài kiểm tra')}</DialogTitle>
+        <Dialog
+          open={resultDetailDialogOpen}
+          onClose={() => setResultDetailDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            {t('patient.dialog.resultDetailTitle', 'Chi tiết kết quả bài kiểm tra')}
+          </DialogTitle>
           <DialogContent>
             {resultDetailLoading ? (
               <Box sx={{ py: 4, textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">{t('common.loading', 'Đang tải...')}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('common.loading', 'Đang tải...')}
+                </Typography>
               </Box>
             ) : selectedResult ? (
               <ExamResultDetail result={selectedResult} />
             ) : null}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setResultDetailDialogOpen(false)} variant="contained" size="small">
+            <Button
+              onClick={() => setResultDetailDialogOpen(false)}
+              variant="contained"
+              size="small"
+            >
               {t('common.close', 'Đóng')}
             </Button>
           </DialogActions>
