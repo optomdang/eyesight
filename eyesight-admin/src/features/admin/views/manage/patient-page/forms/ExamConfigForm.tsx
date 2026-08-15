@@ -49,7 +49,7 @@ interface ExamAssignmentFormProps {
 }
 
 const defaultExamConfig: ExamConfigFormData = {
-  frequency: 'weekly',
+  frequency: 'monthly',
   isEnabled: true,
   notificationSettings: {
     enabled: true,
@@ -62,13 +62,14 @@ const defaultExamConfig: ExamConfigFormData = {
 
 const initialFormData: ExamAssignmentFormData = {
   far: { ...defaultExamConfig },
-  near: { ...defaultExamConfig, frequency: 'weekly' },
-  contrast: { ...defaultExamConfig, frequency: 'monthly', isEnabled: false },
-  stereopsis: { ...defaultExamConfig, frequency: 'monthly' },
+  near: { ...defaultExamConfig },
+  contrast: { ...defaultExamConfig },
+  stereopsis: { ...defaultExamConfig, isEnabled: false },
 };
 
 const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [configsLoading, setConfigsLoading] = useState(true);
   const [existingConfigs, setExistingConfigs] = useState<ExamAssignment[]>([]);
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [resettingConfigId, setResettingConfigId] = useState<number | null>(null);
@@ -175,12 +176,19 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
       });
 
       await Promise.all(promises);
+      await refreshExistingConfigs();
       showSnackbar(
         t('patient.examConfig.saveSuccess', 'Cập nhật cấu hình thành công'),
         SNACKBAR_SEVERITY.SUCCESS
       );
       onSuccess();
     } catch (error: any) {
+      // Refresh so next save uses update instead of create if rows already exist.
+      try {
+        await refreshExistingConfigs();
+      } catch {
+        /* ignore */
+      }
       showSnackbar(
         getErrorMessage(error, t('patient.examConfig.saveError', 'Có lỗi xảy ra khi lưu cấu hình')),
         SNACKBAR_SEVERITY.ERROR
@@ -195,13 +203,14 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
     const loadExistingConfigs = async () => {
       if (!patient.id) return;
 
+      setConfigsLoading(true);
       try {
         const configs = await getExamAssignmentsByPatient(patient.id);
-        setExistingConfigs(configs.rows);
+        setExistingConfigs(configs.rows || []);
 
         // Update form with existing values
         const formData = { ...initialFormData };
-        configs.rows.forEach((config) => {
+        (configs.rows || []).forEach((config) => {
           if (config.examType in formData) {
             const examType = config.examType;
             formData[examType] = {
@@ -221,12 +230,23 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
         reset(formData);
       } catch (error) {
         console.error('Error loading existing configs:', error);
+        showSnackbar(
+          getErrorMessage(error, t('patient.examConfig.loadError', 'Không tải được cấu hình kiểm tra')),
+          SNACKBAR_SEVERITY.ERROR
+        );
+      } finally {
+        setConfigsLoading(false);
       }
     };
 
-    loadExistingConfigs();
-  }, [patient.id]);
+    void loadExistingConfigs();
+  }, [patient.id, reset, showSnackbar, t]);
 
+  const refreshExistingConfigs = async () => {
+    if (!patient.id) return;
+    const configs = await getExamAssignmentsByPatient(patient.id);
+    setExistingConfigs(configs.rows || []);
+  };
   const getFieldError = (examType: string, field: string): string | undefined => {
     const examErrors = errors[examType as keyof ExamAssignmentFormData];
     if (examErrors && typeof examErrors === 'object') {
@@ -564,17 +584,27 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
                           };
 
                           if (existingConfig) {
-                            await updateExamAssignment(patient.id!, existingConfig.id, updatePayload);
+                            await updateExamAssignment(
+                              patient.id!,
+                              existingConfig.id,
+                              updatePayload
+                            );
                           } else {
                             await createExamAssignment(patient.id!, createPayload);
                           }
 
+                          await refreshExistingConfigs();
                           showSnackbar(
                             t('patient.examConfig.saveSuccess', 'Cập nhật cấu hình thành công'),
                             SNACKBAR_SEVERITY.SUCCESS
                           );
                           onSuccess();
                         } catch (error: any) {
+                          try {
+                            await refreshExistingConfigs();
+                          } catch {
+                            /* ignore */
+                          }
                           showSnackbar(
                             getErrorMessage(
                               error,
@@ -586,7 +616,7 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
                           setLoading(false);
                         }
                       }}
-                      disabled={loading || isSubmitting}
+                      disabled={loading || isSubmitting || configsLoading}
                     >
                       {t('common.save', 'Lưu')}
                     </Button>
@@ -596,7 +626,9 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
                       size="small"
                       startIcon={<Replay />}
                       disabled={!canRetake || resettingConfigId === existingConfig?.id}
-                      onClick={() => existingConfig && void handleRetake(existingConfig, examType.name)}
+                      onClick={() =>
+                        existingConfig && void handleRetake(existingConfig, examType.name)
+                      }
                     >
                       {resettingConfigId === existingConfig?.id
                         ? t('patient.examConfig.retaking', 'Đang mở lại...')
@@ -611,11 +643,23 @@ const ExamAssignmentForm: React.FC<ExamAssignmentFormProps> = ({ patient, onSucc
       })}
 
       <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-        <Button type="submit" variant="contained" disabled={loading || isSubmitting} size="large">
-          {loading ? t('common.saving', 'Đang lưu...') : t('common.saveAll', 'Lưu tất cả')}
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={loading || isSubmitting || configsLoading}
+          size="large"
+        >
+          {loading || configsLoading
+            ? t('common.saving', 'Đang lưu...')
+            : t('common.saveAll', 'Lưu tất cả')}
         </Button>
 
-        <Button variant="outlined" onClick={() => reset()} disabled={loading} size="large">
+        <Button
+          variant="outlined"
+          onClick={() => reset()}
+          disabled={loading || configsLoading}
+          size="large"
+        >
           {t('common.reset', 'Đặt lại')}
         </Button>
       </Box>

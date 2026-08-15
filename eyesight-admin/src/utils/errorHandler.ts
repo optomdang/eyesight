@@ -194,7 +194,10 @@ const FIELD_LABELS_VI: Record<string, string> = {
 const fieldLabel = (key: string) => FIELD_LABELS_VI[key] || key;
 
 function translateJoiDetail(message: string): string {
-  if (message === 'password must be at least 8 characters' || message === '"password" must be at least 8 characters') {
+  if (
+    message === 'password must be at least 8 characters' ||
+    message === '"password" must be at least 8 characters'
+  ) {
     return 'Mật khẩu phải có ít nhất 8 ký tự.';
   }
   if (
@@ -229,10 +232,7 @@ function translateJoiDetail(message: string): string {
 
 function translateJoiValidationMessage(message: string): string {
   if (message.includes('"') && (message.includes(' must ') || message.includes(' is required'))) {
-    return message
-      .split(', ')
-      .map(translateJoiDetail)
-      .join('; ');
+    return message.split(', ').map(translateJoiDetail).join('; ');
   }
   return message;
 }
@@ -243,6 +243,23 @@ const EXACT_ERROR_VI: Record<string, string> = {
   'vtSettings cannot be null':
     'Cấu hình VT không hợp lệ. Hãy thử lưu lại hoặc bỏ trống cài đặt VT Quest.',
   'Validation error': 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường trong form.',
+  'Exam assignment not found': 'Không tìm thấy cấu hình bài kiểm tra',
+  'You do not have permission to access this exam assignment':
+    'Bạn không có quyền truy cập cấu hình bài kiểm tra này',
+  'You do not have permission to update this exam assignment':
+    'Bạn không có quyền cập nhật cấu hình bài kiểm tra này',
+  'You do not have permission to delete this exam assignment':
+    'Bạn không có quyền xóa cấu hình bài kiểm tra này',
+  'You do not have permission to update this exam assignment status':
+    'Bạn không có quyền cập nhật trạng thái cấu hình bài kiểm tra này',
+  'Invalid patient ID': 'Mã bệnh nhân không hợp lệ',
+};
+
+const EXAM_TYPE_LABEL_VI: Record<string, string> = {
+  far: 'thị lực xa',
+  near: 'thị lực gần',
+  contrast: 'độ tương phản',
+  stereopsis: 'thị giác lập thể',
 };
 
 /**
@@ -252,6 +269,14 @@ export function translateErrorMessage(message: string): string {
   if (!message) return message;
 
   if (EXACT_ERROR_VI[message]) return EXACT_ERROR_VI[message];
+
+  const examExists = message.match(
+    /^Exam configuration for (\w+) already exists for this patient$/i
+  );
+  if (examExists) {
+    const label = EXAM_TYPE_LABEL_VI[examExists[1]] || examExists[1];
+    return `Cấu hình bài kiểm tra cho ${label} đã tồn tại cho bệnh nhân này`;
+  }
 
   const notNullMatch = message.match(/^(\w+) cannot be null$/);
   if (notNullMatch) {

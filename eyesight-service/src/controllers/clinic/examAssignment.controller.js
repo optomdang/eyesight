@@ -67,11 +67,11 @@ const getExamAssignmentAssignments = catchAsync(async (req, res) => {
 const getExamAssignment = catchAsync(async (req, res) => {
   const assignment = await examAssignmentService.getExamConfigById(req.params.configId);
   if (!assignment) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Exam assignment not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy cấu hình bài kiểm tra');
   }
   // SECURITY: Verify center ownership
   if (assignment.centerId !== req.user.centerId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to access this exam assignment');
+    throw new ApiError(httpStatus.FORBIDDEN, 'Bạn không có quyền truy cập cấu hình bài kiểm tra này');
   }
   res.send(assignment);
 });
@@ -83,10 +83,10 @@ const updateExamAssignment = catchAsync(async (req, res) => {
   // SECURITY: Verify center ownership before updating
   const existingAssignment = await examAssignmentService.getExamConfigById(req.params.configId);
   if (!existingAssignment) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Exam assignment not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy cấu hình bài kiểm tra');
   }
   if (existingAssignment.centerId !== req.user.centerId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to update this exam assignment');
+    throw new ApiError(httpStatus.FORBIDDEN, 'Bạn không có quyền cập nhật cấu hình bài kiểm tra này');
   }
 
   const assignment = await examAssignmentService.updateExamConfigById(req.params.configId, req.body);
@@ -100,10 +100,10 @@ const deleteExamAssignment = catchAsync(async (req, res) => {
   // SECURITY: Verify center ownership before deleting
   const existingAssignment = await examAssignmentService.getExamConfigById(req.params.configId);
   if (!existingAssignment) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Exam assignment not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy cấu hình bài kiểm tra');
   }
   if (existingAssignment.centerId !== req.user.centerId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to delete this exam assignment');
+    throw new ApiError(httpStatus.FORBIDDEN, 'Bạn không có quyền xóa cấu hình bài kiểm tra này');
   }
 
   await examAssignmentService.deleteExamConfigById(req.params.configId, req.body);
@@ -120,10 +120,10 @@ const toggleExamAssignment = catchAsync(async (req, res) => {
   // SECURITY: Verify center ownership before updating
   const existingAssignment = await examAssignmentService.getExamConfigById(configId);
   if (!existingAssignment) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Exam assignment not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Không tìm thấy cấu hình bài kiểm tra');
   }
   if (existingAssignment.centerId !== req.user.centerId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to update this exam assignment status');
+    throw new ApiError(httpStatus.FORBIDDEN, 'Bạn không có quyền cập nhật trạng thái cấu hình bài kiểm tra này');
   }
 
   const assignment = await examAssignmentService.updateExamConfigById(configId, {

@@ -7,21 +7,32 @@ const examSessionService = require('../exam/examSession.service');
 const auditLogService = require('../system/auditLog.service');
 const { calculateNextDueDate } = require('../../utils/common');
 
+const EXAM_TYPE_LABEL_VI = {
+  far: 'thị lực xa',
+  near: 'thị lực gần',
+  contrast: 'độ tương phản',
+  stereopsis: 'thị giác lập thể',
+};
+
+const examTypeLabelVi = (examType) => EXAM_TYPE_LABEL_VI[examType] || examType;
+
 /**
  * Default exam configurations for new patients
+ * far / near / contrast: enabled, monthly
+ * stereopsis: disabled, monthly
  */
 const DEFAULT_EXAM_CONFIGS = [
-  { examType: 'far', frequency: 'weekly', isEnabled: true },
-  { examType: 'near', frequency: 'weekly', isEnabled: true },
+  { examType: 'far', frequency: 'monthly', isEnabled: true },
+  { examType: 'near', frequency: 'monthly', isEnabled: true },
   { examType: 'contrast', frequency: 'monthly', isEnabled: true },
-  { examType: 'stereopsis', frequency: 'monthly', isEnabled: true },
+  { examType: 'stereopsis', frequency: 'monthly', isEnabled: false },
 ];
 
 /**
- * Create exam configuration
+ * Create exam configuration.
+ * If the (patientId, examType) row already exists, update it (idempotent save).
  */
 const createExamConfig = async (configData) => {
-  // Check for duplicate (patientId + examType combination)
   const existing = await ExamAssignment.findOne({
     where: {
       patientId: configData.patientId,
@@ -30,10 +41,13 @@ const createExamConfig = async (configData) => {
   });
 
   if (existing) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      `Exam configuration for ${configData.examType} already exists for this patient`
-    );
+    return updateExamConfigById(existing.id, {
+      frequency: configData.frequency,
+      isEnabled: configData.isEnabled,
+      notificationSettings: configData.notificationSettings,
+      updatedBy: configData.updatedBy,
+      centerId: configData.centerId,
+    });
   }
 
   // Set createdBy = updatedBy for new records
@@ -131,7 +145,7 @@ const updateExamConfigById = async (id, updateData) => {
     if (existing) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Exam configuration for ${updateData.examType} already exists for this patient`
+        `Cấu hình bài kiểm tra cho ${examTypeLabelVi(updateData.examType)} đã tồn tại cho bệnh nhân này`
       );
     }
   }
@@ -221,7 +235,10 @@ const initializePatientConfigs = async (patientId, centerId, updatedBy, configsD
 const updateExamAssignment = async (patientId, examType, updateData) => {
   const config = await getExamAssignment(patientId, examType);
   if (!config) {
-    throw new ApiError(httpStatus.NOT_FOUND, `Cấu hình khám cho ${examType} không tồn tại cho bệnh nhân này`);
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      `Cấu hình khám cho ${examTypeLabelVi(examType)} không tồn tại cho bệnh nhân này`
+    );
   }
 
   Object.assign(config, updateData);
@@ -236,7 +253,7 @@ const updateExamAssignment = async (patientId, examType, updateData) => {
 const getDashboardData = async (patientId) => {
   const patientIdInt = parseInt(patientId, 10);
   if (!patientId || Number.isNaN(patientIdInt)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid patient ID');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Mã bệnh nhân không hợp lệ');
   }
 
   // Get exam configurations for the patient

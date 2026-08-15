@@ -199,14 +199,24 @@ describe('ExamAssignment Service — createExamConfig', () => {
     expect(provisionExamSession).not.toHaveBeenCalled();
   });
 
-  test('throws BAD_REQUEST when config for same examType already exists', async () => {
-    ExamAssignment.findOne.mockResolvedValue({ id: 5 }); // duplicate
+  test('updates existing config when same examType already exists (idempotent save)', async () => {
+    const existing = makeMockConfig({ id: 5, examType: 'far' });
+    ExamAssignment.findOne.mockResolvedValue(existing);
+    ExamAssignment.findByPk.mockResolvedValue(existing);
+    shouldProvisionForPatient.mockResolvedValue(false);
 
-    await expect(
-      examAssignmentService.createExamConfig({ patientId: 10, examType: 'far', centerId: 5 })
-    ).rejects.toMatchObject({ statusCode: 400 });
+    const result = await examAssignmentService.createExamConfig({
+      patientId: 10,
+      examType: 'far',
+      centerId: 5,
+      frequency: 'monthly',
+      isEnabled: false,
+      updatedBy: 2,
+    });
 
     expect(ExamAssignment.create).not.toHaveBeenCalled();
+    expect(existing.save).toHaveBeenCalled();
+    expect(result).toBe(existing);
     expect(provisionExamSession).not.toHaveBeenCalled();
   });
 });

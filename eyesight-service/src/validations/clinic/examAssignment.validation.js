@@ -8,14 +8,14 @@ const notificationSettingsSchema = Joi.object().keys({
   time: Joi.string()
     .pattern(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
     .default('09:00'), // HH:mm format
-  methods: Joi.array().items(Joi.string().valid('email', 'zalo')).default(['email']),
+  methods: Joi.array().items(Joi.string().valid('email', 'zalo', 'sms')).default(['email']),
 });
 
 const createExamAssignment = {
   body: Joi.object().keys({
     patientId: Joi.number().required(),
     examType: Joi.string().valid('far', 'near', 'contrast', 'stereopsis').required(),
-    frequency: Joi.string().valid('daily', 'weekly', 'monthly', 'quarterly', 'yearly').default('weekly'),
+    frequency: Joi.string().valid('daily', 'weekly', 'monthly', 'quarterly', 'yearly').default('monthly'),
     isEnabled: Joi.boolean().default(true),
     notificationSettings: notificationSettingsSchema.optional(),
     centerId: Joi.number(),
