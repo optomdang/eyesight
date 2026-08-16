@@ -35,6 +35,26 @@ describe('exerciseVisionPrerequisites', () => {
     ).toBe(true);
   });
 
+  it('allows when only initialResult (warranty/clinic baseline) exists', () => {
+    expect(
+      hasExerciseVisionLevel({
+        visionType: 'far',
+        eye: 'both',
+        examResults: { far: { initialResult: { leftEye: 7, rightEye: 9 } } },
+      })
+    ).toBe(true);
+  });
+
+  it('still blocks when initialResult eyes are empty', () => {
+    expect(
+      hasExerciseVisionLevel({
+        visionType: 'far',
+        eye: 'both',
+        examResults: { far: { initialResult: { leftEye: null, rightEye: null } } },
+      })
+    ).toBe(false);
+  });
+
   it('exports a user-facing message', () => {
     expect(EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE.length).toBeGreaterThan(10);
   });

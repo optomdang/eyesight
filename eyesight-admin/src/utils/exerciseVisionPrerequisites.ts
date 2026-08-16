@@ -6,10 +6,10 @@ import {
 import { getMyPatientInfo } from 'src/services/patient.service';
 
 export const EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE =
-  'Không thể xác định kích thước bài tập vì chưa có kết quả kiểm tra thị lực phù hợp với loại bài tập này.';
+  'Không thể xác định kích thước bài tập vì chưa có kết quả thị lực phù hợp với loại bài tập này.';
 
 export const EXERCISE_VISION_LEVEL_REQUIRED_GUIDANCE =
-  'Vui lòng hoàn thành bài kiểm tra thị lực tương ứng trước (mục Kiểm tra thị lực), hoặc yêu cầu bác sĩ bật "Chỉ định cấp độ thực hiện" và chọn mức thị lực trong thiết lập bài tập.';
+  'Vui lòng hoàn thành bài kiểm tra thị lực trên hệ thống, hoặc đảm bảo đã nhập kết quả ban đầu trong cam kết bảo hành/hồ sơ bệnh nhân. Có thể yêu cầu bác sĩ bật "Chỉ định cấp độ thực hiện" trong thiết lập bài tập.';
 
 export const hasExerciseVisionLevel = (params: ExerciseAssignmentVisionParams): boolean =>
   resolveExerciseAssignmentVisionLevel(params) !== null;

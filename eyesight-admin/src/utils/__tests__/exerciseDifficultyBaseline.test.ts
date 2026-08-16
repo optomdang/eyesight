@@ -120,6 +120,19 @@ describe('resolveExerciseStartVisionLevel', () => {
     ).toBe(8);
   });
 
+  it('falls back to initialResult when currentResult is missing', () => {
+    expect(
+      resolveExerciseStartVisionLevel({
+        difficultyBaselineSource: 'current_exam',
+        visionType: 'far',
+        configEye: 'right',
+        examResults: {
+          far: { initialResult: { leftEye: 6, rightEye: 10 } },
+        },
+      })
+    ).toBe(10);
+  });
+
   it('returns null for stereopsis', () => {
     expect(
       resolveExerciseStartVisionLevel({

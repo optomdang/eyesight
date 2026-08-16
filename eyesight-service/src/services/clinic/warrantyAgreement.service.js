@@ -27,6 +27,7 @@ const {
   isReexamWithinSixMonths,
   getNextPhaseNumber,
   buildDocumentSnapshot,
+  syncClinicalDataToPatientExamResults,
 } = require('./warrantyAgreement.helpers');
 
 const sanitizeSignatureForResponse = (signature) => {
@@ -282,12 +283,24 @@ const createAgreementForPatient = async (patientId, body, user, requestContext) 
     clinicalData,
   });
 
+  const syncedExamResults = syncClinicalDataToPatientExamResults(patient, clinicalData);
+  if (syncedExamResults) {
+    patient.examResults = syncedExamResults;
+    patient.changed('examResults', true);
+    await patient.save();
+  }
+
   await logWarrantyAudit({
     user,
     action: 'warrantyAgreement.create',
     entityId: agreement.id,
     centerId: patient.centerId,
-    metadata: { patientId, phaseId: initialPhase.id, phaseType: 'initial' },
+    metadata: {
+      patientId,
+      phaseId: initialPhase.id,
+      phaseType: 'initial',
+      syncedExamResultsToPatient: Boolean(syncedExamResults),
+    },
     requestContext,
   });
 
@@ -372,6 +385,13 @@ const updatePhaseClinicalData = async (agreementId, phaseId, body, user, request
 
   await phase.update(updates);
 
+  const syncedExamResults = syncClinicalDataToPatientExamResults(patient, body.clinicalData);
+  if (syncedExamResults) {
+    patient.examResults = syncedExamResults;
+    patient.changed('examResults', true);
+    await patient.save();
+  }
+
   await logWarrantyAudit({
     user,
     action: isAdminAmendCompleted
@@ -382,6 +402,7 @@ const updatePhaseClinicalData = async (agreementId, phaseId, body, user, request
     metadata: {
       patientId: agreement.patientId,
       phaseId: phase.id,
+      syncedExamResultsToPatient: Boolean(syncedExamResults),
       ...(isAdminAmendCompleted
         ? {
             previousClinicalData,

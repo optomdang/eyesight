@@ -218,9 +218,32 @@ describe('computeExercisePatientVision', () => {
     expect(v.farVisionLevel).toBe(8);
   });
 
-  it('không có examResults → null (không fallback)', () => {
+  it('không có examResults → null (không fallback giả)', () => {
     const v = computeExercisePatientVision({ visionType: 'far', eye: 'both' });
     expect(v).toEqual({ farVisionLevel: null, nearVisionLevel: null, contrastLevel: null });
+  });
+
+  it('chỉ có initialResult → dùng làm baseline bài tập', () => {
+    const v = computeExercisePatientVision({
+      visionType: 'far',
+      eye: 'right',
+      examResults: { far: { initialResult: { leftEye: 6, rightEye: 9 } } },
+    });
+    expect(v.farVisionLevel).toBe(9);
+  });
+
+  it('có cả currentResult và initialResult → ưu tiên currentResult', () => {
+    const v = computeExercisePatientVision({
+      visionType: 'far',
+      eye: 'left',
+      examResults: {
+        far: {
+          initialResult: { leftEye: 5, rightEye: 5 },
+          currentResult: { leftEye: 11, rightEye: 12 },
+        },
+      },
+    });
+    expect(v.farVisionLevel).toBe(11);
   });
 });
 
@@ -288,5 +311,37 @@ describe('resolveExerciseAssignmentVisionLevel', () => {
         examResults: { far: { currentResult: { leftEye: 7, rightEye: 11 } } },
       })
     ).toBe(11);
+  });
+
+  it('fallback initialResult khi chưa có currentResult', () => {
+    expect(
+      resolveExerciseAssignmentVisionLevel({
+        visionType: 'near',
+        eye: 'both',
+        examResults: { near: { initialResult: { leftEye: 3, rightEye: 4 } } },
+      })
+    ).toBe(3);
+  });
+
+  it('contrast: ưu tiên currentResult, fallback initialResult', () => {
+    expect(
+      resolveExerciseAssignmentVisionLevel({
+        visionType: 'contrast',
+        eye: 'right',
+        examResults: {
+          contrast: {
+            initialResult: { rightEye: 4 },
+            currentResult: { rightEye: 8 },
+          },
+        },
+      })
+    ).toBe(8);
+    expect(
+      resolveExerciseAssignmentVisionLevel({
+        visionType: 'contrast',
+        eye: 'right',
+        examResults: { contrast: { initialResult: { rightEye: 4 } } },
+      })
+    ).toBe(4);
   });
 });

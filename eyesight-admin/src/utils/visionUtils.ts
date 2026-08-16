@@ -430,12 +430,19 @@ type EyeResult = {
   bothEye?: number | string | null;
 };
 
+type ExamResultBucket = {
+  /** Kết quả bài test hệ thống / kết quả hiện tại trên hồ sơ. */
+  currentResult?: EyeResult;
+  /** Kết quả ban đầu (khám tay / cam kết bảo hành). */
+  initialResult?: EyeResult;
+};
+
 export type ExerciseExamResults =
   | {
-      far?: { currentResult?: EyeResult };
-      near?: { currentResult?: EyeResult };
-      contrast?: { currentResult?: EyeResult };
-      stereopsis?: { currentResult?: EyeResult };
+      far?: ExamResultBucket;
+      near?: ExamResultBucket;
+      contrast?: ExamResultBucket;
+      stereopsis?: ExamResultBucket;
     }
   | null
   | undefined;
@@ -466,8 +473,25 @@ const parsePositiveVisionLevel = (value: unknown): number | null => {
 };
 
 /**
+ * Ưu tiên currentResult (bài test hệ thống); nếu chưa có mức hợp lệ thì dùng
+ * initialResult (kết quả ban đầu trên hồ sơ / cam kết bảo hành).
+ */
+export const resolveExamLevelWithInitialFallback = (
+  bucket: ExamResultBucket | undefined,
+  eye: TrainingEye | string | null | undefined,
+  mode: 'standard' | 'contrast' = 'standard'
+): number | null => {
+  const resolve =
+    mode === 'contrast' ? resolveContrastExamLevel : resolveExerciseVisionLevel;
+  const fromCurrent = resolve(bucket?.currentResult, eye);
+  if (fromCurrent !== null) return fromCurrent;
+  return resolve(bucket?.initialResult, eye);
+};
+
+/**
  * Resolve độ khó thị lực cho một bài tập cụ thể.
- * Trả về null khi không có override bác sĩ và không có kết quả khám phù hợp.
+ * Trả về null khi không có override bác sĩ và không có kết quả khám phù hợp
+ * (currentResult hoặc initialResult).
  */
 export const resolveExerciseAssignmentVisionLevel = (
   params: ExerciseAssignmentVisionParams
@@ -484,14 +508,18 @@ export const resolveExerciseAssignmentVisionLevel = (
   }
 
   if (vt === 'stereopsis') {
-    return parsePositiveVisionLevel(examResults?.stereopsis?.currentResult?.bothEye);
+    const stereo = examResults?.stereopsis;
+    return (
+      parsePositiveVisionLevel(stereo?.currentResult?.bothEye) ??
+      parsePositiveVisionLevel(stereo?.initialResult?.bothEye)
+    );
   }
 
-  const currentResult = examResults?.[vt as 'far' | 'near' | 'contrast']?.currentResult;
+  const bucket = examResults?.[vt as 'far' | 'near' | 'contrast'];
   if (vt === 'contrast') {
-    return resolveContrastExamLevel(currentResult, eye);
+    return resolveExamLevelWithInitialFallback(bucket, eye, 'contrast');
   }
-  return resolveExerciseVisionLevel(currentResult, eye);
+  return resolveExamLevelWithInitialFallback(bucket, eye, 'standard');
 };
 
 /**
@@ -501,8 +529,8 @@ export const resolveExerciseAssignmentVisionLevel = (
  * - Nếu bác sĩ bật override (levelOverride + visionLevel) → dùng visionLevel cho
  *   đúng loại thị lực đang tập. Với contrast, override chỉ áp dụng mức tương phản;
  *   cỡ chữ vẫn lấy từ kết quả khám xa/gần. `eye` bị bỏ qua khi override far/near.
- * - Ngược lại → lấy từ exam của bệnh nhân theo eye (xem resolveExerciseVisionLevel:
- *   'both' = mắt kém hơn). Thiếu dữ liệu → null (caller phải chặn vào bài tập).
+ * - Ngược lại → ưu tiên currentResult, fallback initialResult theo eye
+ *   ('both' = mắt kém hơn). Thiếu dữ liệu → null (caller phải chặn vào bài tập).
  */
 export const computeExercisePatientVision = (
   params: ExerciseAssignmentVisionParams
@@ -516,8 +544,8 @@ export const computeExercisePatientVision = (
       // Contrast override sets sensitivity only — letter size still comes from far/near exam.
       if (visionType === 'contrast') {
         return {
-          farVisionLevel: resolveExerciseVisionLevel(examResults?.far?.currentResult, eye),
-          nearVisionLevel: resolveExerciseVisionLevel(examResults?.near?.currentResult, eye),
+          farVisionLevel: resolveExamLevelWithInitialFallback(examResults?.far, eye),
+          nearVisionLevel: resolveExamLevelWithInitialFallback(examResults?.near, eye),
           contrastLevel: overrideLevel,
         };
       }
@@ -530,9 +558,9 @@ export const computeExercisePatientVision = (
   }
 
   return {
-    farVisionLevel: resolveExerciseVisionLevel(examResults?.far?.currentResult, eye),
-    nearVisionLevel: resolveExerciseVisionLevel(examResults?.near?.currentResult, eye),
-    contrastLevel: resolveContrastExamLevel(examResults?.contrast?.currentResult, eye),
+    farVisionLevel: resolveExamLevelWithInitialFallback(examResults?.far, eye),
+    nearVisionLevel: resolveExamLevelWithInitialFallback(examResults?.near, eye),
+    contrastLevel: resolveExamLevelWithInitialFallback(examResults?.contrast, eye, 'contrast'),
   };
 };
 

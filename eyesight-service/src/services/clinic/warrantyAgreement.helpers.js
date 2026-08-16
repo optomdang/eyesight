@@ -101,6 +101,69 @@ const buildDocumentSnapshot = (phase, agreement) => ({
   completedAt: phase.completedAt,
 });
 
+const eyeResultHasValue = (eyeResult) =>
+  Boolean(
+    eyeResult &&
+      (eyeResult.leftEye || eyeResult.rightEye || eyeResult.bothEye)
+  );
+
+/**
+ * Đồng bộ clinicalData (cam kết bảo hành) → Patient.examResults để portal bài tập
+ * đọc được kết quả ban đầu khi chưa làm bài test hệ thống.
+ * - clinical.initial → patient.initialResult
+ * - nếu patient.currentResult trống → copy initial vào currentResult
+ */
+const syncClinicalDataToPatientExamResults = (patient, clinicalData) => {
+  const clinicalExamResults = clinicalData?.examResults;
+  if (!clinicalExamResults || typeof clinicalExamResults !== 'object') {
+    return null;
+  }
+
+  const nextExamResults = {
+    ...(patient.examResults && typeof patient.examResults === 'object' ? patient.examResults : {}),
+  };
+  let changed = false;
+
+  for (const examType of EXAM_TYPES) {
+    const clinical = clinicalExamResults[examType];
+    if (!clinical) continue;
+
+    const bucket = {
+      ...(nextExamResults[examType] || {}),
+    };
+
+    if (eyeResultHasValue(clinical.initial)) {
+      bucket.initialResult = { ...clinical.initial };
+      changed = true;
+
+      if (!eyeResultHasValue(bucket.currentResult)) {
+        bucket.currentResult = { ...clinical.initial };
+        if (!bucket.lastExamDate) {
+          bucket.lastExamDate = new Date().toISOString();
+        }
+      }
+    }
+
+    // Không ghi đè currentResult đã có từ bài test hệ thống.
+    if (eyeResultHasValue(clinical.current) && !eyeResultHasValue(bucket.currentResult)) {
+      bucket.currentResult = { ...clinical.current };
+      if (!bucket.lastExamDate) {
+        bucket.lastExamDate = clinical.lastExamDate || new Date().toISOString();
+      }
+      changed = true;
+    }
+
+    if (clinical.lastExamDate && !bucket.lastExamDate) {
+      bucket.lastExamDate = clinical.lastExamDate;
+      changed = true;
+    }
+
+    nextExamResults[examType] = bucket;
+  }
+
+  return changed ? nextExamResults : null;
+};
+
 module.exports = {
   PHASE_STATUSES,
   computeDocumentHash,
@@ -112,4 +175,5 @@ module.exports = {
   isReexamWithinSixMonths,
   getNextPhaseNumber,
   buildDocumentSnapshot,
+  syncClinicalDataToPatientExamResults,
 };

@@ -2,6 +2,7 @@ const {
   isReexamWithinSixMonths,
   computeDocumentHash,
   deriveAgreementStatus,
+  syncClinicalDataToPatientExamResults,
   PHASE_STATUSES,
 } = require('../../../src/services/clinic/warrantyAgreement.helpers');
 
@@ -43,5 +44,41 @@ describe('warrantyAgreement helpers', () => {
         { status: PHASE_STATUSES.COMPLETED },
       ])
     ).toBe(PHASE_STATUSES.COMPLETED);
+  });
+
+  test('syncClinicalDataToPatientExamResults maps warranty initial → patient initialResult', () => {
+    const patient = {
+      examResults: {
+        far: {
+          initialResult: { leftEye: null, rightEye: null, bothEye: null },
+          currentResult: { leftEye: null, rightEye: null, bothEye: null },
+        },
+      },
+    };
+    const next = syncClinicalDataToPatientExamResults(patient, {
+      examResults: {
+        far: { initial: { leftEye: 7, rightEye: 9, bothEye: null } },
+      },
+    });
+    expect(next.far.initialResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
+    expect(next.far.currentResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
+  });
+
+  test('syncClinicalDataToPatientExamResults does not overwrite existing currentResult', () => {
+    const patient = {
+      examResults: {
+        far: {
+          initialResult: { leftEye: 5, rightEye: 5, bothEye: null },
+          currentResult: { leftEye: 12, rightEye: 14, bothEye: null },
+        },
+      },
+    };
+    const next = syncClinicalDataToPatientExamResults(patient, {
+      examResults: {
+        far: { initial: { leftEye: 7, rightEye: 9, bothEye: null } },
+      },
+    });
+    expect(next.far.initialResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
+    expect(next.far.currentResult).toEqual({ leftEye: 12, rightEye: 14, bothEye: null });
   });
 });
