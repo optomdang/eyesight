@@ -93,6 +93,19 @@ describe('vtVisionSizing', () => {
     expect(resolved?.stimulusContrastPercent).toBe(100);
   });
 
+  it('resolveVtExerciseVision: contrast can size from far initialResult', () => {
+    const resolved = resolveVtExerciseVision({
+      visionType: 'contrast',
+      eye: 'right',
+      examResults: {
+        far: { initialResult: { rightEye: 10 } },
+        contrast: { currentResult: { rightEye: 5 } },
+      },
+    });
+    expect(resolved?.sizeVisionLevel).toBe(9);
+    expect(resolved?.contrastLevel).toBe(5);
+  });
+
   it('resolveVtExerciseVision: contrast sizes one step larger than far exam', () => {
     const resolved = resolveVtExerciseVision({
       visionType: 'contrast',

@@ -4,17 +4,19 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'src/hooks/useTranslation';
 import {
   EXERCISE_VISION_LEVEL_REQUIRED_GUIDANCE,
-  EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE,
+  getExerciseVisionRequiredMessage,
 } from 'src/utils/exerciseVisionPrerequisites';
 
 type ExerciseVisionRequiredAlertProps = {
   showBackButton?: boolean;
   backTo?: string;
+  visionType?: string | null;
 };
 
 const ExerciseVisionRequiredAlert: React.FC<ExerciseVisionRequiredAlertProps> = ({
   showBackButton = false,
   backTo = '/portal/exercises',
+  visionType,
 }) => {
   const { t } = useTranslation();
 
@@ -23,7 +25,10 @@ const ExerciseVisionRequiredAlert: React.FC<ExerciseVisionRequiredAlertProps> = 
       <AlertTitle>
         {t('exerciseSetup.visionRequiredTitle', 'Chưa thể bắt đầu bài tập')}
       </AlertTitle>
-      {t('exerciseSetup.visionRequiredMessage', EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE)}
+      {t(
+        'exerciseSetup.visionRequiredMessage',
+        getExerciseVisionRequiredMessage(visionType)
+      )}
       <Box component="p" sx={{ mt: 1, mb: 0 }}>
         {t('exerciseSetup.visionRequiredGuidance', EXERCISE_VISION_LEVEL_REQUIRED_GUIDANCE)}
       </Box>

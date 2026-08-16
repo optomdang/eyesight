@@ -11,7 +11,7 @@ import {
   calculateVisualSettings,
   computeExercisePatientVision,
   resolveAssignmentTrainingEye,
-  resolveExerciseVisionLevel,
+  resolveExamLevelWithInitialFallback,
   resolveDevicePixelRatio,
   type ExerciseExamResults,
   type ScreenInfo,
@@ -389,8 +389,8 @@ export function resolveVtExerciseVision(params: VtExerciseVisionInput): VtResolv
     examResults: input.examResults,
   });
 
-  const farFromExam = resolveExerciseVisionLevel(
-    input.examResults?.far?.currentResult,
+  const farFromExam = resolveExamLevelWithInitialFallback(
+    input.examResults?.far,
     effectiveEye ?? undefined
   );
 

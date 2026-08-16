@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Game2048Exercise from '../Game2048Exercise';
 
 const navigateMock = vi.fn();
@@ -135,6 +135,32 @@ describe('Game2048Exercise execution lifecycle', () => {
     mockCompleteExercise.mockResolvedValue({ status: 'completed', id: 1 });
   });
 
+  const startTrainingFromGuide = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: /Bắt đầu luyện tập/i }));
+  };
+
+  it('shows the guide and waits to create a result until training starts', async () => {
+    render(
+      <Game2048Exercise
+        assignmentId={10}
+        sessionId={20}
+        assignment={{
+          ...assignment,
+          trainingEye: 'left',
+        }}
+        screenParams={screenParams}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: /Hướng dẫn luyện tập 2048/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/che mắt phải/i).length).toBeGreaterThan(0);
+    expect(mockStartExercise).not.toHaveBeenCalled();
+
+    await startTrainingFromGuide();
+
+    await waitFor(() => expect(mockStartExercise).toHaveBeenCalledWith(10, 20));
+  });
+
   it('restores resume state after game engine becomes ready', async () => {
     const savedState = {
       grid: {
@@ -173,16 +199,17 @@ describe('Game2048Exercise execution lifecycle', () => {
         sessionId={20}
         assignment={assignment}
         screenParams={screenParams}
-      />
+      />,
     );
 
+    await startTrainingFromGuide();
     await waitFor(() => expect(mockStartExercise).toHaveBeenCalledWith(10, 20));
     expect(setGameState).not.toHaveBeenCalled();
 
     engineReady = true;
     gameInstanceRef.current = {
       score: 256,
-      storageManager: { setGameState },
+      storageManager: { clearGameState: vi.fn(), setGameState },
       setup,
       serialize: vi.fn(() => savedState),
     };
@@ -193,7 +220,7 @@ describe('Game2048Exercise execution lifecycle', () => {
         sessionId={20}
         assignment={assignment}
         screenParams={screenParams}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -230,9 +257,10 @@ describe('Game2048Exercise execution lifecycle', () => {
         sessionId={20}
         assignment={assignment}
         screenParams={screenParams}
-      />
+      />,
     );
 
+    await startTrainingFromGuide();
     await waitFor(() => expect(mockStartExercise).toHaveBeenCalled());
 
     await waitFor(() => {
@@ -242,7 +270,7 @@ describe('Game2048Exercise execution lifecycle', () => {
     expect(screen.queryByText('Tiếp tục luyện')).not.toBeInTheDocument();
     expect(screen.getAllByText('Kết thúc').length).toBeGreaterThan(0);
     expect(
-      await screen.findByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.')
+      await screen.findByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.'),
     ).toBeInTheDocument();
   });
 
@@ -275,13 +303,14 @@ describe('Game2048Exercise execution lifecycle', () => {
         sessionId={20}
         assignment={assignment}
         screenParams={screenParams}
-      />
+      />,
     );
 
+    await startTrainingFromGuide();
     await waitFor(() => expect(mockCompleteExercise).toHaveBeenCalledTimes(1));
 
     expect(
-      screen.queryByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.')
+      screen.queryByText('Bạn đã hoàn thành bài tập. Kết quả đã được lưu lại.'),
     ).not.toBeInTheDocument();
     expect(showSnackbarMock).toHaveBeenCalledWith('Không thể lưu kết quả bài tập', 'error');
   });
@@ -327,9 +356,10 @@ describe('Game2048Exercise execution lifecycle', () => {
         sessionId={20}
         assignment={assignment}
         screenParams={screenParams}
-      />
+      />,
     );
 
+    await startTrainingFromGuide();
     await waitFor(() => expect(mockStartExercise).toHaveBeenCalledWith(10, 20));
     expect(onGameInitHook).toBeDefined();
 

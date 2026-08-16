@@ -81,4 +81,19 @@ describe('warrantyAgreement helpers', () => {
     expect(next.far.initialResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
     expect(next.far.currentResult).toEqual({ leftEye: 12, rightEye: 14, bothEye: null });
   });
+
+  test('syncClinicalDataToPatientExamResults maps near warranty initial', () => {
+    const next = syncClinicalDataToPatientExamResults(
+      { examResults: {} },
+      {
+        examResults: {
+          near: { initial: { leftEye: 3, rightEye: 4, bothEye: null } },
+          far: { initial: { leftEye: 8, rightEye: 9, bothEye: null } },
+        },
+      }
+    );
+    expect(next.near.initialResult).toEqual({ leftEye: 3, rightEye: 4, bothEye: null });
+    expect(next.near.currentResult).toEqual({ leftEye: 3, rightEye: 4, bothEye: null });
+    expect(next.far.initialResult).toEqual({ leftEye: 8, rightEye: 9, bothEye: null });
+  });
 });

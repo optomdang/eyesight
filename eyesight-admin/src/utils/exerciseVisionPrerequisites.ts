@@ -11,6 +11,19 @@ export const EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE =
 export const EXERCISE_VISION_LEVEL_REQUIRED_GUIDANCE =
   'Vui lòng hoàn thành bài kiểm tra thị lực trên hệ thống, hoặc đảm bảo đã nhập kết quả ban đầu trong cam kết bảo hành/hồ sơ bệnh nhân. Có thể yêu cầu bác sĩ bật "Chỉ định cấp độ thực hiện" trong thiết lập bài tập.';
 
+const VISION_TYPE_LABELS: Record<string, string> = {
+  far: 'thị lực xa',
+  near: 'thị lực gần',
+  contrast: 'độ tương phản',
+  stereopsis: 'thị giác lập thể',
+};
+
+export const getExerciseVisionRequiredMessage = (visionType?: string | null): string => {
+  const label = visionType ? VISION_TYPE_LABELS[visionType] : null;
+  if (!label) return EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE;
+  return `Không thể xác định kích thước bài tập vì chưa có kết quả ${label} (ban đầu trong cam kết bảo hành hoặc bài kiểm tra hệ thống).`;
+};
+
 export const hasExerciseVisionLevel = (params: ExerciseAssignmentVisionParams): boolean =>
   resolveExerciseAssignmentVisionLevel(params) !== null;
 

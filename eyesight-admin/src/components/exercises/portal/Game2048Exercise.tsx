@@ -41,6 +41,7 @@ import type { PortalExerciseProps } from './types';
 import { resolveDichopticPresentation } from 'src/utils/dichopticUtils';
 import { useDichopticSessionConfig } from 'src/hooks/exercises/useDichopticSessionConfig';
 import { resolveExerciseColorScheme } from 'src/services/colorPreset.service';
+import Game2048InstructionStep from './Game2048InstructionStep';
 
 /** Score delta between auto-balance fellow-contrast steps in 2048 (no per-stage accuracy). */
 const DICHOPTIC_2048_SCORE_MILESTONE = 200;
@@ -89,7 +90,8 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [completionSlotCounted, setCompletionSlotCounted] = useState(true);
   const [isPausing, setIsPausing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasStartedTraining, setHasStartedTraining] = useState(false);
   const [currentResultId, setCurrentResultId] = useState<number | null>(null);
 
   // Game session tracking
@@ -97,7 +99,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const exerciseConfig = useMemo(() => assignment?.exerciseConfig, [assignment]);
   const { dichopticConfig: sessionDichoptic, tryAdvanceOnAccuracy } = useDichopticSessionConfig(
-    exerciseConfig?.dichoptic
+    exerciseConfig?.dichoptic,
   );
   const tryAdvanceOnAccuracyRef = useRef(tryAdvanceOnAccuracy);
   const lastDichopticScoreMilestoneRef = useRef(0);
@@ -114,7 +116,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         trainingEye: assignment?.trainingEye,
         configEye: exerciseConfig?.eye,
       }),
-    [assignment?.trainingEye, exerciseConfig?.eye]
+    [assignment?.trainingEye, exerciseConfig?.eye],
   );
   const visionType = exerciseConfig?.visionType;
 
@@ -132,7 +134,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         configEye: exerciseConfig?.eye,
         examResults: patientExamResults,
       }),
-    [assignment, patientExamResults, eye, visionType]
+    [assignment, patientExamResults, eye, visionType],
   );
 
   // Starting level respects difficultyBaselineSource — may use lastAchievedVisionLevel
@@ -158,7 +160,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       assignment?.trainingEye,
       exerciseConfig?.eye,
       patientExamResults,
-    ]
+    ],
   );
 
   const canDetermineVisionSize = useMemo(
@@ -171,10 +173,13 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         configEye: exerciseConfig?.eye,
         examResults: patientExamResults,
       }),
-    [assignment, patientExamResults, eye, visionType]
+    [assignment, patientExamResults, eye, visionType],
   );
 
-  useExerciseFullscreen(fullscreenRootRef, !isLoading && canDetermineVisionSize);
+  useExerciseFullscreen(
+    fullscreenRootRef,
+    hasStartedTraining && !isLoading && canDetermineVisionSize,
+  );
 
   const navigateToResults = useCallback(() => {
     navigate(`/portal/assignments/${assignmentId}/sessions/${sessionId}/results`);
@@ -210,7 +215,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   // Block navigation when exercise is active (not during timeout completion)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     return Boolean(
-      shouldBlockExerciseNavigation() && currentLocation.pathname !== nextLocation.pathname
+      shouldBlockExerciseNavigation() && currentLocation.pathname !== nextLocation.pathname,
     );
   });
 
@@ -396,7 +401,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         accuracy: Math.round(accuracy * 100) / 100,
       };
     },
-    [exerciseConfig?.duration]
+    [exerciseConfig?.duration],
   );
 
   /**
@@ -406,7 +411,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   const completeExerciseResult = useCallback(
     async (
       finalScore: number,
-      options?: { fromTimeout?: boolean }
+      options?: { fromTimeout?: boolean },
     ): Promise<{ success: boolean; slotCounted: boolean }> => {
       const currentSession = gameExecutionRef.current;
 
@@ -417,7 +422,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       if (!resultId) {
         showSnackbar(
           'Phiên tập chưa được khởi tạo trên máy chủ — kết quả không thể lưu. Vui lòng tải lại trang.',
-          'error'
+          'error',
         );
         return { success: false, slotCounted: false };
       }
@@ -458,7 +463,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         return { success: false, slotCounted: false };
       }
     },
-    [assignmentId, sessionId, assignment, buildExecutionMetrics, showSnackbar]
+    [assignmentId, sessionId, assignment, buildExecutionMetrics, showSnackbar],
   );
 
   const handleTimeoutSubmission = useCallback(async () => {
@@ -531,10 +536,10 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
   useEffect(() => {
     // Exercise type is guaranteed supported here: the PortalExercise dispatcher
     // only mounts this component for the '2048' registry entry.
-    if (assignment) {
+    if (assignment && hasStartedTraining) {
       void startExerciseResult();
     }
-  }, [assignment]);
+  }, [assignment, hasStartedTraining]);
 
   // Calculate visual settings from patient vision data and exercise config
   const getVisualSettings = useCallback((): VisualSettings | undefined => {
@@ -700,7 +705,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         originalActuate.call(this, grid, metadata);
       };
     },
-    [assignment]
+    [assignment],
   );
 
   /**
@@ -730,7 +735,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
         keepPlaying: typeof state.keepPlaying === 'boolean' ? state.keepPlaying : false,
       };
     },
-    [isValidGameState]
+    [isValidGameState],
   );
 
   const currentVisualSettings = useMemo(() => getVisualSettings(), [getVisualSettings]);
@@ -743,9 +748,9 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
           dichoptic: sessionDichoptic,
           eye: exerciseConfig?.eye ?? null,
         },
-        { trainingEye: assignment?.trainingEye ?? null }
+        { trainingEye: assignment?.trainingEye ?? null },
       ),
-    [exerciseConfig?.colorScheme, sessionDichoptic, exerciseConfig?.eye, assignment?.trainingEye]
+    [exerciseConfig?.colorScheme, sessionDichoptic, exerciseConfig?.eye, assignment?.trainingEye],
   );
 
   // ==================== GAME ENGINE HOOK ====================
@@ -791,7 +796,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 
       return false;
     },
-    [gameInstanceRef, normalizeGameState]
+    [gameInstanceRef, normalizeGameState],
   );
 
   // Fallback restore if engine was already warm when resume state arrives
@@ -889,7 +894,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
 
       assignedDurationMinRef.current = resolveAssignedDurationMinutes(
         result.exerciseConfig?.duration,
-        exerciseConfig?.duration
+        exerciseConfig?.duration,
       );
 
       if (action === 'resume') {
@@ -900,7 +905,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       ) {
         showSnackbar(
           'Không tìm thấy trạng thái bàn chơi đã lưu. Hãy dùng nút Tạm dừng trước khi rời bài tập.',
-          'warning'
+          'warning',
         );
       }
 
@@ -955,7 +960,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
       assignedDurationMinRef.current = null;
       showSnackbar(
         'Không thể bắt đầu bài tập trên máy chủ. Vui lòng thử lại — kết quả sẽ không được lưu nếu tiếp tục offline.',
-        'error'
+        'error',
       );
       navigate('/portal/exercises');
     }
@@ -1006,6 +1011,10 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
     );
   }
 
+  const handleStartTraining = () => {
+    setHasStartedTraining(true);
+  };
+
   // Loading state while starting exercise
   return (
     <LoadingBoundary loading={isLoading} height="100vh">
@@ -1019,147 +1028,160 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          overflow: 'hidden',
-          bgcolor: '#f5f5f5',
+          overflow: hasStartedTraining ? 'hidden' : 'auto',
+          background: hasStartedTraining ? '#f5f5f5' : 'linear-gradient(135deg, #f4f8fd, #eef5ff)',
         }}
       >
-        <Box
-          sx={{
-            position: 'sticky',
-            top: 0,
-            left: 0,
-            right: 0,
-            p: 2,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'white',
-            borderBottom: '1px solid #e0e0e0',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            zIndex: 10,
-            flexShrink: 0,
-          }}
-        >
-          {/* Game Stats - Centered */}
-          {gameExecutionRef?.current && (
-            <Box sx={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                  {gameExecutionRef.current.maxScore}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Điểm
-                </Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  {Math.floor((currentTime - (gameExecutionRef.current.startTime || 0)) / 1000)}s
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Thời gian
-                </Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  {gameExecutionRef.current.movesCount}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Nước đi
-                </Typography>
-              </Box>
-              {timeRemaining !== null && timeRemaining !== undefined && (
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      color: timeRemaining <= 60000 ? 'error.main' : 'success.main',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {Math.floor(timeRemaining / 60000)}:
-                    {(Math.floor(timeRemaining / 1000) % 60).toString().padStart(2, '0')}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Còn lại
-                  </Typography>
+        {!hasStartedTraining ? (
+          <Game2048InstructionStep
+            trainingEye={eye}
+            requiresAnaglyphGlasses={dichopticPresentation.enabled}
+            onStart={handleStartTraining}
+          />
+        ) : (
+          <>
+            <Box
+              sx={{
+                position: 'sticky',
+                top: 0,
+                left: 0,
+                right: 0,
+                p: 2,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'white',
+                borderBottom: '1px solid #e0e0e0',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                zIndex: 10,
+                flexShrink: 0,
+              }}
+            >
+              {/* Game Stats - Centered */}
+              {gameExecutionRef?.current && (
+                <Box
+                  sx={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      {gameExecutionRef.current.maxScore}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Điểm
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {Math.floor((currentTime - (gameExecutionRef.current.startTime || 0)) / 1000)}
+                      s
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Thời gian
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      {gameExecutionRef.current.movesCount}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Nước đi
+                    </Typography>
+                  </Box>
+                  {timeRemaining !== null && timeRemaining !== undefined && (
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          color: timeRemaining <= 60000 ? 'error.main' : 'success.main',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        {Math.floor(timeRemaining / 60000)}:
+                        {(Math.floor(timeRemaining / 1000) % 60).toString().padStart(2, '0')}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Còn lại
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               )}
+
+              {/* Control Buttons - Positioned absolute right */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: 16,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  gap: 1,
+                }}
+              >
+                <Button
+                  onClick={handlePauseClick}
+                  variant="outlined"
+                  color="primary"
+                  size="small"
+                  disabled={isPausing || !isGameActive()}
+                >
+                  {isPausing ? 'Đang lưu...' : 'Tạm dừng'}
+                </Button>
+                <Button
+                  onClick={handleEndExercise}
+                  variant="contained"
+                  color="error"
+                  size="small"
+                  disabled={!isGameActive()}
+                >
+                  Kết thúc
+                </Button>
+              </Box>
             </Box>
-          )}
 
-          {/* Control Buttons - Positioned absolute right */}
-          <Box
-            sx={{
-              position: 'absolute',
-              right: 16,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              display: 'flex',
-              gap: 1,
-            }}
-          >
-            <Button
-              onClick={handlePauseClick}
-              variant="outlined"
-              color="primary"
-              size="small"
-              disabled={isPausing || !isGameActive()}
-            >
-              {isPausing ? 'Đang lưu...' : 'Tạm dừng'}
-            </Button>
-            <Button
-              onClick={handleEndExercise}
-              variant="contained"
-              color="error"
-              size="small"
-              disabled={!isGameActive()}
-            >
-              Kết thúc
-            </Button>
-          </Box>
-        </Box>
+            {/* Game container */}
+            <Box
+              component="div"
+              className="game-wrapper"
+              ref={gameContainerRef}
+              data-patient-vision={patientVision ? JSON.stringify(patientVision) : undefined}
+              data-visual-settings={
+                currentVisualSettings ? JSON.stringify(currentVisualSettings) : undefined
+              }
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                px: 2,
+                pb: 2,
+              }}
+            />
 
-        {/* Game container */}
-        <Box
-          component="div"
-          className="game-wrapper"
-          ref={gameContainerRef}
-          data-patient-vision={patientVision ? JSON.stringify(patientVision) : undefined}
-          data-visual-settings={
-            currentVisualSettings ? JSON.stringify(currentVisualSettings) : undefined
-          }
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            px: 2,
-            pb: 2,
-          }}
-        />
+            <ExitConfirmationDialog
+              open={showExitDialog}
+              onClose={handleExitCancel}
+              onConfirm={handleExitConfirm}
+              container={fullscreenRootRef.current}
+            />
 
-        <ExitConfirmationDialog
-          open={showExitDialog}
-          onClose={handleExitCancel}
-          onConfirm={handleExitConfirm}
-          container={fullscreenRootRef.current}
-        />
+            <ExerciseEndConfirmDialog
+              open={showEndDialog}
+              onConfirm={handleEndConfirm}
+              onCancel={handleEndCancel}
+              container={fullscreenRootRef.current}
+            />
 
-        <ExerciseEndConfirmDialog
-          open={showEndDialog}
-          onConfirm={handleEndConfirm}
-          onCancel={handleEndCancel}
-          container={fullscreenRootRef.current}
-        />
-
-        <ExerciseCompletionDialog
-          open={showCompletionDialog}
-          onClose={handleCompletionDialogClose}
-          container={fullscreenRootRef.current}
-          slotCounted={completionSlotCounted}
-        />
+            <ExerciseCompletionDialog
+              open={showCompletionDialog}
+              onClose={handleCompletionDialogClose}
+              container={fullscreenRootRef.current}
+              slotCounted={completionSlotCounted}
+            />
+          </>
+        )}
       </Box>
     </LoadingBoundary>
   );

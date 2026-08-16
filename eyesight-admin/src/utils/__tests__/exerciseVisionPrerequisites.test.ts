@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE,
+  getExerciseVisionRequiredMessage,
   hasExerciseVisionLevel,
 } from '../exerciseVisionPrerequisites';
 
@@ -45,6 +46,29 @@ describe('exerciseVisionPrerequisites', () => {
     ).toBe(true);
   });
 
+  it('near exercise ignores contrast-only results', () => {
+    expect(
+      hasExerciseVisionLevel({
+        visionType: 'near',
+        eye: 'both',
+        examResults: {
+          contrast: { currentResult: { leftEye: 5, rightEye: 6 } },
+          far: { initialResult: { leftEye: 8, rightEye: 9 } },
+        },
+      })
+    ).toBe(false);
+  });
+
+  it('allows near when warranty near initialResult exists', () => {
+    expect(
+      hasExerciseVisionLevel({
+        visionType: 'near',
+        eye: 'both',
+        examResults: { near: { initialResult: { leftEye: 3, rightEye: 4 } } },
+      })
+    ).toBe(true);
+  });
+
   it('still blocks when initialResult eyes are empty', () => {
     expect(
       hasExerciseVisionLevel({
@@ -57,5 +81,6 @@ describe('exerciseVisionPrerequisites', () => {
 
   it('exports a user-facing message', () => {
     expect(EXERCISE_VISION_LEVEL_REQUIRED_MESSAGE.length).toBeGreaterThan(10);
+    expect(getExerciseVisionRequiredMessage('near')).toMatch(/thị lực gần/);
   });
 });

@@ -16,6 +16,7 @@ const { provisionAllSessionsForPatient } = require('../../utils/sessionProvision
 const { sanitizePagination, buildSortBy, buildPagination, ATTRS, FILTERS, monitor } = require('../../utils/query');
 const { ExamResult } = require('../../models');
 const { rebuildExamResults, hasData, VISION_TYPES } = require('../../utils/examResultsBackfill');
+const { syncClinicalDataToPatientExamResults } = require('./warrantyAgreement.helpers');
 
 // ===== PATIENT OPERATIONS =====
 
@@ -636,13 +637,30 @@ const updateMedicalRecord = async (patientId, medicalData) => {
 
 /**
  * Rebuild Patient.examResults from completed ExamResult rows when cache is missing/stale.
- * Fixes portal exercise gate after exams completed before cache sync existed.
+ * Also hydrates initialResult from warranty clinicalData so portal can unlock from
+ * cam kết bảo hành without requiring the doctor to re-save the warranty form.
  */
 const ensurePatientExamResultsCache = async (patient) => {
   if (!patient) return patient;
 
-  const missingTypes = VISION_TYPES.filter((type) => !hasData(patient.examResults?.[type]?.currentResult));
+  let examResults = patient.examResults;
+  let changed = false;
+
+  // 1) Warranty clinical (cam kết) → patient.examResults.initialResult (+ current if empty)
+  const warrantySynced = await hydrateExamResultsFromWarranty(patient);
+  if (warrantySynced) {
+    examResults = warrantySynced;
+    changed = true;
+    patient.examResults = examResults;
+  }
+
+  // 2) Completed system exams → fill missing currentResult buckets
+  const missingTypes = VISION_TYPES.filter((type) => !hasData(examResults?.[type]?.currentResult));
   if (missingTypes.length === 0) {
+    if (changed) {
+      await patient.update({ examResults });
+      patient.examResults = examResults;
+    }
     return patient;
   }
 
@@ -652,7 +670,12 @@ const ensurePatientExamResultsCache = async (patient) => {
     raw: true,
   });
 
-  const { examResults, changed } = rebuildExamResults(patient.examResults, completedExams);
+  const rebuilt = rebuildExamResults(examResults, completedExams);
+  if (rebuilt.changed) {
+    examResults = rebuilt.examResults;
+    changed = true;
+  }
+
   if (!changed) {
     return patient;
   }
@@ -660,6 +683,41 @@ const ensurePatientExamResultsCache = async (patient) => {
   await patient.update({ examResults });
   patient.examResults = examResults;
   return patient;
+};
+
+/**
+ * Pull clinical exam baselines from the patient's warranty phases into Patient.examResults.
+ * Applies phases in ascending order so later re-exam data can fill empty currentResult.
+ */
+const hydrateExamResultsFromWarranty = async (patient) => {
+  const { WarrantyAgreement, WarrantyAgreementPhase } = require('../../models');
+
+  const agreement = await WarrantyAgreement.findOne({
+    where: { patientId: patient.id, deleted: false },
+    order: [['id', 'DESC']],
+    attributes: ['id'],
+  });
+  if (!agreement) return null;
+
+  const phases = await WarrantyAgreementPhase.findAll({
+    where: { agreementId: agreement.id },
+    order: [['phaseNumber', 'ASC']],
+    attributes: ['phaseNumber', 'clinicalData'],
+  });
+  if (!phases.length) return null;
+
+  let workingPatient = { examResults: patient.examResults };
+  let nextExamResults = null;
+
+  for (const phase of phases) {
+    const synced = syncClinicalDataToPatientExamResults(workingPatient, phase.clinicalData);
+    if (synced) {
+      nextExamResults = synced;
+      workingPatient = { examResults: synced };
+    }
+  }
+
+  return nextExamResults;
 };
 
 // ===== EXPORTS =====

@@ -8,7 +8,7 @@ import {
   ScreenInfo,
   calculateVisualSettings,
   formatVisionLevel,
-  resolveExerciseVisionLevel,
+  resolveExamLevelWithInitialFallback,
 } from 'src/utils/visionUtils';
 import useSnackbar from 'src/contexts/UseSnackbar';
 import ScreenSetupForm from 'src/components/forms/ScreenSetupForm';
@@ -121,17 +121,6 @@ const ExerciseSetup: React.FC<ExerciseSetupProps> = ({
       exerciseVisionType: exerciseConfig?.visionType ?? vtVisionResolved.visionType,
     });
   }, [isVtQuest, vtVisionResolved, exerciseConfig, screenValues]);
-
-  // Get current vision level based on eye config.
-  // 'left'/'right' → mắt tương ứng; 'both' → mắt kém hơn (min). Khớp logic runtime
-  // trong PortalExercise để preview "cỡ ký tự dự kiến" đúng với game thật.
-  const getVisionLevelByEye = (
-    result: { leftEye?: number | null; rightEye?: number | null } | undefined
-  ): number | null =>
-    resolveExerciseVisionLevel(
-      result,
-      assignmentTrainingEye ?? exerciseConfig?.eye
-    );
 
   // Calculate actual font size based on vision params
   const calculateActualFontSize = (
@@ -289,13 +278,17 @@ const ExerciseSetup: React.FC<ExerciseSetupProps> = ({
     const isOverrideActive = levelOverride === true && assignmentVisionLevel != null;
     const effectiveLevel = (visionType: string) => {
       if (isOverrideActive) return assignmentVisionLevel as number;
-      const result =
+      const bucket =
         visionType === 'far'
-          ? freshExamResults?.far?.currentResult
+          ? freshExamResults?.far
           : visionType === 'near'
-            ? freshExamResults?.near?.currentResult
-            : freshExamResults?.contrast?.currentResult;
-      return getVisionLevelByEye(result);
+            ? freshExamResults?.near
+            : freshExamResults?.contrast;
+      return resolveExamLevelWithInitialFallback(
+        bucket,
+        assignmentTrainingEye ?? exerciseConfig?.eye,
+        visionType === 'contrast' ? 'contrast' : 'standard'
+      );
     };
 
     const farLevel =
@@ -428,7 +421,7 @@ const ExerciseSetup: React.FC<ExerciseSetupProps> = ({
         <Divider sx={{ my: 3 }} />
 
         {!examResultsLoading && !canDetermineVisionSize ? (
-          <ExerciseVisionRequiredAlert />
+          <ExerciseVisionRequiredAlert visionType={exerciseConfig?.visionType} />
         ) : examResultsLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress size={32} />
