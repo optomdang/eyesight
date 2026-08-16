@@ -1,13 +1,6 @@
-import React from 'react';
-import { Box, Button, Container, Typography } from '@mui/material';
-import GlassesIcon from '@mui/icons-material/RemoveRedEyeOutlined';
-import DistanceIcon from '@mui/icons-material/StraightenRounded';
-import EyeIcon from '@mui/icons-material/VisibilityRounded';
-import SwipeIcon from '@mui/icons-material/SwipeRounded';
-import GoalIcon from '@mui/icons-material/TrendingUpRounded';
-import RefreshIcon from '@mui/icons-material/RefreshRounded';
-import PostureIcon from '@mui/icons-material/FaceRounded';
-import LightIcon from '@mui/icons-material/LightModeRounded';
+import React, { useLayoutEffect, useRef, useState } from 'react';
+import { Box, ButtonBase } from '@mui/material';
+import guideBoard from 'src/assets/game2048-guide/guide-board.png';
 
 interface Game2048InstructionStepProps {
   trainingEye: 'left' | 'right' | 'both' | null;
@@ -15,57 +8,113 @@ interface Game2048InstructionStepProps {
   onStart: () => void;
 }
 
-const getEyeInstruction = (
+/** The artwork is authored at this size; every coordinate below is in artwork pixels. */
+const DESIGN_WIDTH = 1536;
+const DESIGN_HEIGHT = 1024;
+
+const NAVY = '#12356e';
+const BODY = '#33456b';
+
+type CardBox = { x: number; y: number; w: number; h: number };
+
+const CARD_BOXES: CardBox[] = [
+  { x: 33, y: 286, w: 338, h: 283 },
+  { x: 380, y: 286, w: 356, h: 283 },
+  { x: 745, y: 286, w: 323, h: 283 },
+  { x: 1076, y: 286, w: 430, h: 283 },
+  { x: 33, y: 577, w: 338, h: 268 },
+  { x: 380, y: 577, w: 356, h: 268 },
+  { x: 745, y: 577, w: 323, h: 268 },
+  { x: 1076, y: 577, w: 430, h: 268 },
+];
+
+const BADGE_COLORS = [
+  'linear-gradient(145deg, #1aa2ff, #087de9)',
+  'linear-gradient(145deg, #ffa529, #f47b08)',
+  'linear-gradient(145deg, #16d78d, #05aa65)',
+  'linear-gradient(145deg, #9363f5, #6738d8)',
+  'linear-gradient(145deg, #28d4de, #08aebf)',
+  'linear-gradient(145deg, #ff619a, #e83276)',
+  'linear-gradient(145deg, #3294ff, #0b67e8)',
+  'linear-gradient(145deg, #ffa323, #f27606)',
+];
+
+/** Per-card title sizes, tuned so long titles stay on one line like the artwork. */
+const TITLE_SIZES = [17, 17, 18, 18, 17, 17, 11.5, 16];
+
+const HEADLINE = 'Bài tập này giúp bạn rèn luyện thị lực để quan sát rõ hơn, tăng khả năng tập trung và phản ứng nhanh.';
+const SUBTITLE = 'LUYỆN NHÌN RÕ Ô SỐ, TẬP TRUNG VÀ PHẢN ỨNG HIỆU QUẢ';
+const DISTANCE_LABEL = ['Giữ khoảng cách', 'từ 50cm'];
+const IMPORTANT_TITLE = 'QUAN TRỌNG';
+const IMPORTANT_TEXT = 'Sự kiên trì mỗi ngày sẽ giúp cải thiện thị lực rõ rệt. Hãy luyện tập đều đặn theo hướng dẫn và theo dõi sự tiến bộ của bạn!';
+const TIPS_TITLE = 'GỢI Ý LUYỆN TẬP HIỆU QUẢ';
+const TIPS = [
+  'Luyện tập đều đặn mỗi ngày',
+  'Tuân thủ thời gian luyện tập khuyến nghị',
+  'Theo dõi tiến bộ qua từng buổi tập',
+  'Kiên trì là chìa khóa để đạt kết quả tốt nhất',
+];
+const TIP_CENTERS = [525, 671, 833, 983];
+const CTA_LABEL = 'BẮT ĐẦU LUYỆN TẬP';
+const BRAND_TEXT = ' luôn đồng hành cùng bạn trên hành trình cải thiện thị lực!';
+
+const STATIC_STEPS = [
+  {
+    title: 'ĐEO KÍNH TRƯỚC KHI CHƠI',
+    description: 'Nếu đang đeo kính, hãy đeo kính vào trước khi chơi.',
+  },
+  {
+    title: 'NGỒI ĐÚNG KHOẢNG CÁCH',
+    description:
+      'Ngồi đúng khoảng cách đã thiết lập trên màn hình. Giữ tư thế ổn định, không rướn người lại gần màn hình.',
+  },
+  null, // slot 3 depends on the training eye
+  {
+    title: 'CÁCH CHƠI',
+    description:
+      'Dùng phím mũi tên ( ↑ ↓ ← → ) trên bàn phím để di chuyển các ô số. Hai ô cùng số chạm nhau sẽ gộp lại thành ô có giá trị lớn hơn.',
+  },
+  {
+    title: 'MỤC TIÊU LUYỆN TẬP',
+    description:
+      'Cố gắng tạo ô số 2048 (hoặc lớn hơn) trong suốt thời gian bài tập. Không nhất thiết phải đạt đúng 2048 mới được tính.',
+  },
+  {
+    title: 'TIẾP TỤC CHƠI',
+    description:
+      'Khi bàn cờ đầy hoặc không còn nước đi, bàn cờ sẽ làm mới để tiếp tục chơi. Điểm và thời gian luyện tập vẫn được giữ.',
+  },
+  {
+    title: 'KHÔNG NHEO MẮT, KHÔNG TI HÍ CHE MẮT',
+    description:
+      'Được phép suy nghĩ chậm, nhưng không nheo mắt, không ti hí che mắt, hoặc mở mắt quá mức trong lúc chơi.',
+  },
+  {
+    title: 'ÁNH SÁNG & MÔI TRƯỜNG',
+    description:
+      'Không cần chỉnh đèn phòng quá sáng; giữ ánh sáng ổn định để độ tương phản trên màn hình đúng như thiết kế bài tập.',
+  },
+];
+
+const getEyeStep = (
   trainingEye: Game2048InstructionStepProps['trainingEye'],
   requiresAnaglyphGlasses: boolean,
 ) => {
-  if (requiresAnaglyphGlasses) {
+  if (requiresAnaglyphGlasses || trainingEye === 'both' || trainingEye === null) {
     return {
-      title: 'Mở cả hai mắt',
-      description:
-        'Mở cả hai mắt và đeo kính lọc màu theo hướng dẫn (nếu có) chồng lên kính đang đeo.',
+      title: 'MỞ CẢ HAI MẮT',
+      description: 'Mở cả hai mắt và đeo kính lọc màu theo hướng dẫn trong suốt bài tập.',
     };
   }
-  if (trainingEye === 'left') {
-    return {
-      title: 'Che mắt phải',
-      description: 'Hãy che mắt phải trong suốt bài tập để luyện mắt trái.',
-    };
-  }
-  if (trainingEye === 'right') {
-    return {
-      title: 'Che mắt trái',
-      description: 'Hãy che mắt trái trong suốt bài tập để luyện mắt phải.',
-    };
-  }
-  return {
-    title: 'Mở cả hai mắt',
-    description: 'Mở cả hai mắt trong suốt bài tập.',
-  };
-};
-
-const stepCardSx = {
-  border: '1px solid #dce7f4',
-  borderRadius: '18px',
-  p: { xs: 2, sm: 2.5 },
-  display: 'grid',
-  gridTemplateColumns: { xs: '48px 1fr', sm: '58px 1fr' },
-  gap: 1.8,
-  alignItems: 'start',
-  background: 'linear-gradient(180deg, #fff, #fbfdff)',
-};
-
-const illustrationSx = {
-  gridColumn: { xs: '1 / -1', sm: 2 },
-  bgcolor: '#eaf4ff',
-  borderRadius: '14px',
-  p: 1.25,
-  mt: 1,
-  minHeight: 104,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#1976d2',
+  return trainingEye === 'left'
+    ? {
+        title: 'CHE MẮT PHẢI',
+        description: 'Hãy che mắt phải trong suốt bài tập để luyện mắt trái.',
+      }
+    : {
+        title: 'CHE MẮT TRÁI',
+        description: 'Hãy che mắt trái trong suốt bài tập để luyện mắt phải.',
+      };
 };
 
 const Game2048InstructionStep: React.FC<Game2048InstructionStepProps> = ({
@@ -73,291 +122,301 @@ const Game2048InstructionStep: React.FC<Game2048InstructionStepProps> = ({
   requiresAnaglyphGlasses,
   onStart,
 }) => {
-  const eyeInstruction = getEyeInstruction(trainingEye, requiresAnaglyphGlasses);
-  const coveredEyeReminder =
-    trainingEye !== 'both' && !requiresAnaglyphGlasses ? ' hoặc mở mắt đang che để nhìn phụ' : '';
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
 
-  const steps = [
-    {
-      title: 'Đeo kính nếu cần',
-      description: 'Nếu đang đeo kính, hãy đeo kính vào trước khi bắt đầu chơi.',
-      icon: <GlassesIcon sx={{ fontSize: 58 }} />,
-      illustration: 'Đeo kính',
-    },
-    {
-      title: 'Giữ đúng khoảng cách',
-      description:
-        'Ngồi đúng khoảng cách đã thiết lập. Giữ tư thế ổn định, không rướn người lại gần màn hình.',
-      icon: <DistanceIcon sx={{ fontSize: 58 }} />,
-      illustration: 'Giữ khoảng cách',
-    },
-    {
-      title: eyeInstruction.title,
-      description: eyeInstruction.description,
-      icon: <EyeIcon sx={{ fontSize: 58 }} />,
-      illustration:
-        requiresAnaglyphGlasses || trainingEye === 'both'
-          ? 'Mở hai mắt'
-          : `Luyện mắt ${trainingEye === 'left' ? 'trái' : 'phải'}`,
-    },
-    {
-      title: 'Cách chơi 2048',
-      description:
-        'Dùng phím mũi tên hoặc vuốt trên màn hình để di chuyển các ô. Hai ô cùng số chạm nhau sẽ gộp thành một ô lớn hơn.',
-      icon: <SwipeIcon sx={{ fontSize: 58 }} />,
-      illustration: '2  +  2  →  4',
-      tiles: true,
-    },
-    {
-      title: 'Mục tiêu luyện tập',
-      description:
-        'Cố gắng tạo ô số càng lớn càng tốt và duy trì tập trung trong suốt thời gian bài tập. Không nhất thiết phải đạt đúng 2048.',
-      icon: <GoalIcon sx={{ fontSize: 58 }} />,
-      illustration: 'Tập trung  →  Điểm số ↑',
-    },
-    {
-      title: 'Khi không còn nước đi',
-      description: 'Bàn cờ sẽ làm mới để tiếp tục chơi; điểm và thời gian luyện tập vẫn được giữ.',
-      icon: <RefreshIcon sx={{ fontSize: 58 }} />,
-      illustration: 'Làm mới bàn cờ',
-    },
-    {
-      title: 'Không nheo mắt, nghiêng đầu',
-      description: `Được phép suy nghĩ chậm, nhưng không nheo mắt, nghiêng đầu quá mức${coveredEyeReminder}.`,
-      icon: <PostureIcon sx={{ fontSize: 58 }} />,
-      illustration: 'Nhìn thẳng, mắt mở tự nhiên',
-    },
-    {
-      title: 'Giữ ánh sáng ổn định',
-      description:
-        'Không cần chỉnh đèn phòng quá sáng; giữ ánh sáng ổn định để độ tương phản đúng như thiết kế bài tập.',
-      icon: <LightIcon sx={{ fontSize: 58, color: '#f2b600' }} />,
-      illustration: 'Ánh sáng vừa đủ',
-    },
-  ];
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return undefined;
+
+    const fit = () => {
+      const { width, height } = frame.getBoundingClientRect();
+      if (!width || !height) return;
+      setScale(Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT));
+    };
+
+    fit();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', fit);
+      return () => window.removeEventListener('resize', fit);
+    }
+
+    const observer = new ResizeObserver(fit);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
+
+  const eyeStep = getEyeStep(trainingEye, requiresAnaglyphGlasses);
+  const steps = STATIC_STEPS.map((step) => step ?? eyeStep);
 
   return (
-    <Container
-      maxWidth={false}
+    <Box
+      ref={frameRef}
       sx={{
-        maxWidth: '1180px',
-        minHeight: '100%',
-        py: { xs: 1.75, sm: 3.5 },
-        px: { xs: 1.5, sm: 2.5 },
-        overflow: 'auto',
-        color: '#172033',
+        position: 'relative',
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        overflow: 'hidden',
+        bgcolor: '#eaf6ff',
       }}
     >
       <Box
+        component="h1"
         sx={{
-          background: 'linear-gradient(135deg, #1674d1, #2d8de6)',
-          borderRadius: { xs: '20px', sm: '26px' },
-          px: { xs: 3, sm: 4.25 },
-          py: { xs: 3, sm: 3.75 },
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 3,
-          boxShadow: '0 16px 40px rgba(25,118,210,.20)',
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          m: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          clipPath: 'inset(50%)',
         }}
       >
-        <Box>
-          <Typography sx={{ fontWeight: 700, opacity: 0.9, mb: 1, letterSpacing: 0.6 }}>
-            BÀI TẬP NHƯỢC THỊ
-          </Typography>
-          <Typography
-            component="h1"
-            sx={{
-              fontWeight: 800,
-              fontSize: { xs: 28, sm: 36, md: 44 },
-              lineHeight: 1.15,
-              mb: 1.25,
-            }}
-          >
-            Hướng dẫn luyện tập 2048
-          </Typography>
-          <Typography sx={{ opacity: 0.94, fontSize: 17, lineHeight: 1.5 }}>
-            Luyện nhìn rõ ô số, khả năng tập trung và phản ứng trong thời gian được giao.
-          </Typography>
-        </Box>
-
-        <Box
-          aria-hidden
-          sx={{
-            display: { xs: 'none', sm: 'grid' },
-            width: 190,
-            minWidth: 150,
-            gridTemplateColumns: 'repeat(2, 58px)',
-            gap: 1.25,
-            justifyContent: 'center',
-            p: 2.5,
-            borderRadius: '22px',
-            bgcolor: 'rgba(255,255,255,.18)',
-          }}
-        >
-          {[
-            ['2', '#ffd166', '#6b4d00'],
-            ['4', '#ff9f68', '#6b2400'],
-            ['8', '#90caf9', '#123b66'],
-            ['16', '#b7e4c7', '#14532d'],
-          ].map(([value, bg, color]) => (
-            <Box
-              key={value}
-              sx={{
-                height: 46,
-                borderRadius: '9px',
-                bgcolor: bg,
-                color,
-                fontWeight: 800,
-                fontSize: 21,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {value}
-            </Box>
-          ))}
-        </Box>
+        Hướng dẫn luyện tập 2048
       </Box>
 
       <Box
         sx={{
-          bgcolor: '#fff',
-          border: '1px solid #dce7f4',
-          borderRadius: '22px',
-          boxShadow: '0 8px 25px rgba(20,50,90,.07)',
-          p: { xs: 2, sm: 3 },
-          mt: 2.75,
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: DESIGN_WIDTH,
+          height: DESIGN_HEIGHT,
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: 'center center',
+          backgroundImage: `url(${guideBoard})`,
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+          color: BODY,
+          fontWeight: 500,
         }}
       >
-        <Typography sx={{ fontSize: 17, lineHeight: 1.6 }}>
-          <strong>Hãy đọc hết hướng dẫn trước khi bắt đầu.</strong> Trong suốt bài tập, ưu tiên nhìn
-          rõ màn hình, giữ tư thế ổn định và thực hiện đúng yêu cầu về mắt cần luyện.
-        </Typography>
+        <Box
+          sx={{
+            position: 'absolute',
+            left: 228,
+            top: 108,
+            width: 172,
+            fontSize: 15.5,
+            lineHeight: '23.3px',
+            color: '#46536b',
+          }}
+        >
+          {HEADLINE}
+        </Box>
 
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-            gap: 2.25,
-            mt: 2.75,
+            position: 'absolute',
+            left: 458,
+            top: 227,
+            width: 572,
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16.5,
+            fontWeight: 800,
+            whiteSpace: 'nowrap',
+            color: '#fff',
           }}
         >
-          {steps.map((step, index) => (
-            <Box key={step.title} sx={stepCardSx}>
+          {SUBTITLE}
+        </Box>
+
+        <Box
+          sx={{
+            position: 'absolute',
+            left: 498,
+            top: 352,
+            width: 150,
+            textAlign: 'center',
+            fontSize: 14,
+            lineHeight: '20px',
+            fontWeight: 600,
+          }}
+        >
+          {DISTANCE_LABEL.map((line) => (
+            <Box key={line}>{line}</Box>
+          ))}
+        </Box>
+
+        {steps.map((step, index) => {
+          const card = CARD_BOXES[index];
+          return (
+            <React.Fragment key={step.title}>
               <Box
                 sx={{
-                  width: { xs: 44, sm: 52 },
-                  height: { xs: 44, sm: 52 },
-                  borderRadius: { xs: '13px', sm: '16px' },
-                  bgcolor: '#1976d2',
-                  color: 'white',
-                  fontWeight: 800,
-                  fontSize: { xs: 20, sm: 24 },
+                  position: 'absolute',
+                  left: card.x + 20,
+                  top: card.y + 9,
+                  width: card.w - 34,
+                  height: 42,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '12px',
                 }}
               >
-                {index + 1}
-              </Box>
-              <Box>
-                <Typography component="h3" sx={{ fontWeight: 700, fontSize: 18, mb: 0.75 }}>
+                <Box
+                  sx={{
+                    width: 42,
+                    height: 42,
+                    flexShrink: 0,
+                    borderRadius: '50%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: BADGE_COLORS[index],
+                    boxShadow: '0 2px 4px rgba(0, 70, 150, .2)',
+                    color: '#fff',
+                    fontSize: 22,
+                    fontWeight: 800,
+                  }}
+                >
+                  {index + 1}
+                </Box>
+                <Box
+                  sx={{
+                    fontSize: TITLE_SIZES[index],
+                    whiteSpace: 'nowrap',
+                    fontWeight: 800,
+                    letterSpacing: '.2px',
+                    lineHeight: 1.15,
+                    color: NAVY,
+                  }}
+                >
                   {step.title}
-                </Typography>
-                <Typography sx={{ color: '#45546a', lineHeight: 1.55, fontSize: 15.5 }}>
-                  {step.description}
-                </Typography>
-              </Box>
-              <Box sx={illustrationSx}>
-                <Box sx={{ textAlign: 'center' }}>
-                  {step.icon}
-                  <Typography
-                    sx={{
-                      mt: 0.5,
-                      color: '#17345f',
-                      fontWeight: step.tiles ? 800 : 700,
-                      fontSize: step.tiles ? 19 : 14,
-                    }}
-                  >
-                    {step.illustration}
-                  </Typography>
                 </Box>
               </Box>
-            </Box>
-          ))}
+
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: card.x + 28,
+                  bottom: DESIGN_HEIGHT - (card.y + card.h) + 22,
+                  width: card.w - 56,
+                  textAlign: 'center',
+                  fontSize: 14.5,
+                  lineHeight: '20.5px',
+                }}
+              >
+                {step.description}
+              </Box>
+            </React.Fragment>
+          );
+        })}
+
+        <Box
+          sx={{
+            position: 'absolute',
+            left: 79,
+            top: 886,
+            width: 108,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 13.5,
+            whiteSpace: 'nowrap',
+            fontWeight: 800,
+            letterSpacing: '.2px',
+            color: '#fff',
+          }}
+        >
+          {IMPORTANT_TITLE}
         </Box>
 
         <Box
           sx={{
-            display: 'flex',
-            gap: 2.25,
-            alignItems: 'center',
-            bgcolor: '#fff9df',
-            border: '1px solid #f3df8a',
-            borderRadius: '18px',
-            px: 2.5,
-            py: 2.25,
-            mt: 2.75,
+            position: 'absolute',
+            left: 56,
+            top: 920,
+            width: 374,
+            fontSize: 15,
+            lineHeight: '20.5px',
+            color: '#2f4a7a',
           }}
         >
-          <Typography aria-hidden sx={{ fontSize: 34 }}>
-            👁️
-          </Typography>
-          <Typography sx={{ lineHeight: 1.55 }}>
-            <strong>Quan trọng</strong> — Đây là bài tập thị giác. Hãy thực hiện đúng tư thế, đúng
-            mắt cần luyện và duy trì sự tập trung trong suốt thời gian được giao.
-          </Typography>
+          {IMPORTANT_TEXT}
         </Box>
-      </Box>
 
-      <Box
-        sx={{
-          mt: 2.75,
-          bgcolor: '#17345f',
-          color: 'white',
-          borderRadius: '22px',
-          p: 3,
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'stretch', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2.5,
-        }}
-      >
-        <Box>
-          <Typography component="h2" sx={{ fontSize: 22, fontWeight: 700, mb: 0.75 }}>
-            Sẵn sàng bắt đầu?
-          </Typography>
-          <Typography sx={{ color: '#dce9fb', lineHeight: 1.5 }}>
-            Hãy kiểm tra kính, tư thế ngồi và mắt được che trước khi vào bài.
-          </Typography>
-          <Typography sx={{ color: '#b9cbe3', fontSize: 13, mt: 1.5 }}>
-            Điểm số và thời gian sẽ được ghi nhận trong quá trình luyện tập.
-          </Typography>
+        <Box
+          sx={{
+            position: 'absolute',
+            left: 600,
+            top: 861,
+            width: 330,
+            textAlign: 'center',
+            fontSize: 15.5,
+            fontWeight: 800,
+            color: '#1560c4',
+          }}
+        >
+          {TIPS_TITLE}
         </Box>
-        <Button
+
+        {TIPS.map((tip, index) => (
+          <Box
+            key={tip}
+            sx={{
+              position: 'absolute',
+              left: TIP_CENTERS[index] - 68,
+              top: 955,
+              width: 136,
+              textAlign: 'center',
+              fontSize: 10.5,
+              lineHeight: '15px',
+              fontWeight: 600,
+            }}
+          >
+            {tip}
+          </Box>
+        ))}
+
+        <ButtonBase
           onClick={onStart}
           sx={{
-            border: 0,
-            bgcolor: '#ffb800',
-            color: '#15294a',
-            fontSize: 16,
+            position: 'absolute',
+            left: 1097,
+            top: 876,
+            width: 346,
+            height: 62,
+            pl: '54px',
+            pt: '10px',
+            borderRadius: '31px',
+            display: 'flex',
+            justifyContent: 'center',
+            fontSize: 22,
             fontWeight: 800,
-            px: 3,
-            py: 1.65,
-            borderRadius: '12px',
+            letterSpacing: '.4px',
             whiteSpace: 'nowrap',
-            boxShadow: '0 5px 12px rgba(0,0,0,.18)',
-            '&:hover': { bgcolor: '#ffc21c' },
+            color: '#fff',
+            '&:hover': { bgcolor: 'rgba(255, 255, 255, .12)' },
           }}
         >
-          Bắt đầu luyện tập →
-        </Button>
+          {CTA_LABEL}
+        </ButtonBase>
+
+        <Box
+          sx={{
+            position: 'absolute',
+            left: 1165,
+            top: 961,
+            width: 265,
+            fontSize: 15.5,
+            lineHeight: '21px',
+            color: '#2f4a7a',
+          }}
+        >
+          <Box component="span" sx={{ fontWeight: 800, color: '#1a73d1' }}>
+            D-VisUp
+          </Box>
+          {BRAND_TEXT}
+        </Box>
       </Box>
-    </Container>
+    </Box>
   );
 };
 

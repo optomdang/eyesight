@@ -1028,7 +1028,7 @@ const Game2048Exercise: React.FC<PortalExerciseProps> = ({
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          overflow: hasStartedTraining ? 'hidden' : 'auto',
+          overflow: 'hidden',
           background: hasStartedTraining ? '#f5f5f5' : 'linear-gradient(135deg, #f4f8fd, #eef5ff)',
         }}
       >
