@@ -6,6 +6,7 @@ import {
   FAR_LEVEL_MAX,
   CONTRAST_LEVEL_MAX,
   CONTRAST_LEVEL_MIN,
+  resolveFarAcuitySizeVisionType,
 } from '../useFarAcuityEngine';
 import { contrastVisionLevels, farVisionLevels } from 'src/utils/constant';
 
@@ -257,5 +258,27 @@ describe('useFarAcuityEngine', () => {
       fill(result, 5);
       expect(result.current.allAnswered).toBe(true);
     });
+  });
+});
+
+describe('resolveFarAcuitySizeVisionType', () => {
+  it('near visionType → near table', () => {
+    expect(resolveFarAcuitySizeVisionType('near', 0.4)).toBe('near');
+    expect(resolveFarAcuitySizeVisionType('near', 3)).toBe('near');
+  });
+
+  it('far visionType → far table', () => {
+    expect(resolveFarAcuitySizeVisionType('far', 0.5)).toBe('far');
+    expect(resolveFarAcuitySizeVisionType('far', 3)).toBe('far');
+  });
+
+  it('contrast at near distance (<1 m) → near table / N-notation', () => {
+    expect(resolveFarAcuitySizeVisionType('contrast', 0.5)).toBe('near');
+    expect(resolveFarAcuitySizeVisionType('contrast', 0.4)).toBe('near');
+  });
+
+  it('contrast at far distance → far table / Snellen', () => {
+    expect(resolveFarAcuitySizeVisionType('contrast', 1)).toBe('far');
+    expect(resolveFarAcuitySizeVisionType('contrast', 3)).toBe('far');
   });
 });

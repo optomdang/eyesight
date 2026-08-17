@@ -51,6 +51,7 @@ import useFreshPatientExamResults from 'src/hooks/useFreshPatientExamResults';
 import {
   useFarAcuityEngine,
   getAcuityLevelInfo,
+  resolveFarAcuitySizeVisionType,
   getContrastLevelInfo,
   CONTRAST_LEVEL_MAX,
   FAR_ACUITY_CHAR_COUNT,
@@ -101,9 +102,17 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const exerciseConfig = useMemo(() => assignment?.exerciseConfig, [assignment]);
   const patientExamResults = freshExamResults ?? (patient as any)?.examResults;
 
-  const trainingVisionType = useMemo((): FarAcuityVisionType => {
-    return exerciseConfig?.visionType === 'near' ? 'near' : 'far';
-  }, [exerciseConfig?.visionType]);
+  const distance = useMemo(
+    () => parseFloat(String(exerciseConfig?.distance || '3')),
+    [exerciseConfig?.distance]
+  );
+
+  /** Letter-size table + HUD notation (N… vs 20/x). Contrast at <1 m uses near. */
+  const trainingVisionType = useMemo(
+    (): FarAcuityVisionType =>
+      resolveFarAcuitySizeVisionType(exerciseConfig?.visionType, distance),
+    [exerciseConfig?.visionType, distance]
+  );
 
   /** True when the exercise config is "Thị lực tương phản" (contrast sensitivity training). */
   const isContrastMode = exerciseConfig?.visionType === 'contrast';
@@ -120,14 +129,23 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const canDetermineVisionSize = useMemo(
     () =>
       hasExerciseVisionLevel({
-        levelOverride: assignment?.levelOverride,
-        visionLevel: assignment?.visionLevel,
+        // Contrast: visionLevel override is the logCS step, not letter size — size comes from exam.
+        levelOverride: isContrastMode ? false : assignment?.levelOverride,
+        visionLevel: isContrastMode ? null : assignment?.visionLevel,
         visionType: trainingVisionType,
         trainingEye: assignment?.trainingEye,
         configEye: exerciseConfig?.eye,
         examResults: patientExamResults,
       }),
-    [assignment, patientExamResults, exerciseConfig?.eye, trainingVisionType]
+    [
+      assignment?.levelOverride,
+      assignment?.visionLevel,
+      assignment?.trainingEye,
+      patientExamResults,
+      exerciseConfig?.eye,
+      trainingVisionType,
+      isContrastMode,
+    ]
   );
 
   const { dichopticConfig: sessionDichoptic, tryAdvanceOnAccuracy } = useDichopticSessionConfig(
@@ -204,7 +222,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [currentResultId]);
 
   // ── Engine ────────────────────────────────────────────────────────────────
-  // Contrast mode: override level = contrast step (logCS); far letter size anchored to exam far.
+  // Contrast mode: override level = contrast step (logCS); letter size from far or near
+  // acuity exam depending on viewing distance (<1 m → near / N-notation).
   // Acuity mode:   starts at the patient's current exam level; contrast locked at 100%.
   const initialAcuityLevel = useMemo(() => {
     if (isContrastMode) {
@@ -215,11 +234,11 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         resolveExerciseStartVisionLevel({
           difficultyBaselineSource: 'current_exam',
           levelOverride: false,
-          visionType: 'far',
+          visionType: trainingVisionType,
           trainingEye: assignment?.trainingEye,
           configEye: exerciseConfig?.eye,
           examResults: patientExamResults,
-        }) ?? 10
+        }) ?? (trainingVisionType === 'near' ? 6 : 10)
       );
     }
     return (
@@ -329,13 +348,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   }, [initialAcuityLevel, initialContrastLevel, charType, resetSession, resetInputState]);
 
   // ── Visual sizing ─────────────────────────────────────────────────────────
-  const distance = useMemo(
-    () => parseFloat(String(exerciseConfig?.distance || '3')),
-    [exerciseConfig?.distance]
-  );
-
   const fontSizeMm = useMemo(() => {
-    // Contrast training keeps letter size on the far acuity axis
+    // Contrast keeps a fixed letter size from the acuity table (far or near by distance)
     const sizeVisionType: FarAcuityVisionType =
       trainingVisionType === 'near' ? 'near' : 'far';
     const acuityInfo = getAcuityLevelInfo(sizeVisionType, state.farLevel);

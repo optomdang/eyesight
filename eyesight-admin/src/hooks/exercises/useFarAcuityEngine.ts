@@ -146,6 +146,28 @@ export function getAcuityLevelMax(visionType: FarAcuityVisionType = 'far'): numb
   return visionType === 'near' ? nearVisionLevels.length : farVisionLevels.length;
 }
 
+/**
+ * Letter-size table + HUD notation for VAC.
+ * - visionType near → N-notation (near table)
+ * - visionType contrast at near distance (< 1 m, e.g. 50 cm) → near table
+ * - otherwise → Snellen 20/x (far table)
+ */
+export function resolveFarAcuitySizeVisionType(
+  visionType: string | null | undefined,
+  distanceM: number
+): FarAcuityVisionType {
+  if (visionType === 'near') return 'near';
+  if (
+    visionType === 'contrast' &&
+    Number.isFinite(distanceM) &&
+    distanceM > 0 &&
+    distanceM < 1
+  ) {
+    return 'near';
+  }
+  return 'far';
+}
+
 export interface UseFarAcuityEngineOptions {
   /** Starting acuity level (1-based, far or near table). Defaults to 1. */
   initialFarLevel?: number;

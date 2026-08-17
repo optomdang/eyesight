@@ -25,7 +25,7 @@ import VtQuestExercise from 'src/components/exercises/vt/portal/VtQuestExercise'
 import { buildVtQuestSandboxAssignment } from 'src/components/exercises/vt/core/vtQuestSandbox';
 import FarAcuityExercise from 'src/components/exercises/far-acuity/portal/FarAcuityExercise';
 import { buildFarAcuitySandboxAssignment } from 'src/components/exercises/far-acuity/core/farAcuitySandbox';
-import { getAcuityLevelInfo, type FarAcuityVisionType } from 'src/hooks/exercises/useFarAcuityEngine';
+import { getAcuityLevelInfo, resolveFarAcuitySizeVisionType, type FarAcuityVisionType } from 'src/hooks/exercises/useFarAcuityEngine';
 import {
   computeVtVisionSizing,
   resolveVtExerciseVision,
@@ -334,11 +334,17 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({
     visionType === 'contrast'
       ? contrastVisionLevels.find((level) => level.level === selectedLevel)
       : null;
-  const farAcuityPreviewVisionType: FarAcuityVisionType =
-    visionType === 'near' ? 'near' : 'far';
-  // Contrast: selectedLevel is contrast step; letter-size acuity stays at mid far (20/50 ≈ 10)
+  const farAcuityPreviewVisionType: FarAcuityVisionType = resolveFarAcuitySizeVisionType(
+    visionType,
+    previewDistance
+  );
+  // Contrast: selectedLevel is contrast step; letter-size from far mid (20/50) or near mid (N8)
   const acuityPreviewLevel =
-    isFarAcuity && visionType === 'contrast' ? 10 : selectedLevel;
+    isFarAcuity && visionType === 'contrast'
+      ? farAcuityPreviewVisionType === 'near'
+        ? 6
+        : 10
+      : selectedLevel;
   const acuityPreview = isFarAcuity
     ? getAcuityLevelInfo(farAcuityPreviewVisionType, acuityPreviewLevel)
     : null;

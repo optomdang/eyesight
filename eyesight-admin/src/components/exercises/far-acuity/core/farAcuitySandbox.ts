@@ -14,7 +14,7 @@ export interface FarAcuitySandboxParams {
   visionLevel?: number;
   /** far | near | contrast — controls acuity table / contrast ladder. */
   visionType?: 'far' | 'near' | 'contrast';
-  /** Explicit letter-size acuity when visionType is contrast (defaults to level 10 / 20/50). */
+  /** Explicit letter-size acuity when visionType is contrast (defaults: far 10 / near 6). */
   farAcuityLevel?: number;
   distance?: number;
   eye?: 'left' | 'right' | 'both';
@@ -28,6 +28,8 @@ export interface FarAcuitySandboxParams {
 export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams = {}): Assignment {
   const visionType = params.visionType ?? 'far';
   const isContrast = visionType === 'contrast';
+  const distance = params.distance ?? 3;
+  const defaultContrastSizeLevel = distance < 1 ? 6 : 10;
 
   return {
     id: 0,
@@ -36,9 +38,11 @@ export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams =
     status: 'active',
     sessionsCompleted: 0,
     levelOverride: true,
-    // Contrast: assignment.visionLevel = contrast step; far letter size via lastAchievedVisionLevel stash
+    // Contrast: assignment.visionLevel = contrast step; letter size via lastAchievedVisionLevel stash
     visionLevel: params.visionLevel ?? (isContrast ? 1 : 10),
-    lastAchievedVisionLevel: isContrast ? (params.farAcuityLevel ?? 10) : undefined,
+    lastAchievedVisionLevel: isContrast
+      ? (params.farAcuityLevel ?? defaultContrastSizeLevel)
+      : undefined,
     createdAt: '',
     updatedAt: '',
     exercise: {
@@ -53,7 +57,7 @@ export function buildFarAcuitySandboxAssignment(params: FarAcuitySandboxParams =
       configType: 'admin',
       name: 'Bài tập thị lực xa — Chơi thử',
       eye: params.eye ?? 'both',
-      distance: params.distance ?? 3,
+      distance,
       duration: params.duration ?? 30,
       visionType,
       fontSize: 55,
