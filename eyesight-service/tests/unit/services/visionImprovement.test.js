@@ -1,10 +1,13 @@
 const {
   patientImproved,
+  patientDeclined,
+  classifyPatientOutcome,
   farLineDelta,
   farLineDeltaBestEye,
   classifyType,
   improvedInType,
   compareType,
+  typeNetDelta,
   farRecoveryPct,
 } = require('../../../src/services/dashboard/visionImprovement');
 
@@ -12,22 +15,36 @@ const {
 const far = (initL, initR, curL, curR) => ({
   far: { initialResult: { leftEye: initL, rightEye: initR }, currentResult: { leftEye: curL, rightEye: curR } },
 });
+const contrast = (initL, initR, curL, curR) => ({
+  contrast: {
+    initialResult: { leftEye: initL, rightEye: initR },
+    currentResult: { leftEye: curL, rightEye: curR },
+  },
+});
 const stereo = (init, cur) => ({
   stereopsis: { initialResult: { bothEye: init }, currentResult: { bothEye: cur } },
 });
 
 describe('visionImprovement — numeric & per-eye correctness', () => {
   it('compares levels NUMERICALLY, not lexicographically (9 < 10)', () => {
-    // far left: 9 → 10 is an improvement (lexical "9" > "10" would be wrong)
     expect(improvedInType('far', far('9', '9', '10', '10'))).toBe(true);
     expect(compareType('far', far('9', '9', '10', '10').far).improved).toBe(true);
   });
 
-  it('never compares across eyes (left vs left, right vs right)', () => {
-    // left declines (10→7) but right improves (5→8) → improved=true, declined=true
+  it('uses best-eye net delta: one eye down does not force declined if better eye holds/up', () => {
+    // left declines (10→7) but right improves (5→8) → net best = +3 → improved only
     const res = compareType('far', far('10', '5', '7', '8').far);
     expect(res.improved).toBe(true);
-    expect(res.declined).toBe(true);
+    expect(res.declined).toBe(false);
+    expect(typeNetDelta('far', far('10', '5', '7', '8').far)).toBe(3);
+  });
+
+  it('one eye dips while the other is flat → type stable (best-eye delta 0), not declined', () => {
+    expect(classifyType('far', far('11', '13', '11', '11'))).toBe('stable');
+    expect(compareType('far', far('11', '13', '11', '11').far)).toEqual({
+      improved: false,
+      declined: false,
+    });
   });
 
   it('stereopsis uses bothEye only (legacy level index 1–10: higher = better)', () => {
@@ -40,15 +57,35 @@ describe('visionImprovement — numeric & per-eye correctness', () => {
     expect(improvedInType('stereopsis', stereo('25', '40'))).toBe(false);
   });
 
-  it('patientImproved = improved in ANY of 4 types', () => {
-    const both = { ...far('7', '7', '7', '7'), ...stereo('40', '25') }; // far flat, stereo arcsec improved
-    expect(patientImproved(both)).toBe(true);
-    expect(patientImproved(far('7', '7', '7', '7'))).toBe(false);
+  it('patient outcome prefers far best-eye over contrast-only dips', () => {
+    // far flat, contrast down → stable (not declined)
+    const flatFarContrastDown = { ...far('12', '11', '12', '11'), ...contrast('13', '13', '11', '5') };
+    expect(classifyPatientOutcome(flatFarContrastDown)).toBe('stable');
+    expect(patientImproved(flatFarContrastDown)).toBe(false);
+    expect(patientDeclined(flatFarContrastDown)).toBe(false);
+
+    // far up, contrast down → improved
+    const farUpContrastDown = { ...far('10', '10', '12', '12'), ...contrast('13', '13', '5', '5') };
+    expect(classifyPatientOutcome(farUpContrastDown)).toBe('improved');
+    expect(patientImproved(farUpContrastDown)).toBe(true);
+
+    // far down → declined even if contrast flat
+    expect(classifyPatientOutcome(far('12', '12', '9', '9'))).toBe('declined');
+    expect(patientDeclined(far('12', '12', '9', '9'))).toBe(true);
+  });
+
+  it('far best-eye still better than baseline → improved (not declined)', () => {
+    // left +2, right -1 → best = +2
+    expect(classifyPatientOutcome(far('10', '14', '12', '13'))).toBe('improved');
+  });
+
+  it('no far data: fall back to other types net delta', () => {
+    expect(classifyPatientOutcome(contrast('10', '10', '12', '12'))).toBe('improved');
+    expect(classifyPatientOutcome(contrast('12', '12', '10', '10'))).toBe('declined');
+    expect(classifyPatientOutcome(stereo('40', '25'))).toBe('improved');
   });
 
   it('farLineDelta = average of the two far eyes deltas (BU example → +2.5)', () => {
-    // Patient A: 7→10 = +3 (use left), Patient B: 9→11 = +2. Here single patient both eyes:
-    // left 7→10 (+3), right 9→11 (+2) → avg = 2.5
     expect(farLineDelta(far('7', '9', '10', '11'))).toBeCloseTo(2.5, 5);
   });
 
@@ -63,13 +100,9 @@ describe('visionImprovement — numeric & per-eye correctness', () => {
   });
 
   it('farRecoveryPct: both <20/20 → better eye; one =20/20 → the other eye', () => {
-    // TH1: MP 80%, MT 40% (cả 2 <100) → mắt tốt hơn = 80
     expect(farRecoveryPct(80, 40)).toBe(80);
-    // TH2: MP 100% (đạt 20/20), MT 50% → lấy mắt còn lại = 50
     expect(farRecoveryPct(100, 50)).toBe(50);
-    // cả 2 đạt → 100
     expect(farRecoveryPct(100, 120)).toBe(100);
-    // chỉ 1 mắt có dữ liệu
     expect(farRecoveryPct(66.67, null)).toBe(66.67);
     expect(farRecoveryPct(null, null)).toBeNull();
   });

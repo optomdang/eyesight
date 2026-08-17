@@ -9,9 +9,9 @@ const {
 const { sanitizePagination, buildPagination } = require('../../utils/query');
 const {
   patientImproved,
+  patientDeclined,
   farLineDelta,
   farLineDeltaBestEye,
-  compareType,
   improvedInType,
   VISION_TYPES,
   toLevel,
@@ -131,8 +131,7 @@ const getPatientImprovementStats = async (centerId, doctorId = null, causes = nu
   const improvedCount = improvedList.length;
   const improvementRate = totalTreated > 0 ? round2((improvedCount / totalTreated) * 100) : 0;
 
-  // declined = không cải thiện nhưng có loại giảm; stable = phần còn lại
-  const patientDeclined = (er) => !patientImproved(er) && VISION_TYPES.some((t) => compareType(t, er?.[t]).declined);
+  // declined / stable: net latest vs baseline (far best-eye primary — see classifyPatientOutcome)
   const declinedCount = treated.filter((p) => patientDeclined(p.examResults)).length;
   const stableCount = totalTreated - improvedCount - declinedCount;
 

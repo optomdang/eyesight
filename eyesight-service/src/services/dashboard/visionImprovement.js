@@ -6,6 +6,7 @@
  *    (no bothEye, NEVER compare across eyes — fixes D10 cross-eye bug).
  *  - Levels are compared NUMERICALLY (toLevel) so "9" vs "10" is 9<10, not lexicographic (D2).
  *  - Higher level = better vision (level 20 = 20/5 ... level 1 = 20/400).
+ *  - Type / patient outcome uses net latest vs baseline (best-eye), not “any single eye dipped”.
  *
  * Pure functions — unit-testable, no DB.
  */
@@ -22,46 +23,90 @@ const toLevel = (v) => {
 };
 
 /**
- * Compare one vision type's initial vs current per eye.
+ * Net latest−baseline delta for one vision type.
+ * far/near/contrast → best-eye delta (higher level = better).
+ * stereopsis → signed improvement (positive = better); legacy 1–10 higher=better, arcsec lower=better.
+ * @returns {number|null}
+ */
+const typeNetDelta = (type, data) => {
+  if (!data || !data.initialResult || !data.currentResult) return null;
+
+  if (type === 'stereopsis') {
+    const init = toLevel(data.initialResult.bothEye);
+    const cur = toLevel(data.currentResult.bothEye);
+    if (init === null || cur === null) return null;
+    const legacy = init >= 1 && init <= 10 && cur >= 1 && cur <= 10;
+    return legacy ? cur - init : init - cur;
+  }
+
+  let best = null;
+  for (const eye of ['leftEye', 'rightEye']) {
+    const init = toLevel(data.initialResult[eye]);
+    const cur = toLevel(data.currentResult[eye]);
+    if (init === null || cur === null) continue;
+    const delta = cur - init;
+    if (best === null || delta > best) best = delta;
+  }
+  return best;
+};
+
+/**
+ * Compare one vision type's initial vs current (net / best-eye).
  * @returns {{ improved: boolean, declined: boolean }}
  */
 const compareType = (type, data) => {
-  if (!data || !data.initialResult || !data.currentResult) return { improved: false, declined: false };
-  let improved = false;
-  let declined = false;
-  for (const eye of eyesForType(type)) {
-    const init = toLevel(data.initialResult[eye]);
-    const cur = toLevel(data.currentResult[eye]);
-    if (init === null || cur === null) continue; // need same-eye pair
-    if (type === 'stereopsis') {
-      // Legacy levels 1–10: higher = better. New arcsec (≥20): lower = better.
-      const legacy = init >= 1 && init <= 10 && cur >= 1 && cur <= 10;
-      if (legacy) {
-        if (cur > init) improved = true;
-        else if (cur < init) declined = true;
-      } else {
-        if (cur < init) improved = true;
-        else if (cur > init) declined = true;
-      }
-    } else if (cur > init) improved = true;
-    else if (cur < init) declined = true;
-  }
-  return { improved, declined };
+  const delta = typeNetDelta(type, data);
+  if (delta === null) return { improved: false, declined: false };
+  return { improved: delta > 0, declined: delta < 0 };
 };
 
-/** TỶ LỆ CẢI THIỆN numerator rule: improved in ≥1 of the 4 types. */
-const patientImproved = (examResults) => !!examResults && VISION_TYPES.some((t) => compareType(t, examResults[t]).improved);
+/**
+ * Overall patient bucket for pie #9 / rate #3.
+ * Prefer far acuity best-eye (same primary metric as BXH CẢI THIỆN):
+ *   latest vs baseline → >0 improved, <0 declined, 0 stable.
+ * A single eye dip does not force Giảm sút when the better eye is flat/up.
+ * Contrast-only dips do not override a flat/better far result.
+ * When far data is missing, fall back to near/contrast/stereopsis net deltas.
+ * @returns {'improved'|'declined'|'stable'}
+ */
+const classifyPatientOutcome = (examResults) => {
+  if (!examResults) return 'stable';
+
+  const farDelta = typeNetDelta('far', examResults.far);
+  if (farDelta !== null) {
+    if (farDelta > 0) return 'improved';
+    if (farDelta < 0) return 'declined';
+    return 'stable';
+  }
+
+  let sawUp = false;
+  let sawDown = false;
+  for (const t of ['near', 'contrast', 'stereopsis']) {
+    const delta = typeNetDelta(t, examResults[t]);
+    if (delta === null) continue;
+    if (delta > 0) sawUp = true;
+    else if (delta < 0) sawDown = true;
+  }
+  if (sawUp) return 'improved';
+  if (sawDown) return 'declined';
+  return 'stable';
+};
+
+/** TỶ LỆ CẢI THIỆN numerator: net far (or fallback) latest > baseline. */
+const patientImproved = (examResults) => classifyPatientOutcome(examResults) === 'improved';
+
+/** Giảm sút: net latest < baseline (far-primary). */
+const patientDeclined = (examResults) => classifyPatientOutcome(examResults) === 'declined';
 
 /**
- * Classify a patient for ONE vision type (cause pie #9).
- * improved (any eye up) > declined (any eye down) > stable.
+ * Classify a patient for ONE vision type (cause pie helpers / per-type cards).
+ * improved (net > 0) > declined (net < 0) > stable.
  * Returns null if no comparable data for that type.
  */
 const classifyType = (type, examResults) => {
   const data = examResults?.[type];
   if (!data || !data.initialResult || !data.currentResult) return null;
   const { improved, declined } = compareType(type, data);
-  // need at least one comparable eye pair
   const comparable = eyesForType(type).some(
     (eye) => toLevel(data.initialResult[eye]) !== null && toLevel(data.currentResult[eye]) !== null
   );
@@ -96,15 +141,7 @@ const farLineDelta = (examResults) => {
 const farLineDeltaBestEye = (examResults) => {
   const data = examResults?.far;
   if (!data || !data.initialResult || !data.currentResult) return null;
-  let best = null;
-  for (const eye of ['leftEye', 'rightEye']) {
-    const init = toLevel(data.initialResult[eye]);
-    const cur = toLevel(data.currentResult[eye]);
-    if (init === null || cur === null) continue;
-    const delta = cur - init;
-    if (best === null || delta > best) best = delta;
-  }
-  return best;
+  return typeNetDelta('far', data);
 };
 
 /** Per-type improvement boolean for the 4 cards (#12-15). */
@@ -131,8 +168,11 @@ const farRecoveryPct = (leftPct, rightPct) => {
 module.exports = {
   VISION_TYPES,
   toLevel,
+  typeNetDelta,
   compareType,
+  classifyPatientOutcome,
   patientImproved,
+  patientDeclined,
   classifyType,
   farLineDelta,
   farLineDeltaBestEye,
