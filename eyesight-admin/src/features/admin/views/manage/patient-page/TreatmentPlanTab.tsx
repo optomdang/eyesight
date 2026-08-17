@@ -42,7 +42,7 @@ import dayjs from 'dayjs';
 import {
   formatVisionLevel,
   getVisionExamChartYAxisConfig,
-  mapExamResultLevelsForChart,
+  buildExamHistoryChartSeries,
 } from 'src/utils/visionUtils';
 
 interface TreatmentPlanTabProps {
@@ -124,22 +124,15 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
         const examTypes = new Set<string>();
 
         examResultsResponse.rows?.forEach((result: any) => {
-          const examType = result.examType;
-          const levels = mapExamResultLevelsForChart(examType, result);
-          if (!levels) return;
-
-          examTypes.add(examType);
-          if (!examResultsByType[examType]) examResultsByType[examType] = [];
-
-          examResultsByType[examType].push({
-            date: result.startedAt ? dayjs(result.startedAt).format('DD/MM/YYYY') : '',
-            timestamp: result.startedAt ? dayjs(result.startedAt).valueOf() : 0,
-            ...levels,
-          });
+          examTypes.add(result.examType);
         });
 
-        Object.keys(examResultsByType).forEach((type) => {
-          examResultsByType[type].sort((a, b) => a.timestamp - b.timestamp);
+        examTypes.forEach((examType) => {
+          examResultsByType[examType] = buildExamHistoryChartSeries(
+            examType,
+            examResultsResponse.rows ?? [],
+            patient.examResults
+          );
         });
 
         setExamResultsChartData(examResultsByType);
@@ -158,7 +151,7 @@ const TreatmentPlanTab: React.FC<TreatmentPlanTabProps> = ({ patient, getExamTyp
     };
 
     fetchChartData();
-  }, [patient.id]);
+  }, [patient.id, patient.examResults]);
 
   // ── Exam result dialog ───────────────────────────────────────────────────
   const handleOpenResultDialog = async (result: ExamResult) => {

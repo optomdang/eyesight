@@ -10,10 +10,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { getMyExamResults, getMyExerciseSessionsHistory } from 'src/services/patient.service';
+import { getMyExamResults, getMyExerciseSessionsHistory, getMyPatientInfo } from 'src/services/patient.service';
 import ExerciseSessionProgressChart from 'src/components/shared/ExerciseSessionProgressChart';
-import { formatVisionLevel, getVisionExamChartYAxisConfig, mapExamResultLevelsForChart } from 'src/utils/visionUtils';
-import dayjs from 'dayjs';
+import { formatVisionLevel, getVisionExamChartYAxisConfig, buildExamHistoryChartSeries } from 'src/utils/visionUtils';
 
 const EXAM_TYPE_LABELS: Record<string, string> = {
   far: 'Thị lực xa',
@@ -33,9 +32,10 @@ const TreatmentProgressCharts: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [examRes, sessionsRes] = await Promise.all([
+        const [examRes, sessionsRes, patientInfo] = await Promise.all([
           getMyExamResults({ limit: 200 }),
           getMyExerciseSessionsHistory({ limit: 500 }),
+          getMyPatientInfo(),
         ]);
 
         // ── Exam results ─────────────────────────────────────────────────
@@ -43,21 +43,16 @@ const TreatmentProgressCharts: React.FC = () => {
         const types = new Set<string>();
 
         (examRes?.rows ?? []).forEach((result: any) => {
-          const examType: string = result.examType;
-          const levels = mapExamResultLevelsForChart(examType, result);
-          if (!levels) return;
-
-          types.add(examType);
-          if (!byType[examType]) byType[examType] = [];
-
-          byType[examType].push({
-            date: result.startedAt ? dayjs(result.startedAt).format('DD/MM/YYYY') : '',
-            timestamp: result.startedAt ? dayjs(result.startedAt).valueOf() : 0,
-            ...levels,
-          });
+          types.add(result.examType);
         });
 
-        Object.keys(byType).forEach((t) => byType[t].sort((a, b) => a.timestamp - b.timestamp));
+        types.forEach((examType) => {
+          byType[examType] = buildExamHistoryChartSeries(
+            examType,
+            examRes?.rows ?? [],
+            patientInfo?.examResults
+          );
+        });
 
         setExamChartData(byType);
         const typeArr = Array.from(types);

@@ -33,6 +33,7 @@ import {
   getExamSetupVisionResultSource,
   getVisionExamChartYAxisConfig,
   mapExamResultLevelsForChart,
+  buildExamHistoryChartSeries,
   toExamChartVisionLevel,
   calculatePPI,
   mmToPixels,
@@ -475,6 +476,54 @@ describe('Vision Notation Formatting', () => {
         leftEye: 7,
         rightEye: null,
       });
+    });
+  });
+
+  describe('buildExamHistoryChartSeries — baseline-first anchor', () => {
+    const farRows = [
+      {
+        examType: 'far',
+        status: 'completed',
+        startedAt: '2026-07-13T04:30:52.126Z',
+        leftEyeLevel: 14,
+        rightEyeLevel: 8,
+      },
+      {
+        examType: 'far',
+        status: 'completed',
+        startedAt: '2026-08-14T10:45:39.270Z',
+        leftEyeLevel: 16,
+        rightEyeLevel: 10,
+      },
+    ];
+
+    it('prepends warranty/clinic initialResult when it differs from first system test', () => {
+      const series = buildExamHistoryChartSeries('far', farRows, {
+        far: {
+          initialResult: { leftEye: 14, rightEye: 7, lastExamDate: '2026-07-13T04:30:52.126Z' },
+        },
+      });
+      expect(series).toHaveLength(3);
+      expect(series[0]).toMatchObject({ leftEye: 14, rightEye: 7, isBaseline: true });
+      expect(series[1]).toMatchObject({ leftEye: 14, rightEye: 8 });
+      expect(series[1].isBaseline).not.toBe(true);
+      expect(series[2]).toMatchObject({ leftEye: 16, rightEye: 10 });
+    });
+
+    it('uses first completed test as baseline when no initialResult', () => {
+      const series = buildExamHistoryChartSeries('far', farRows, {});
+      expect(series).toHaveLength(2);
+      expect(series[0]).toMatchObject({ leftEye: 14, rightEye: 8, isBaseline: true });
+      expect(series[1]).toMatchObject({ leftEye: 16, rightEye: 10 });
+    });
+
+    it('does not duplicate when first test matches baseline exactly', () => {
+      const rows = [farRows[0]];
+      const series = buildExamHistoryChartSeries('far', rows, {
+        far: { initialResult: { leftEye: 14, rightEye: 8 } },
+      });
+      expect(series).toHaveLength(1);
+      expect(series[0]).toMatchObject({ leftEye: 14, rightEye: 8, isBaseline: true });
     });
   });
 

@@ -127,6 +127,165 @@ export function mapExamResultLevelsForChart(
   return { leftEye, rightEye };
 }
 
+export type ExamHistoryChartRowInput = {
+  examType: string;
+  status?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  leftEyeLevel?: unknown;
+  rightEyeLevel?: unknown;
+  bothEyeLevel?: unknown;
+};
+
+export type ExamHistoryChartPoint = {
+  date: string;
+  timestamp: number;
+  leftEye?: number | null;
+  rightEye?: number | null;
+  bothEye?: number | null;
+  /** Synthetic anchor from warranty/clinic initial baseline (not a separate exam row). */
+  isBaseline?: boolean;
+};
+
+const EXAM_HISTORY_VISION_TYPES = ['far', 'near', 'contrast', 'stereopsis'] as const;
+type ExamHistoryVisionType = (typeof EXAM_HISTORY_VISION_TYPES)[number];
+
+function isExamHistoryVisionType(value: string): value is ExamHistoryVisionType {
+  return (EXAM_HISTORY_VISION_TYPES as readonly string[]).includes(value);
+}
+
+function examHistoryRowTimestamp(row: ExamHistoryChartRowInput): number {
+  const raw = row.completedAt || row.startedAt;
+  if (!raw) return 0;
+  const ts = Date.parse(raw);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function formatExamHistoryChartDate(timestamp: number): string {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function isFullCompletedExamHistoryRow(examType: string, row: ExamHistoryChartRowInput): boolean {
+  if (row.status && row.status !== 'completed') return false;
+  if (examType === 'stereopsis') {
+    return toExamChartVisionLevel(row.bothEyeLevel) !== null;
+  }
+  return (
+    toExamChartVisionLevel(row.leftEyeLevel) !== null &&
+    toExamChartVisionLevel(row.rightEyeLevel) !== null
+  );
+}
+
+function baselineLevelsFromInitialResult(
+  examType: string,
+  initial: { leftEye?: unknown; rightEye?: unknown; bothEye?: unknown }
+): Omit<ExamHistoryChartPoint, 'date' | 'timestamp' | 'isBaseline'> | null {
+  if (examType === 'stereopsis') {
+    const bothEye = parsePositiveVisionLevel(initial.bothEye);
+    return bothEye === null ? null : { bothEye };
+  }
+  const leftEye = parsePositiveVisionLevel(initial.leftEye);
+  const rightEye = parsePositiveVisionLevel(initial.rightEye);
+  if (leftEye === null || rightEye === null) return null;
+  return { leftEye, rightEye };
+}
+
+function chartLevelsEqual(
+  a: Pick<ExamHistoryChartPoint, 'leftEye' | 'rightEye' | 'bothEye'>,
+  b: Pick<ExamHistoryChartPoint, 'leftEye' | 'rightEye' | 'bothEye'>
+): boolean {
+  return a.leftEye === b.leftEye && a.rightEye === b.rightEye && a.bothEye === b.bothEye;
+}
+
+/**
+ * Build exam-history chart series with a baseline-first anchor point.
+ * Baseline priority (same as BXH CẢI THIỆN):
+ *   1. Patient.examResults[type].initialResult (warranty phase-1 / clinic initial)
+ *   2. First completed full system test for that type
+ * Subsequent points = all completed full tests in chronological order.
+ */
+export function buildExamHistoryChartSeries(
+  examType: string,
+  rows: ExamHistoryChartRowInput[],
+  patientExamResults?: ExerciseExamResults
+): ExamHistoryChartPoint[] {
+  const completed = rows
+    .filter((row) => row.examType === examType && isFullCompletedExamHistoryRow(examType, row))
+    .slice()
+    .sort((a, b) => examHistoryRowTimestamp(a) - examHistoryRowTimestamp(b));
+
+  const testPoints: ExamHistoryChartPoint[] = completed
+    .map((row) => {
+      const levels = mapExamResultLevelsForChart(examType, row);
+      if (!levels) return null;
+      const timestamp = examHistoryRowTimestamp(row);
+      return {
+        date: formatExamHistoryChartDate(timestamp),
+        timestamp,
+        ...levels,
+      };
+    })
+    .filter((p): p is ExamHistoryChartPoint => p !== null);
+
+  if (!isExamHistoryVisionType(examType)) {
+    return testPoints;
+  }
+
+  const bucket = patientExamResults?.[examType];
+  const cachedInitial = bucket?.initialResult;
+  const baselineFromCache =
+    cachedInitial != null ? baselineLevelsFromInitialResult(examType, cachedInitial) : null;
+  const baselineFromFirstExam =
+    completed[0] != null ? mapExamResultLevelsForChart(examType, completed[0]) : null;
+  const baselineLevels = baselineFromCache ?? baselineFromFirstExam;
+
+  if (!baselineLevels) {
+    return testPoints;
+  }
+
+  const initialDateRaw =
+    (cachedInitial as { lastExamDate?: string | null } | undefined)?.lastExamDate ??
+    bucket?.lastExamDate ??
+    null;
+  const baselineTimestamp = (() => {
+    if (initialDateRaw) {
+      const ts = Date.parse(initialDateRaw);
+      if (Number.isFinite(ts)) return ts;
+    }
+    if (completed[0]) return examHistoryRowTimestamp(completed[0]);
+    return 0;
+  })();
+
+  const baselinePoint: ExamHistoryChartPoint = {
+    date: formatExamHistoryChartDate(baselineTimestamp),
+    timestamp: baselineTimestamp,
+    ...baselineLevels,
+    isBaseline: true,
+  };
+
+  if (testPoints.length === 0) {
+    return [baselinePoint];
+  }
+
+  const firstTest = testPoints[0];
+  if (chartLevelsEqual(firstTest, baselinePoint)) {
+    return [{ ...firstTest, isBaseline: true }, ...testPoints.slice(1)];
+  }
+
+  if (baselineTimestamp <= firstTest.timestamp) {
+    const anchorTimestamp =
+      baselineTimestamp === firstTest.timestamp ? baselineTimestamp - 1 : baselineTimestamp;
+    return [{ ...baselinePoint, timestamp: anchorTimestamp }, ...testPoints];
+  }
+
+  return [baselinePoint, ...testPoints];
+}
+
 // ==================== EXAM CHART Y-AXIS ====================
 
 export type VisionExamChartRow = {
