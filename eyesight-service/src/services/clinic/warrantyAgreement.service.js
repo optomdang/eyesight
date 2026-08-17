@@ -385,7 +385,11 @@ const updatePhaseClinicalData = async (agreementId, phaseId, body, user, request
 
   await phase.update(updates);
 
-  const syncedExamResults = syncClinicalDataToPatientExamResults(patient, body.clinicalData);
+  const syncedExamResults = syncClinicalDataToPatientExamResults(
+    patient,
+    body.clinicalData,
+    { overwriteInitial: phase.phaseNumber === 1 }
+  );
   if (syncedExamResults) {
     patient.examResults = syncedExamResults;
     patient.changed('examResults', true);

@@ -559,11 +559,39 @@ const getLeaderboard = async (centerId, doctorId = null) => {
 
     const focusScore = round2(computePatientFocusPct(exResultsByPatient[p.id] || []));
 
-    const cur = p.examResults?.far?.currentResult;
+    // Current vision is read from the latest completed full test, not solely from
+    // the denormalized Patient cache. This prevents a retest from leaving BXH stale.
+    // Baseline stays in Patient.examResults because warranty initial has priority;
+    // when absent, fall back to the first completed full test.
+    const fullFarResults = pExamResults.filter(
+      (r) =>
+        r.examType === 'far' &&
+        r.status === 'completed' &&
+        r.leftEyeLevel != null &&
+        r.leftEyeLevel !== '' &&
+        r.rightEyeLevel != null &&
+        r.rightEyeLevel !== ''
+    );
+    const latestFar = fullFarResults[0] || null; // query is ordered newest first
+    const firstFar = fullFarResults[fullFarResults.length - 1] || null;
+    const cachedInitial = p.examResults?.far?.initialResult;
+    const initial =
+      cachedInitial &&
+      toLevel(cachedInitial.leftEye) != null &&
+      toLevel(cachedInitial.rightEye) != null
+        ? cachedInitial
+        : firstFar
+          ? { leftEye: firstFar.leftEyeLevel, rightEye: firstFar.rightEyeLevel, bothEye: null }
+          : null;
+    const cur = latestFar
+      ? { leftEye: latestFar.leftEyeLevel, rightEye: latestFar.rightEyeLevel, bothEye: null }
+      : p.examResults?.far?.currentResult;
     const lPct = cur && toLevel(cur.leftEye) != null ? farLevelToRecoveryPct(toLevel(cur.leftEye)) : null;
     const rPct = cur && toLevel(cur.rightEye) != null ? farLevelToRecoveryPct(toLevel(cur.rightEye)) : null;
     const phucHoi = farRecoveryPct(lPct, rPct);
-    const delta = farLineDeltaBestEye(p.examResults);
+    const delta = farLineDeltaBestEye({
+      far: { initialResult: initial, currentResult: cur },
+    });
 
     return {
       patientCode: p.code,

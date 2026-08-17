@@ -64,7 +64,7 @@ describe('warrantyAgreement helpers', () => {
     expect(next.far.currentResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
   });
 
-  test('syncClinicalDataToPatientExamResults does not overwrite existing currentResult', () => {
+  test('syncClinicalDataToPatientExamResults prioritizes warranty initial without overwriting currentResult', () => {
     const patient = {
       examResults: {
         far: {
@@ -80,6 +80,27 @@ describe('warrantyAgreement helpers', () => {
     });
     expect(next.far.initialResult).toEqual({ leftEye: 7, rightEye: 9, bothEye: null });
     expect(next.far.currentResult).toEqual({ leftEye: 12, rightEye: 14, bothEye: null });
+  });
+
+  test('later warranty phases do not replace the phase-1 baseline', () => {
+    const patient = {
+      examResults: {
+        far: {
+          initialResult: { leftEye: 7, rightEye: 9, bothEye: null },
+          currentResult: { leftEye: 12, rightEye: 14, bothEye: null },
+        },
+      },
+    };
+    const next = syncClinicalDataToPatientExamResults(
+      patient,
+      {
+        examResults: {
+          far: { initial: { leftEye: 10, rightEye: 11, bothEye: null } },
+        },
+      },
+      { overwriteInitial: false }
+    );
+    expect(next).toBeNull();
   });
 
   test('syncClinicalDataToPatientExamResults maps near warranty initial', () => {

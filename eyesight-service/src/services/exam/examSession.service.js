@@ -8,7 +8,7 @@ const { sequelize } = require('../../config/db');
 const examNotificationService = require('./examNotification.service');
 const auditLogService = require('../system/auditLog.service');
 const { recalculatePatientComplianceByType } = require('../clinic/compliance.service');
-const { eyeObj, isFull } = require('../../utils/examResultsBackfill');
+const { eyeObj, isFull, hasData } = require('../../utils/examResultsBackfill');
 const {
   standardQuery,
   standardCreate,
@@ -208,8 +208,11 @@ const resetExamSessionForRetake = async (sessionId, actor = {}) => {
       } else {
         const first = completedResults[0];
         const latest = completedResults[completedResults.length - 1];
+        const existingInitial = examResults[session.examType]?.initialResult;
         examResults[session.examType] = {
-          initialResult: eyeObj(first),
+          // Warranty baseline has priority; otherwise this is already the first
+          // completed full test. Never replace it while resetting a later retest.
+          initialResult: hasData(existingInitial) ? existingInitial : eyeObj(first),
           currentResult: eyeObj(latest),
           lastExamDate: latest.completedAt || latest.createdAt || null,
         };

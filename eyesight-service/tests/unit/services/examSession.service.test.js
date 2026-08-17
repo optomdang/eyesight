@@ -256,7 +256,8 @@ describe('ExamSession Service', () => {
       const patient = {
         examResults: {
           far: {
-            initialResult: { leftEye: 5, rightEye: 5, bothEye: null },
+            // Warranty baseline is intentionally different from first system exam.
+            initialResult: { leftEye: 4, rightEye: 4, bothEye: null },
             currentResult: { leftEye: 8, rightEye: 8, bothEye: null },
           },
         },
@@ -302,6 +303,7 @@ describe('ExamSession Service', () => {
         expect.objectContaining({
           examResults: expect.objectContaining({
             far: expect.objectContaining({
+              initialResult: { leftEye: 4, rightEye: 4, bothEye: null },
               currentResult: { leftEye: 5, rightEye: 6, bothEye: null },
             }),
           }),

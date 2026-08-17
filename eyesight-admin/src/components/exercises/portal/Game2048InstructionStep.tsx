@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Box, ButtonBase } from '@mui/material';
 import guideBoard from 'src/assets/game2048-guide/guide-board.png';
+import anaglyphGlasses from 'src/assets/exercise-guide/anaglyph-glasses.png';
 
 interface Game2048InstructionStepProps {
   trainingEye: 'left' | 'right' | 'both' | null;
@@ -61,7 +62,8 @@ const BRAND_TEXT = ' luôn đồng hành cùng bạn trên hành trình cải th
 const STATIC_STEPS = [
   {
     title: 'ĐEO KÍNH TRƯỚC KHI CHƠI',
-    description: 'Nếu đang đeo kính, hãy đeo kính vào trước khi chơi.',
+    description:
+      'Nếu đang đeo kính, hãy đeo kính vào trước khi chơi. Hãy đeo cả kính xanh đỏ đồng thời cùng với kính của bé nếu bài tập có yêu cầu.',
   },
   {
     title: 'NGỒI ĐÚNG KHOẢNG CÁCH',
@@ -291,6 +293,22 @@ const Game2048InstructionStep: React.FC<Game2048InstructionStepProps> = ({
                 </Box>
               </Box>
 
+              {index === 0 && (
+                <Box
+                  component="img"
+                  src={anaglyphGlasses}
+                  alt="Kính lọc màu xanh đỏ"
+                  sx={{
+                    position: 'absolute',
+                    left: card.x + 215,
+                    top: card.y + 125,
+                    width: 115,
+                    height: 'auto',
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
+
               <Box
                 sx={{
                   position: 'absolute',
@@ -298,8 +316,8 @@ const Game2048InstructionStep: React.FC<Game2048InstructionStepProps> = ({
                   bottom: DESIGN_HEIGHT - (card.y + card.h) + 22,
                   width: card.w - 56,
                   textAlign: 'center',
-                  fontSize: 14.5,
-                  lineHeight: '20.5px',
+                  fontSize: index === 0 ? 11.5 : 14.5,
+                  lineHeight: index === 0 ? '14px' : '20.5px',
                 }}
               >
                 {step.description}

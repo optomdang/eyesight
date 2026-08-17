@@ -80,6 +80,30 @@ const applyCompletedExamToPatientCache = (existingExamResults, completedExam) =>
   return { examResults, changed: true };
 };
 
+/**
+ * Force-rebuild examResults for every vision type from completed full exams.
+ * initialResult = first full exam; currentResult = latest full exam.
+ * Used to repair caches inflated by incomplete/warranty baseline writes.
+ *
+ * @param {Array} exams - completed ExamResult rows for the patient, sorted by completedAt ASC
+ * @returns {object} next examResults map (types with no full exams are omitted)
+ */
+const forceRebuildExamResultsFromHistory = (exams) => {
+  const examResults = {};
+  for (const type of VISION_TYPES) {
+    const full = (exams || []).filter((e) => e.examType === type && isFull(e));
+    if (full.length === 0) continue;
+    const first = full[0];
+    const last = full[full.length - 1];
+    examResults[type] = {
+      initialResult: eyeObj(first),
+      currentResult: eyeObj(last),
+      lastExamDate: last.completedAt || last.createdAt || null,
+    };
+  }
+  return examResults;
+};
+
 module.exports = {
   VISION_TYPES,
   isFull,
@@ -87,4 +111,5 @@ module.exports = {
   hasData,
   rebuildExamResults,
   applyCompletedExamToPatientCache,
+  forceRebuildExamResultsFromHistory,
 };

@@ -110,10 +110,14 @@ const eyeResultHasValue = (eyeResult) =>
 /**
  * Đồng bộ clinicalData (cam kết bảo hành) → Patient.examResults để portal bài tập
  * đọc được kết quả ban đầu khi chưa làm bài test hệ thống.
- * - clinical.initial → patient.initialResult
+ * - clinical.initial → patient.initialResult và được ưu tiên hơn baseline bài test hệ thống
  * - nếu patient.currentResult trống → copy initial vào currentResult
  */
-const syncClinicalDataToPatientExamResults = (patient, clinicalData) => {
+const syncClinicalDataToPatientExamResults = (
+  patient,
+  clinicalData,
+  { overwriteInitial = true } = {}
+) => {
   const clinicalExamResults = clinicalData?.examResults;
   if (!clinicalExamResults || typeof clinicalExamResults !== 'object') {
     return null;
@@ -132,7 +136,10 @@ const syncClinicalDataToPatientExamResults = (patient, clinicalData) => {
       ...(nextExamResults[examType] || {}),
     };
 
-    if (eyeResultHasValue(clinical.initial)) {
+    if (
+      eyeResultHasValue(clinical.initial) &&
+      (overwriteInitial || !eyeResultHasValue(bucket.initialResult))
+    ) {
       bucket.initialResult = { ...clinical.initial };
       changed = true;
 

@@ -98,14 +98,27 @@ describe('Dashboard User Service - getPatientStatistics', () => {
         id: 1,
         code: 'A',
         examResults: {
-          far: { initialResult: { leftEye: 7, rightEye: 7 }, currentResult: { leftEye: 10, rightEye: 10 } },
+          // Warranty baseline is authoritative; cache current is intentionally stale.
+          far: { initialResult: { leftEye: 7, rightEye: 7 }, currentResult: { leftEye: 20, rightEye: 20 } },
         },
         user: { name: 'A' },
       },
       { id: 2, code: 'B', examResults: null, user: { name: 'B' } },
     ]);
     jest.spyOn(ExamSession, 'findAll').mockResolvedValue([]);
-    jest.spyOn(ExamResult, 'findAll').mockResolvedValue([]);
+    jest.spyOn(ExamResult, 'findAll').mockResolvedValue([
+      {
+        id: 501,
+        patientId: 1,
+        examSessionId: null,
+        examType: 'far',
+        status: 'completed',
+        leftEyeLevel: 9,
+        rightEyeLevel: 10,
+        completedAt: new Date('2026-08-17'),
+        createdAt: new Date('2026-08-17'),
+      },
+    ]);
     jest.spyOn(ExerciseAssignment, 'findAll').mockResolvedValue([]);
     jest.spyOn(ExamAssignment, 'findAll').mockResolvedValue([]);
     jest.spyOn(ExerciseSession, 'findAll').mockResolvedValue([
@@ -150,6 +163,7 @@ describe('Dashboard User Service - getPatientStatistics', () => {
     expect(board[0].patientCode).toBe('A');
     expect(board[0].completionRate).toBe(100);
     expect(board[0].focusScore).toBe(90);
+    // Latest full test vs warranty baseline: left +2, right +3 → show the higher +3.
     expect(board[0].improvementLines).toBe(3);
     expect(board[1].patientCode).toBe('B');
     expect(board[1].completionRate).toBe(50);

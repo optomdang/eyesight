@@ -64,6 +64,7 @@ import {
 import type { PortalExerciseProps } from 'src/components/exercises/portal/types';
 import { evaluateAnswer } from 'src/utils/examUtils';
 import FarAcuityCharTypeStep from './FarAcuityCharTypeStep';
+import FarAcuityInstructionStep from './FarAcuityInstructionStep';
 import FarAcuityTestStep from './FarAcuityTestStep';
 import { ensureOptotypeFontsLoaded } from 'src/utils/optotypeFonts';
 import FarAcuityRoundFeedbackOverlay from './FarAcuityRoundFeedbackOverlay';
@@ -134,7 +135,9 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   );
 
   // ── charType + setup phase ────────────────────────────────────────────────
-  const [setupPhase, setSetupPhase] = useState<'charType' | 'active'>('charType');
+  const [setupPhase, setSetupPhase] = useState<'instructions' | 'charType' | 'active'>(
+    'instructions',
+  );
   const [charType, setCharType] = useState<ExamCharType>('E');
   const [suggestedCharType, setSuggestedCharType] = useState<ExamCharType | null>(null);
   const [currentBatch, setCurrentBatch] = useState(0);
@@ -312,12 +315,14 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
   const handleCharTypeConfirm = useCallback(() => {
     rememberFarAcuityCharType(charType);
     setSetupPhase('active');
-    resetSession({
-      farLevel: initialAcuityLevel ?? 1,
-      contrastLevel: initialContrastLevel,
-      charType,
-    });
-    resetInputState();
+    if (!restoredRef.current) {
+      resetSession({
+        farLevel: initialAcuityLevel ?? 1,
+        contrastLevel: initialContrastLevel,
+        charType,
+      });
+      resetInputState();
+    }
     if (charType === 'A' || charType === 'N') {
       setInputFocusKey((k) => k + 1);
     }
@@ -830,84 +835,124 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
     else onSandboxExit?.();
   }, [sandboxMode, navigate, onSandboxExit]);
 
-  // ── Start exercise (mount) ─────────────────────────────────────────────────
+  // ── Start exercise after the guide CTA (not on mount) ─────────────────────
+  const sessionBootstrappedRef = useRef(false);
+
   useEffect(() => {
-    if (!assignment || sandboxMode) {
-      setIsLoading(false);
-      if (sandboxMode) {
-        const startTime = Date.now();
-        executionRef.current = { startTime, completed: false };
-        setCurrentTime(startTime);
-        setIsActive(true);
-      }
-      return;
+    // Show the instruction screen immediately; API start waits for the CTA.
+    setIsLoading(false);
+  }, [assignment, sandboxMode]);
+
+  const bootstrapSession = useCallback(async (): Promise<'resume' | 'fresh' | 'blocked' | 'error'> => {
+    if (sandboxMode) {
+      return 'fresh';
+    }
+    if (sessionBootstrappedRef.current && currentResultIdRef.current) {
+      return restoredRef.current ? 'resume' : 'fresh';
     }
 
-    void (async () => {
-      try {
-        const response = await startExercise(assignmentId, sessionId);
-        const { action, result, reason } = response;
+    try {
+      const response = await startExercise(assignmentId, sessionId);
+      const { action, result, reason } = response;
 
-        if (action === 'blocked') {
-          setIsLoading(false);
-          const msgs: Record<string, string> = {
-            timed_out_not_playable: 'Bài tập này đã hết thời gian thực hiện.',
-            session_completed_not_playable: 'Phiên bài tập này đã hoàn thành.',
-          };
-          showSnackbar(msgs[reason as string] ?? 'Không thể tiếp tục bài tập này.', 'warning');
-          navigate(`/portal/assignments/${assignmentId}/sessions/${sessionId}/results`);
-          return;
-        }
-
-        setCurrentResultId(result.id);
-        currentResultIdRef.current = result.id;
-        assignedDurationMinRef.current = resolveAssignedDurationMinutes(
-          result.exerciseConfig?.duration,
-          exerciseConfig?.duration
-        );
-
-        if (action === 'resume' && result.exerciseState) {
-          try {
-            restoreFromSnapshot(result.exerciseState);
-            if (result.exerciseState.gamification) {
-              restoreGamification(result.exerciseState.gamification);
-            }
-            if (result.exerciseState.charType) {
-              setCharType(result.exerciseState.charType as ExamCharType);
-            }
-            restoredRef.current = true;
-            setSetupPhase('active');
-            showSnackbar('Tiếp tục từ lần luyện trước', 'info');
-          } catch {
-            showSnackbar('Không thể khôi phục trạng thái, bắt đầu mới', 'warning');
-          }
-        }
-
-        const startTime =
-          action === 'resume' || action === 'continue'
-            ? Date.now() - (result.duration ?? 0) * 1000
-            : Date.now();
-
-        executionRef.current = { startTime, completed: false };
-        setCurrentTime(Date.now());
-        resetInactivityTimer();
-        setIsActive(true);
-        setIsLoading(false);
-      } catch {
-        setIsLoading(false);
-        executionRef.current = null;
-        setCurrentResultId(null);
-        currentResultIdRef.current = null;
-        assignedDurationMinRef.current = null;
-        setIsActive(false);
-        showSnackbar(
-          'Không thể bắt đầu bài tập trên máy chủ. Vui lòng thử lại.',
-          'error'
-        );
-        navigate('/portal/exercises');
+      if (action === 'blocked') {
+        const msgs: Record<string, string> = {
+          timed_out_not_playable: 'Bài tập này đã hết thời gian thực hiện.',
+          session_completed_not_playable: 'Phiên bài tập này đã hoàn thành.',
+        };
+        showSnackbar(msgs[reason as string] ?? 'Không thể tiếp tục bài tập này.', 'warning');
+        navigate(`/portal/assignments/${assignmentId}/sessions/${sessionId}/results`);
+        return 'blocked';
       }
-    })();
-  }, [assignment, assignmentId, sessionId, sandboxMode, exerciseConfig?.duration, showSnackbar, navigate]);
+
+      setCurrentResultId(result.id);
+      currentResultIdRef.current = result.id;
+      assignedDurationMinRef.current = resolveAssignedDurationMinutes(
+        result.exerciseConfig?.duration,
+        exerciseConfig?.duration
+      );
+      sessionBootstrappedRef.current = true;
+
+      let resumed = false;
+      if (action === 'resume' && result.exerciseState) {
+        try {
+          restoreFromSnapshot(result.exerciseState);
+          if (result.exerciseState.gamification) {
+            restoreGamification(result.exerciseState.gamification);
+          }
+          if (result.exerciseState.charType) {
+            setCharType(result.exerciseState.charType as ExamCharType);
+          }
+          restoredRef.current = true;
+          resumed = true;
+          showSnackbar('Tiếp tục từ lần luyện trước', 'info');
+        } catch {
+          showSnackbar('Không thể khôi phục trạng thái, bắt đầu mới', 'warning');
+        }
+      }
+
+      const startTime =
+        action === 'resume' || action === 'continue'
+          ? Date.now() - (result.duration ?? 0) * 1000
+          : Date.now();
+
+      executionRef.current = { startTime, completed: false };
+      setCurrentTime(Date.now());
+      return resumed ? 'resume' : 'fresh';
+    } catch {
+      executionRef.current = null;
+      setCurrentResultId(null);
+      currentResultIdRef.current = null;
+      assignedDurationMinRef.current = null;
+      setIsActive(false);
+      showSnackbar('Không thể bắt đầu bài tập trên máy chủ. Vui lòng thử lại.', 'error');
+      navigate('/portal/exercises');
+      return 'error';
+    }
+  }, [
+    sandboxMode,
+    assignmentId,
+    sessionId,
+    exerciseConfig?.duration,
+    showSnackbar,
+    navigate,
+    restoreFromSnapshot,
+    restoreGamification,
+  ]);
+
+  const handleInstructionsStart = useCallback(async () => {
+    setIsLoading(true);
+    const outcome = await bootstrapSession();
+    setIsLoading(false);
+    if (outcome === 'resume') {
+      resetInactivityTimer();
+      setIsActive(true);
+      setSetupPhase('active');
+      return;
+    }
+    if (outcome === 'fresh') {
+      // Keep the local clock paused until char-type is confirmed.
+      setIsActive(false);
+      setSetupPhase('charType');
+    }
+  }, [bootstrapSession, resetInactivityTimer]);
+
+  useEffect(() => {
+    if (setupPhase !== 'active') return;
+    if (sandboxMode && !executionRef.current) {
+      const startTime = Date.now();
+      executionRef.current = { startTime, completed: false };
+      setCurrentTime(startTime);
+      setIsActive(true);
+      return;
+    }
+    if (!sandboxMode && executionRef.current && !isActive && !restoredRef.current) {
+      executionRef.current = { ...executionRef.current, startTime: Date.now() };
+      setCurrentTime(Date.now());
+      resetInactivityTimer();
+      setIsActive(true);
+    }
+  }, [setupPhase, sandboxMode, isActive, resetInactivityTimer]);
 
   // ── Guards ────────────────────────────────────────────────────────────────
   if (!assignment) {
@@ -959,7 +1004,8 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
           overflow: 'hidden',
         }}
       >
-        {/* Top HUD */}
+        {/* Top HUD — hidden on the full-page instruction guide */}
+        {setupPhase !== 'instructions' && (
         <Box
           sx={{
             position: 'sticky',
@@ -1155,6 +1201,7 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
             </Button>
           </Box>
         </Box>
+        )}
 
         {saveFailed && (
           <Alert
@@ -1182,7 +1229,15 @@ const FarAcuityExercise: React.FC<PortalExerciseProps> = ({
         )}
 
         {/* Main content: char-type setup or test (exam-style) */}
-        {setupPhase === 'charType' ? (
+        {setupPhase === 'instructions' ? (
+          <FarAcuityInstructionStep
+            trainingEye={eye}
+            requiresAnaglyphGlasses={dichopticPresentation.enabled}
+            onStart={() => {
+              void handleInstructionsStart();
+            }}
+          />
+        ) : setupPhase === 'charType' ? (
           <FarAcuityCharTypeStep
             charType={charType}
             onCharTypeChange={setCharType}

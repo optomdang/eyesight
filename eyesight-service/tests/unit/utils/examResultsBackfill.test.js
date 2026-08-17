@@ -1,4 +1,9 @@
-const { rebuildExamResults, isFull, applyCompletedExamToPatientCache } = require('../../../src/utils/examResultsBackfill');
+const {
+  rebuildExamResults,
+  isFull,
+  applyCompletedExamToPatientCache,
+  forceRebuildExamResultsFromHistory,
+} = require('../../../src/utils/examResultsBackfill');
 
 describe('examResultsBackfill.rebuildExamResults (P6)', () => {
   const farFull = (l, r, at) => ({ examType: 'far', leftEyeLevel: l, rightEyeLevel: r, completedAt: at });
@@ -83,5 +88,34 @@ describe('examResultsBackfill.rebuildExamResults (P6)', () => {
     expect(changed).toBe(true);
     expect(examResults.far.initialResult).toEqual({ leftEye: 5, rightEye: 5, bothEye: null });
     expect(examResults.far.currentResult).toEqual({ leftEye: 9, rightEye: 11, bothEye: null });
+  });
+
+  it('forceRebuildExamResultsFromHistory resets initial to first full and current to latest full', () => {
+    const exams = [
+      {
+        examType: 'far',
+        status: 'completed',
+        leftEyeLevel: 5,
+        rightEyeLevel: 5,
+        completedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        examType: 'far',
+        status: 'completed',
+        leftEyeLevel: 7,
+        rightEyeLevel: 6,
+        completedAt: '2026-02-01T00:00:00.000Z',
+      },
+      {
+        examType: 'far',
+        status: 'completed',
+        leftEyeLevel: 8,
+        rightEyeLevel: 7,
+        completedAt: '2026-03-01T00:00:00.000Z',
+      },
+    ];
+    const examResults = forceRebuildExamResultsFromHistory(exams);
+    expect(examResults.far.initialResult).toEqual({ leftEye: 5, rightEye: 5, bothEye: null });
+    expect(examResults.far.currentResult).toEqual({ leftEye: 8, rightEye: 7, bothEye: null });
   });
 });

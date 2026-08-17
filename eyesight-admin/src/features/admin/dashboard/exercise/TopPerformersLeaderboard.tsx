@@ -24,7 +24,8 @@ const LEADERBOARD_SUBTITLE_HELP =
 const LEADERBOARD_METRIC_TOOLTIPS = {
   completion: 'Mức độ hoàn thành các nhiệm vụ được giao (kiểm tra thị lực và lượt tập).',
   focus: 'Mức độ tập trung khi thực hiện bài tập (ít tạm dừng và bỏ tương tác).',
-  improvement: 'Mức cải thiện thị lực nhìn xa so với lúc bắt đầu điều trị.',
+  improvement:
+    'Kết quả nhìn xa hoàn tất gần nhất trừ kết quả ban đầu. Ưu tiên kết quả ban đầu trong cam kết bảo hành; nếu không có thì dùng lần test hoàn tất đầu tiên. Nếu cả hai mắt đều cải thiện, hiển thị mắt tăng nhiều hơn.',
   recovery: 'Thị lực nhìn xa hiện tại so với chuẩn 20/20 (không liên quan bài tập).',
 } as const;
 

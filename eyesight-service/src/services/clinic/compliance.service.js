@@ -112,11 +112,18 @@ async function updatePatientCompliance(patientId, examResult) {
     }
 
     const currentExamResults = (patient.examResults && patient.examResults[examResult.examType]) || {};
-    const hasInitialResult =
+    // Baseline must be a full eye set — a partial first write used to lock forever and
+    // inflate BXH “CẢI THIỆN” (current − initial) after later full exams.
+    const hasFullInitialResult =
       currentExamResults.initialResult &&
       (examResult.examType === 'stereopsis'
-        ? currentExamResults.initialResult.bothEye !== null && currentExamResults.initialResult.bothEye !== undefined
-        : currentExamResults.initialResult.leftEye !== null || currentExamResults.initialResult.rightEye !== null);
+        ? currentExamResults.initialResult.bothEye !== null &&
+          currentExamResults.initialResult.bothEye !== undefined &&
+          currentExamResults.initialResult.bothEye !== ''
+        : currentExamResults.initialResult.leftEye != null &&
+          currentExamResults.initialResult.leftEye !== '' &&
+          currentExamResults.initialResult.rightEye != null &&
+          currentExamResults.initialResult.rightEye !== '');
 
     const examResultData = {
       leftEye: examResult.examType === 'stereopsis' ? null : examResult.leftEyeLevel || null,
@@ -135,12 +142,15 @@ async function updatePatientCompliance(patientId, examResult) {
     const allExamResults = patient.examResults || {};
 
     // Update only the specific exam type — always recorded, independent of any schedule.
+    // initialResult is set only from a full completed exam (same gate as currentResult).
     const updatedExamResults = {
       ...allExamResults,
       [examResult.examType]: {
         ...allExamResults[examResult.examType],
         ...(shouldUpdateCurrentResult ? { currentResult: examResultData } : {}),
-        ...(hasInitialResult ? {} : { initialResult: examResultData }),
+        ...(shouldUpdateCurrentResult && !hasFullInitialResult
+          ? { initialResult: examResultData }
+          : {}),
       },
     };
 
@@ -159,7 +169,7 @@ async function updatePatientCompliance(patientId, examResult) {
     await Patient.update(updateFields, { where: { id: patientId } });
 
     logger.debug(
-      `Updated ${hasInitialResult ? 'current' : 'initial + current'} result for patient ${patientId} (${
+      `Updated ${hasFullInitialResult ? 'current' : 'initial + current'} result for patient ${patientId} (${
         examResult.examType
       }); compliance ${examConfig ? 'updated' : 'skipped (no schedule)'}; currentResult ${
         shouldUpdateCurrentResult ? 'YES' : 'NO'

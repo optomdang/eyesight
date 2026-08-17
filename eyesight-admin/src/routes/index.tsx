@@ -11,6 +11,9 @@ const WarrantySignPage = Loadable(lazy(() => import('../views/sign/WarrantySignP
 const Game2048GuidePreviewPage = Loadable(
   lazy(() => import('../views/dev/Game2048GuidePreviewPage')),
 );
+const FarAcuityGuidePreviewPage = Loadable(
+  lazy(() => import('../views/dev/FarAcuityGuidePreviewPage')),
+);
 
 // Public sign routes — no auth required
 const SignRoutes = {
@@ -33,6 +36,14 @@ const DevRoutes = {
       path: '2048-guide',
       element: import.meta.env.DEV ? (
         <Game2048GuidePreviewPage />
+      ) : (
+        <Navigate to="/auth/404" replace />
+      ),
+    },
+    {
+      path: 'vac-guide',
+      element: import.meta.env.DEV ? (
+        <FarAcuityGuidePreviewPage />
       ) : (
         <Navigate to="/auth/404" replace />
       ),

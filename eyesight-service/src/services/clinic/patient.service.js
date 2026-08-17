@@ -710,7 +710,13 @@ const hydrateExamResultsFromWarranty = async (patient) => {
   let nextExamResults = null;
 
   for (const phase of phases) {
-    const synced = syncClinicalDataToPatientExamResults(workingPatient, phase.clinicalData);
+    const synced = syncClinicalDataToPatientExamResults(
+      workingPatient,
+      phase.clinicalData,
+      // Phase 1 is the warranty baseline. Later re-exam phases may supply current
+      // data but must never replace that baseline.
+      { overwriteInitial: phase.phaseNumber === 1 }
+    );
     if (synced) {
       nextExamResults = synced;
       workingPatient = { examResults: synced };
