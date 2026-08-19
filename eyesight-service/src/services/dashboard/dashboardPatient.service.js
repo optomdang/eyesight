@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { sequelize } = require('../../config/db');
 const { Patient, User } = require('../../models');
 const { patientImproved } = require('./visionImprovement');
+const { vnMoment } = require('../../utils/common');
 
 /**
  * Dashboard Patient Correlation Service
@@ -48,25 +49,23 @@ const calculateCorrelation = (x, y) => {
  * @returns {Promise<{data: Array, statistics: Object}>}
  */
 const getPatientCorrelation = async (centerId, visionType, days, doctorId = null) => {
-  const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
+  const end = vnMoment().endOf('day');
+  const start = vnMoment().startOf('day').subtract(Math.max(1, days) - 1, 'day');
+  const startDateStr = start.format('YYYY-MM-DD');
+  const endDateStr = end.format('YYYY-MM-DD');
 
-  // Format dates for PostgreSQL
-  const startDateStr = startDate.toISOString().split('T')[0];
-  const endDateStr = endDate.toISOString().split('T')[0];
-
-  // Generate date series and aggregate training + vision data
+  // Generate date series and aggregate training + vision data (VN clinic days)
   const query = `
     WITH RECURSIVE date_series AS (
-      SELECT DATE(:startDate) AS date
+      SELECT DATE(:startDateStr) AS date
       UNION ALL
       SELECT DATE(date + INTERVAL '1 day')
       FROM date_series
-      WHERE date < DATE(:endDate)
+      WHERE date < DATE(:endDateStr)
     ),
     training_by_date AS (
       SELECT 
-        DATE(er."createdAt") AS date,
+        DATE(er."createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
         ROUND(CAST(SUM(er.duration) AS NUMERIC) / 3600.0, 2) AS training_hours
       FROM "ExerciseResults" er
       ${
@@ -76,13 +75,13 @@ const getPatientCorrelation = async (centerId, visionType, days, doctorId = null
       }
       WHERE er."centerId" = :centerId
         ${doctorId ? 'AND p."doctorId" = :doctorId' : ''}
-        AND er."createdAt" BETWEEN :startDate AND :endDate
+        AND er."createdAt" BETWEEN :rangeStart AND :rangeEnd
         AND er."status" = 'completed'
-      GROUP BY DATE(er."createdAt")
+      GROUP BY DATE(er."createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')
     ),
     vision_by_date AS (
       SELECT 
-        DATE(ex."completedAt") AS date,
+        DATE(ex."completedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh') AS date,
         -- Level columns are SMALLINT (P3). Treat 0 as "không đo". Avg các mắt có giá trị, rồi avg theo ngày.
         ROUND(
           AVG(
@@ -102,9 +101,9 @@ const getPatientCorrelation = async (centerId, visionType, days, doctorId = null
       WHERE ex."centerId" = :centerId
         ${doctorId ? 'AND p."doctorId" = :doctorId' : ''}
         AND ex."examType" = :visionType
-        AND ex."completedAt" BETWEEN :startDate AND :endDate
+        AND ex."completedAt" BETWEEN :rangeStart AND :rangeEnd
         AND ex."status" = 'completed'
-      GROUP BY DATE(ex."completedAt")
+      GROUP BY DATE(ex."completedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')
     ),
     vision_forward_fill AS (
       SELECT 
@@ -131,7 +130,15 @@ const getPatientCorrelation = async (centerId, visionType, days, doctorId = null
   `;
 
   const data = await sequelize.query(query, {
-    replacements: { centerId, visionType, startDate: startDateStr, endDate: endDateStr, ...(doctorId && { doctorId }) },
+    replacements: {
+      centerId,
+      visionType,
+      startDateStr,
+      endDateStr,
+      rangeStart: start.toDate(),
+      rangeEnd: end.toDate(),
+      ...(doctorId && { doctorId }),
+    },
     type: sequelize.QueryTypes.SELECT,
   });
 

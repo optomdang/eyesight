@@ -244,12 +244,12 @@ const getUserActivityTrend = async (centerId, days = 30, doctorId = null) => {
   const rows = await sequelize.query(
     `SELECT TO_CHAR(d, 'YYYY-MM-DD') AS date, COUNT(DISTINCT "patientId")::int AS count
        FROM (
-         SELECT DATE((COALESCE(er."startedAt", er."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, er."patientId"
+         SELECT DATE(COALESCE(er."startedAt", er."createdAt") AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, er."patientId"
            FROM "ExerciseResults" er
           WHERE er."centerId" = :centerId AND er.deleted = false
             AND COALESCE(er."startedAt", er."createdAt") BETWEEN :startDate AND :endDate ${doctorEx}
          UNION ALL
-         SELECT DATE((COALESCE(ex."startedAt", ex."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, ex."patientId"
+         SELECT DATE(COALESCE(ex."startedAt", ex."createdAt") AT TIME ZONE 'Asia/Ho_Chi_Minh') AS d, ex."patientId"
            FROM "ExamResults" ex
           WHERE ex."centerId" = :centerId AND ex.deleted = false
             AND COALESCE(ex."startedAt", ex."createdAt") BETWEEN :startDate AND :endDate ${doctorExam}
@@ -650,7 +650,7 @@ const getPatientStatistics = async ({ centerId, trendDays = 30, doctorId = null,
       sequelize
         .query(
           `SELECT
-        COUNT(DISTINCT DATE(er."createdAt")) AS training_days,
+        COUNT(DISTINCT DATE(er."createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')) AS training_days,
         ROUND(CAST(SUM(er.duration) AS NUMERIC) / 3600.0, 1) AS total_hours,
         COUNT(DISTINCT er.id) AS total_exercises
        FROM "ExerciseResults" er

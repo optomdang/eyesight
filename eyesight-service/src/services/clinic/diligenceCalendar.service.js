@@ -178,7 +178,11 @@ const buildDiligenceDaysForRange = async (patient, start, end) => {
         : Promise.resolve([]),
       sequelize.query(
         `
-        SELECT TO_CHAR(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') AS day,
+        -- timestamptz: AT TIME ZONE 'Asia/Ho_Chi_Minh' → giờ tường VN.
+        -- KHÔNG dùng (col AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh':
+        -- bước đầu ra timestamp naive UTC, bước sau hiểu nhầm là giờ VN → lùi 7h
+        -- (lượt tập 00:00–07:00 VN bị cộng vào ngày hôm trước).
+        SELECT TO_CHAR("createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') AS day,
                COALESCE(SUM(duration), 0)::int AS "actualSec"
         FROM "ExerciseResults"
         WHERE "patientId" = :patientId

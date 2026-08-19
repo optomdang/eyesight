@@ -274,6 +274,16 @@ const VN_TZ = 'Asia/Ho_Chi_Minh';
 /** Clinic calendar clock — always Vietnam, never server TZ or the user's login location. */
 const vnMoment = (value) => moment(value).utcOffset(VN_UTC_OFFSET_MINUTES);
 
+/** YYYY-MM-DD of the Vietnam clinic day. Do not use `toISOString().split('T')[0]` (that is UTC). */
+const vnDateKey = (value) => vnMoment(value).format('YYYY-MM-DD');
+
+/**
+ * Postgres calendar date in Vietnam for a timestamptz expression.
+ * Do not use DATE(timestamptz) (session TZ, usually UTC) or
+ * (col AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh' (shifts timestamptz by −7h).
+ */
+const sqlVnDate = (expr) => `DATE((${expr}) AT TIME ZONE '${VN_TZ}')`;
+
 const getCurrentCycleDateRange = (frequency, now = new Date()) => {
   const start = vnMoment(now).startOf('day');
 
@@ -322,4 +332,6 @@ module.exports = {
   VN_UTC_OFFSET_MINUTES,
   VN_TZ,
   vnMoment,
+  vnDateKey,
+  sqlVnDate,
 };

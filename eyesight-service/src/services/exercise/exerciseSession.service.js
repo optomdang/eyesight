@@ -6,7 +6,6 @@
 
 const httpStatus = require('http-status');
 const { Op } = require('sequelize');
-const moment = require('moment');
 const { ExerciseSession, ExerciseAssignment, ExerciseConfig, Exercise, ExerciseResult } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const { sequelize } = require('../../config/db');
@@ -15,7 +14,7 @@ const {
   computeSessionFocusScore,
 } = require('../dashboard/leaderboardMetrics');
 const { standardQuery } = require('../../utils/patterns');
-const { generateCode, getCurrentCycleDateRange } = require('../../utils/common');
+const { generateCode, getCurrentCycleDateRange, vnDateKey } = require('../../utils/common');
 const exerciseAssignmentService = require('./exerciseAssignment.service');
 
 /**
@@ -179,7 +178,7 @@ const getSessionProgress = async (assignmentId, date = new Date()) => {
     const requiredExecutions = assignment.exerciseConfig?.executionCount || 1;
     return {
       assignmentId,
-      date: date.toISOString().split('T')[0],
+      date: vnDateKey(date),
       sessionExists: false,
       completed: 0,
       required: requiredExecutions,
@@ -204,7 +203,7 @@ const getSessionProgress = async (assignmentId, date = new Date()) => {
 
   return {
     assignmentId,
-    date: date.toISOString().split('T')[0],
+    date: vnDateKey(date),
     sessionExists: true,
     sessionId: todaySession.id,
     sessionStatus: todaySession.status,
@@ -228,9 +227,9 @@ const getWeeklyProgress = async (assignmentId, weekStart = new Date()) => {
   const assignment = await exerciseAssignmentService.getAssignmentById(assignmentId);
   if (!assignment) return null;
 
-  // Get start of week (Monday)
-  const startOfWeek = moment(weekStart).startOf('isoWeek').toDate();
-  const endOfWeek = moment(weekStart).endOf('isoWeek').toDate();
+  // Get start of week (Monday) in Vietnam clinic time
+  const { start: startOfWeek, end: endOfWeek } = getCurrentCycleDateRange('weekly', weekStart);
+  const vnStartedAtDate = sequelize.literal(`DATE("startedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')`);
 
   const sessions = await ExerciseSession.findAll({
     where: {
@@ -239,10 +238,10 @@ const getWeeklyProgress = async (assignmentId, weekStart = new Date()) => {
       startedAt: { [Op.between]: [startOfWeek, endOfWeek] },
     },
     attributes: [
-      [sequelize.fn('DATE', sequelize.col('startedAt')), 'date'],
+      [vnStartedAtDate, 'date'],
       [sequelize.fn('COUNT', sequelize.col('id')), 'sessions'],
     ],
-    group: [sequelize.fn('DATE', sequelize.col('startedAt'))],
+    group: [vnStartedAtDate],
     raw: true,
   });
 
@@ -261,8 +260,8 @@ const getWeeklyProgress = async (assignmentId, weekStart = new Date()) => {
 
   return {
     assignmentId,
-    weekStart: startOfWeek.toISOString().split('T')[0],
-    weekEnd: endOfWeek.toISOString().split('T')[0],
+    weekStart: vnDateKey(startOfWeek),
+    weekEnd: vnDateKey(endOfWeek),
     frequency,
     dailySessions: sessions,
     totalCompleted,

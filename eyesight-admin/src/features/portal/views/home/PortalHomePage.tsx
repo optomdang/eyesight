@@ -85,15 +85,21 @@ const PortalHomePage: React.FC = () => {
     const last30Days = new Date();
     last30Days.setDate(last30Days.getDate() - 30);
 
-    // Key bằng ISO date (YYYY-MM-DD) để sort chính xác, display label riêng
+    // Key theo ngày lâm sàng VN — toISOString() là UTC nên 00:00–07:00 VN bị gom ngày hôm trước
     const dailyData: { [isoDate: string]: { total: number; count: number; label: string } } = {};
+    const vnDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const vnLabelFmt = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      day: '2-digit',
+      month: '2-digit',
+    });
 
     results.forEach((result) => {
       if (!result.completedAt) return;
       const date = new Date(result.completedAt);
       if (date >= last30Days) {
-        const isoDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
-        const label = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        const isoDate = vnDateFmt.format(date);
+        const label = vnLabelFmt.format(date);
         if (!dailyData[isoDate]) {
           dailyData[isoDate] = { total: 0, count: 0, label };
         }

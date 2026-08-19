@@ -1,7 +1,6 @@
 const { Op } = require('sequelize');
 const cron = require('node-cron');
-const moment = require('moment');
-const { vnMoment } = require('../../utils/common');
+const { vnMoment, getCurrentCycleDateRange } = require('../../utils/common');
 const { ExamAssignment, Patient, ExamSession, Notification } = require('../../models');
 const { notificationTemplateService, emailService, zaloService } = require('../index');
 const logger = require('../../config/logger');
@@ -131,7 +130,7 @@ const getExamSessionsDueForNotification = async (centerId, examType) => {
  */
 const sendExamReminders = async (centerId, examType, dryRun = false) => {
   const sessionsDue = await getExamSessionsDueForNotification(centerId, examType);
-  const today = new Date().toISOString().split('T')[0]; // "2025-11-12"
+  const { start: todayStart, end: todayEnd } = getCurrentCycleDateRange('daily');
 
   const examTypeNames = {
     far: 'Far Vision',
@@ -153,8 +152,8 @@ const sendExamReminders = async (centerId, examType, dryRun = false) => {
         referenceId: session.id.toString(),
         sent: true,
         sentAt: {
-          [Op.gte]: new Date(`${today} 00:00:00`),
-          [Op.lt]: new Date(`${today} 23:59:59`),
+          [Op.gte]: todayStart,
+          [Op.lte]: todayEnd,
         },
       },
     });

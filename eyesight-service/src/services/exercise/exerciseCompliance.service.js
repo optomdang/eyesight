@@ -13,6 +13,7 @@ const { exerciseNotificationService } = require('../index');
 const logger = require('../../config/logger');
 const { buildInTreatmentWhereClause } = require('../../utils/treatmentUtils');
 const { recordSessionCompletion } = require('./exerciseSessionCompletion.service');
+const { getCurrentCycleDateRange } = require('../../utils/common');
 
 /**
  * Calculate next due date based on frequency
@@ -206,8 +207,7 @@ const sendComplianceReminders = async (centerIds = null, options = {}) => {
 
   const overdueAssignments = await getOverdueAssignments(centerIds);
   const now = new Date();
-
-  const today = new Date().toISOString().split('T')[0]; // "2025-11-12"
+  const { start: todayStart, end: todayEnd } = getCurrentCycleDateRange('daily');
 
   const sendResults = await Promise.allSettled(
     overdueAssignments.map(async (assignment) => {
@@ -233,8 +233,8 @@ const sendComplianceReminders = async (centerIds = null, options = {}) => {
           referenceId: assignment.id.toString(),
           sent: true,
           sentAt: {
-            [Op.gte]: new Date(`${today} 00:00:00`),
-            [Op.lt]: new Date(`${today} 23:59:59`),
+            [Op.gte]: todayStart,
+            [Op.lte]: todayEnd,
           },
         },
       });
