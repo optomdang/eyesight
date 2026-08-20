@@ -8,10 +8,10 @@
  * vì khác visionType → ký hiệu độ khó & thang điểm khác nhau, không gộp chung trục.
  *
  * Mỗi biểu đồ con:
- *   Trục X      : ngày thực hiện (categorical, chỉ ngày có buổi tập)
- *   Trục Y trái : Điểm trung bình (Bar)
+ *   Trục X      : ngày (giờ VN); thêm giờ nếu cùng ngày có nhiều buổi
+ *   Trục Y trái : Điểm trung bình (Bar) — domain chỉ từ điểm, không lẫn %
  *   Trục Y phải : % (Thời gian thực hiện & Mức độ tập trung — Line)
- *   Label Bar   : Độ khó (visionLevel đã định dạng theo visionType)
+ *   Label Bar   : chính giá trị điểm (khớp chiều cao cột); độ khó ở tooltip
  *
  * Toàn bộ dữ liệu đọc từ SESSION (snapshot). Không fetch ExerciseResult.
  *
@@ -88,6 +88,8 @@ interface RawSession {
 }
 
 interface ChartPoint {
+  /** Unique per session — duplicate calendar dates must not share an X category. */
+  xKey: string;
   dateLabel: string;
   fullDate: string;
   timestamp: number;
@@ -206,13 +208,45 @@ export const resolveExerciseSessionChartTitle = (input: {
   );
 };
 
-/** Nhãn trục X thích nghi theo chu kỳ: monthly+ → MM/YYYY; còn lại → DD/MM/YYYY. */
+const VN_TZ = 'Asia/Ho_Chi_Minh';
+
+const formatInVn = (ts: number, options: Intl.DateTimeFormatOptions): string =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: VN_TZ, ...options }).format(new Date(ts));
+
+const formatAxisTime = (ts: number): string =>
+  formatInVn(ts, { hour: '2-digit', minute: '2-digit', hour12: false });
+
+/** Nhãn trục X theo ngày lâm sàng VN. monthly+ → MM/YYYY; còn lại → DD/MM HH:mm (tránh trùng ngày). */
 const formatAxisDate = (ts: number, frequency?: string | null): string => {
   if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') {
-    return dayjs(ts).format('MM/YYYY');
+    return formatInVn(ts, { month: '2-digit', year: 'numeric' });
   }
-  return dayjs(ts).format('DD/MM/YYYY');
+  return `${formatInVn(ts, { day: '2-digit', month: '2-digit' })} ${formatAxisTime(ts)}`;
 };
+
+const formatFullDateTime = (ts: number): string =>
+  `${formatInVn(ts, { day: '2-digit', month: '2-digit', year: 'numeric' })} ${formatAxisTime(ts)}`;
+
+const formatScoreLabel = (value: unknown): string => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return '';
+  return Number.isInteger(n) ? String(n) : n.toLocaleString('vi-VN', { maximumFractionDigits: 1 });
+};
+
+/** If two sessions still share a tick label (same minute), append a disambiguator. */
+const disambiguateSameDayLabels = (points: ChartPoint[]): void => {
+  const counts = new Map<string, number>();
+  points.forEach((p) => counts.set(p.dateLabel, (counts.get(p.dateLabel) ?? 0) + 1));
+  const seen = new Map<string, number>();
+  points.forEach((p) => {
+    if ((counts.get(p.dateLabel) ?? 0) <= 1) return;
+    const n = (seen.get(p.dateLabel) ?? 0) + 1;
+    seen.set(p.dateLabel, n);
+    p.dateLabel = `${p.dateLabel} (${n})`;
+  });
+};
+
+const niceCeil = (value: number, step: number): number => Math.ceil(value / step) * step;
 
 const safePct = (value: number | null | undefined): string =>
   value != null ? `${value}%` : '-';
@@ -238,10 +272,17 @@ const computeTimePercent = (s: RawSession): number | null => {
 
 const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }) => {
   const barColor = SERIES_COLORS[group.colorIndex % SERIES_COLORS.length];
+  const scoreMax = group.points.reduce((max, p) => Math.max(max, p.averageScore), 0);
+  const pctMax = group.points.reduce(
+    (max, p) => Math.max(max, p.timePercent ?? 0, p.focusScore ?? 0),
+    0
+  );
+  const scoreDomainMax = scoreMax > 0 ? niceCeil(scoreMax * 1.15, scoreMax >= 100 ? 50 : 1) : 1;
+  const pctDomainMax = Math.max(100, niceCeil(pctMax, 25));
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
-    const pt: ChartPoint = payload[0]?.payload;
+    const pt: ChartPoint | undefined = payload[0]?.payload;
     if (!pt) return null;
     return (
       <Box
@@ -275,12 +316,15 @@ const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
         {group.name}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+        Chiều cao cột = điểm (trục trái). Độ khó xem khi hover.
       </Typography>
       <Box sx={{ height: 300, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={group.points} margin={{ top: 28, right: 28, left: 8, bottom: 20 }}>
+          <ComposedChart data={group.points} margin={{ top: 28, right: 36, left: 8, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
 
             <XAxis
@@ -288,32 +332,33 @@ const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }
               tick={{ fontSize: 11 }}
               angle={-30}
               textAnchor="end"
-              height={40}
+              height={48}
               tickMargin={8}
+              interval={0}
             />
 
-            {/* Y trái — điểm */}
             <YAxis
               yAxisId="score"
               orientation="left"
+              domain={[0, scoreDomainMax]}
               tick={{ fontSize: 11 }}
               allowDecimals={false}
+              allowDataOverflow
               label={{ value: 'Điểm', angle: -90, position: 'insideLeft', fontSize: 12 }}
             />
 
-            {/* Y phải — phần trăm */}
             <YAxis
               yAxisId="pct"
               orientation="right"
-              domain={[0, 100]}
+              domain={[0, pctDomainMax]}
               tick={{ fontSize: 11 }}
               tickFormatter={(v) => `${v}%`}
+              allowDataOverflow
               label={{ value: '%', angle: 90, position: 'insideRight', fontSize: 12 }}
             />
 
             <Tooltip isAnimationActive={false} content={<CustomTooltip />} />
 
-            {/* Bar — điểm trung bình; nhãn độ khó trên đầu cột */}
             <Bar
               yAxisId="score"
               dataKey="averageScore"
@@ -322,15 +367,16 @@ const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }
               radius={[3, 3, 0, 0]}
               fill={barColor}
               fillOpacity={0.85}
+              isAnimationActive={false}
             >
               <LabelList
-                dataKey="difficultyLabel"
+                dataKey="averageScore"
                 position="top"
+                formatter={formatScoreLabel}
                 style={{ fontSize: 10, fill: '#555', fontWeight: 600 }}
               />
             </Bar>
 
-            {/* Line — thời gian thực hiện (%) */}
             <Line
               yAxisId="pct"
               type="monotone"
@@ -340,9 +386,9 @@ const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }
               strokeWidth={2}
               dot={{ r: 4, fill: TIME_COLOR }}
               connectNulls
+              isAnimationActive={false}
             />
 
-            {/* Line — mức độ tập trung (%) */}
             <Line
               yAxisId="pct"
               type="monotone"
@@ -352,6 +398,7 @@ const AssignmentProgressChart: React.FC<{ group: AssignmentGroup }> = ({ group }
               strokeWidth={2}
               dot={{ r: 4, fill: FOCUS_COLOR }}
               connectNulls
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -415,8 +462,9 @@ const ExerciseSessionProgressChart: React.FC<ExerciseSessionProgressChartProps> 
 
         const ts = dayjs(s.completedAt).valueOf();
         map.get(id)!.points.push({
+          xKey: String(s.id),
           dateLabel: formatAxisDate(ts, frequency),
-          fullDate: dayjs(s.completedAt).format('DD/MM/YYYY'),
+          fullDate: formatFullDateTime(ts),
           timestamp: ts,
           averageScore: Number(s.averageScore ?? 0),
           timePercent: computeTimePercent(s),
@@ -427,7 +475,10 @@ const ExerciseSessionProgressChart: React.FC<ExerciseSessionProgressChartProps> 
       });
 
     const result = Array.from(map.values());
-    result.forEach((g) => g.points.sort((a, b) => a.timestamp - b.timestamp));
+    result.forEach((g) => {
+      g.points.sort((a, b) => a.timestamp - b.timestamp);
+      disambiguateSameDayLabels(g.points);
+    });
     return result;
   }, [sessions]);
 

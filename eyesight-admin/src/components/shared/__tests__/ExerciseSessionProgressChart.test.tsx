@@ -224,8 +224,42 @@ describe('ExerciseSessionProgressChart — small multiples & states', () => {
     expect(screen.queryByText(/BTL/)).not.toBeInTheDocument();
   });
 
-  it('empty input → thông báo trống', () => {
-    renderChart([]);
-    expect(screen.getByText('Chưa có dữ liệu phiên bài tập.')).toBeInTheDocument();
+  it('nhãn cột là điểm, không phải độ khó', () => {
+    renderChart([makeSession()]);
+    expect(screen.getByTestId('labellist')).toHaveAttribute('data-key', 'averageScore');
+  });
+
+  it('ngày trục X theo giờ VN — 23:09 UTC 18/8 là sáng 19/8 VN', () => {
+    renderChart([
+      makeSession({
+        id: 791,
+        completedAt: '2026-08-18T23:09:00.000Z',
+        averageScore: 900,
+      }),
+    ]);
+    const pt = pointsOf()[0];
+    expect(pt.dateLabel).toMatch(/^19\/08/);
+    expect(pt.fullDate).toMatch(/19\/08\/2026/);
+  });
+
+  it('hai buổi cùng ngày VN không trùng nhãn trục X', () => {
+    renderChart([
+      makeSession({
+        id: 1,
+        completedAt: '2026-08-18T02:00:00.000Z', // 09:00 VN 18/8
+        averageScore: 600,
+      }),
+      makeSession({
+        id: 2,
+        completedAt: '2026-08-18T10:00:00.000Z', // 17:00 VN 18/8
+        averageScore: 0,
+      }),
+    ]);
+    const pts = pointsOf();
+    expect(pts).toHaveLength(2);
+    expect(pts[0].dateLabel).not.toBe(pts[1].dateLabel);
+    expect(pts[0].xKey).not.toBe(pts[1].xKey);
+    expect(pts[0].averageScore).toBe(600);
+    expect(pts[1].averageScore).toBe(0);
   });
 });
