@@ -86,6 +86,8 @@ export const useExamState = (
   const [rightEyeResult, setRightEyeResult] = useState<number | null>(null);
   const [leftEyeResult, setLeftEyeResult] = useState<number | null>(null);
   const [bothResult, setBothEyeResult] = useState<number | null>(null);
+  /** 0-based line each eye actually started on this session (not the final threshold). */
+  const [sessionStartLines, setSessionStartLines] = useState({ right: 0, left: 0, both: 0 });
 
   const [currentBatch, setCurrentBatch] = useState(0);
   const [currentBatchCharIndex, setCurrentBatchCharIndex] = useState(0);
@@ -95,16 +97,21 @@ export const useExamState = (
   const [error, setError] = useState<string | null>(null);
   const [examSessionId] = useState(sessionId); // NEW: Store sessionId in state
 
-  // Auto-start level calculation
+  // Contrast: the first retest starts where the inaugural session began
+  // (usually 100%). After that, use last threshold — same as far/near.
   const getAutoStartLevel = useCallback((targetEye?: 'right' | 'left' | 'both') => {
     const patientExamResults =
       (freshExamResults as Record<string, any> | null | undefined) ??
       (user?.patient as { examResults?: Record<string, any> } | undefined)?.examResults;
 
-    if (!patientExamResults?.[initialExamType]?.currentResult) {
+    const bucket = patientExamResults?.[initialExamType];
+    const useInauguralStart =
+      initialExamType === 'contrast' && !bucket?.autoStartFromResult;
+    const source = useInauguralStart ? bucket?.lastStart : bucket?.currentResult;
+
+    if (!source) {
       return 0;
     }
-    const currentResult = patientExamResults[initialExamType].currentResult;
     const levels = getLevels(initialExamType);
 
     const toIndex = (val: any): number => {
@@ -116,17 +123,32 @@ export const useExamState = (
     // If the eye has no result yet, return 0 (start from the easiest level).
     // Never inherit another eye's result — a weaker eye must not be forced to start
     // at the level of a stronger eye.
-    if (targetEye === 'right') return currentResult.rightEye ? toIndex(currentResult.rightEye) : 0;
-    if (targetEye === 'left')  return currentResult.leftEye  ? toIndex(currentResult.leftEye)  : 0;
-    if (targetEye === 'both')  return currentResult.bothEye  ? toIndex(currentResult.bothEye)  : 0;
+    if (targetEye === 'right') return source.rightEye ? toIndex(source.rightEye) : 0;
+    if (targetEye === 'left')  return source.leftEye  ? toIndex(source.leftEye)  : 0;
+    if (targetEye === 'both')  return source.bothEye  ? toIndex(source.bothEye)  : 0;
 
     // No specific eye requested (e.g. initialising stereopsis): use max across all eyes.
     let maxLevel = 0;
-    if (currentResult.rightEye) { const i = toIndex(currentResult.rightEye); if (i > maxLevel) maxLevel = i; }
-    if (currentResult.leftEye)  { const i = toIndex(currentResult.leftEye);  if (i > maxLevel) maxLevel = i; }
-    if (currentResult.bothEye)  { const i = toIndex(currentResult.bothEye);  if (i > maxLevel) maxLevel = i; }
+    if (source.rightEye) { const i = toIndex(source.rightEye); if (i > maxLevel) maxLevel = i; }
+    if (source.leftEye)  { const i = toIndex(source.leftEye);  if (i > maxLevel) maxLevel = i; }
+    if (source.bothEye)  { const i = toIndex(source.bothEye);  if (i > maxLevel) maxLevel = i; }
     return maxLevel;
   }, [user, freshExamResults, initialExamType]);
+
+  const examRawDataWithStart = useCallback(
+    (items: ExamItems) => {
+      const levels = getLevels(initialExamType);
+      return {
+        ...items,
+        startLevels: {
+          right: levels[sessionStartLines.right]?.level ?? 1,
+          left: levels[sessionStartLines.left]?.level ?? 1,
+          both: levels[sessionStartLines.both]?.level ?? 1,
+        },
+      };
+    },
+    [initialExamType, sessionStartLines]
+  );
 
   /** Far level (1-based) for contrast letter size — per eye or worst eye before test starts. */
   const getPatientFarLevelForContrast = useCallback(
@@ -317,6 +339,7 @@ export const useExamState = (
     if (initialExamType === 'stereopsis') {
       // Titmus RDS flow: steps generated inside StereopsisStep at runtime.
       items.both = [];
+      setSessionStartLines({ right: 0, left: 0, both: startLevel });
     } else {
       // Generate items for each eye using THAT eye's own strategy (totalChars),
       // not the other eye's — the font size differs per level and per eye start.
@@ -329,6 +352,11 @@ export const useExamState = (
       );
       items.right = levels.map(() => generateRandomText(strategy.totalChars, charType));
       items.left = levels.map(() => generateRandomText(leftStrategy.totalChars, charType));
+      setSessionStartLines({
+        right: startLevel,
+        left: leftStartLevel,
+        both: 0,
+      });
     }
 
     if (configuredScreenInfo) {
@@ -524,7 +552,7 @@ export const useExamState = (
               distance: initialExamType === 'near' ? parseFloat(distance) : parseFloat(distance),
               startedAt: testStartedAt.toISOString(),
               completedAt: completedAt.toISOString(),
-              rawData: testItems,
+              rawData: examRawDataWithStart(testItems),
             });
           } catch (err) {
             setError('Failed to save test results. Please try again.');
@@ -554,7 +582,7 @@ export const useExamState = (
               distance: initialExamType === 'near' ? parseFloat(distance) : parseFloat(distance),
               startedAt: testStartedAt.toISOString(),
               completedAt: completedAt.toISOString(),
-              rawData: testItems,
+              rawData: examRawDataWithStart(testItems),
             });
           } catch (err) {
             setError('Failed to save test results. Please try again.');
@@ -582,6 +610,8 @@ export const useExamState = (
     distance,
     displayStrategy.totalChars,
     getAutoStartLevel, // ← required: used inside to set left-eye start line
+    examRawDataWithStart,
+    sessionStartLines,
   ]
   );
 

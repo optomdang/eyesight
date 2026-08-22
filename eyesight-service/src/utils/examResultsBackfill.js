@@ -68,6 +68,7 @@ const applyCompletedExamToPatientCache = (existingExamResults, completedExam) =>
   const examResults = { ...(existingExamResults || {}) };
   const entry = { ...(examResults[type] || {}) };
   const current = eyeObj(completedExam);
+  const alreadyHadCurrent = hasData(entry.currentResult);
 
   if (!hasData(entry.initialResult)) {
     entry.initialResult = { ...current };
@@ -75,6 +76,22 @@ const applyCompletedExamToPatientCache = (existingExamResults, completedExam) =>
   entry.currentResult = current;
   entry.lastExamDate =
     completedExam.completedAt || completedExam.updatedAt || completedExam.createdAt || new Date().toISOString();
+
+  // Contrast: remember inaugural start for the first retest only.
+  // Completing a second contrast exam switches later runs back to last threshold.
+  if (type === 'contrast') {
+    const sl = completedExam.rawData?.startLevels;
+    if (sl && (sl.left != null || sl.right != null || sl.both != null)) {
+      entry.lastStart = {
+        leftEye: sl.left ?? null,
+        rightEye: sl.right ?? null,
+        bothEye: sl.both ?? null,
+      };
+    }
+    if (alreadyHadCurrent) {
+      entry.autoStartFromResult = true;
+    }
+  }
 
   examResults[type] = entry;
   return { examResults, changed: true };

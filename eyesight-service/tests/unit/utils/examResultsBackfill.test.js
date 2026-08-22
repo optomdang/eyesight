@@ -90,6 +90,42 @@ describe('examResultsBackfill.rebuildExamResults (P6)', () => {
     expect(examResults.far.currentResult).toEqual({ leftEye: 9, rightEye: 11, bothEye: null });
   });
 
+  it('applyCompletedExamToPatientCache stores contrast lastStart from rawData, not the threshold', () => {
+    const completed = {
+      examType: 'contrast',
+      status: 'completed',
+      leftEyeLevel: 12,
+      rightEyeLevel: 13,
+      completedAt: '2026-08-22T00:00:00.000Z',
+      rawData: { startLevels: { left: 1, right: 1, both: 1 } },
+    };
+    const { examResults } = applyCompletedExamToPatientCache({}, completed);
+    expect(examResults.contrast.currentResult).toEqual({ leftEye: 12, rightEye: 13, bothEye: null });
+    expect(examResults.contrast.lastStart).toEqual({ leftEye: 1, rightEye: 1, bothEye: 1 });
+    expect(examResults.contrast.autoStartFromResult).toBeUndefined();
+  });
+
+  it('second completed contrast exam switches later auto-start back to last threshold', () => {
+    const existing = {
+      contrast: {
+        initialResult: { leftEye: 12, rightEye: 13, bothEye: null },
+        currentResult: { leftEye: 12, rightEye: 13, bothEye: null },
+        lastStart: { leftEye: 1, rightEye: 1, bothEye: 1 },
+      },
+    };
+    const completed = {
+      examType: 'contrast',
+      status: 'completed',
+      leftEyeLevel: 11,
+      rightEyeLevel: 12,
+      completedAt: '2026-08-23T00:00:00.000Z',
+      rawData: { startLevels: { left: 1, right: 1, both: 1 } },
+    };
+    const { examResults } = applyCompletedExamToPatientCache(existing, completed);
+    expect(examResults.contrast.autoStartFromResult).toBe(true);
+    expect(examResults.contrast.currentResult).toEqual({ leftEye: 11, rightEye: 12, bothEye: null });
+  });
+
   it('forceRebuildExamResultsFromHistory resets initial to first full and current to latest full', () => {
     const exams = [
       {

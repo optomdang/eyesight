@@ -46,8 +46,16 @@ interface CurrentResult {
 const computeAutoStartLevel = (
   currentResult: CurrentResult | null | undefined,
   examType: 'far' | 'near' | 'contrast' | 'stereopsis',
-  targetEye?: TargetEye
+  targetEye?: TargetEye,
+  lastStart?: CurrentResult | null,
+  autoStartFromResult?: boolean
 ): number => {
+  // Contrast first retest: inaugural start. Later retests: last threshold (old logic).
+  if (examType === 'contrast' && !autoStartFromResult) {
+    if (!lastStart) return 0;
+    currentResult = lastStart;
+  }
+
   if (!currentResult) return 0;
 
   const levels = getLevels(examType);
@@ -293,7 +301,7 @@ describe('getAutoStartLevel — far vision', () => {
 
 describe('getAutoStartLevel — stereopsis (bothEye only)', () => {
   it('uses bothEye result when targetEye=both', () => {
-    const currentResult: CurrentResult = { bothEye: '5' };
+    const currentResult: CurrentResult = { bothEye: '100' }; // stereopsisLevels index 4
     expect(computeAutoStartLevel(currentResult, 'stereopsis', 'both')).toBe(4);
   });
 
@@ -306,5 +314,28 @@ describe('getAutoStartLevel — stereopsis (bothEye only)', () => {
     // targetEye='both' && bothEye=null → false → returns 0.
     // Per-eye results are irrelevant for stereopsis; don't carry them over.
     expect(computeAutoStartLevel(currentResult, 'stereopsis', 'both')).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CONTRAST — retest must start at 100%, not last (faint) threshold
+// ---------------------------------------------------------------------------
+
+describe('getAutoStartLevel — contrast', () => {
+  it('first retest: ignores faint threshold when lastStart is missing (inaugural started at 100%)', () => {
+    const currentResult: CurrentResult = { rightEye: '13', leftEye: '12' };
+    expect(computeAutoStartLevel(currentResult, 'contrast', 'right')).toBe(0);
+    expect(computeAutoStartLevel(currentResult, 'contrast', 'left')).toBe(0);
+  });
+
+  it('first retest: reuses inaugural lastStart', () => {
+    const lastStart: CurrentResult = { rightEye: '1', leftEye: '1' };
+    expect(computeAutoStartLevel({ rightEye: '13' }, 'contrast', 'right', lastStart)).toBe(0);
+  });
+
+  it('later retests: old logic — start from last threshold', () => {
+    const currentResult: CurrentResult = { rightEye: '13', leftEye: '12' };
+    expect(computeAutoStartLevel(currentResult, 'contrast', 'right', { rightEye: '1' }, true)).toBe(12);
+    expect(computeAutoStartLevel(currentResult, 'contrast', 'left', { leftEye: '1' }, true)).toBe(11);
   });
 });
